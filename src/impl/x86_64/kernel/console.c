@@ -2,11 +2,6 @@
 
 static char* cur = (char*) VRAM;
 
-//void clearScreen() {
-//    for (short* v = (short*) VRAM; v < (short*) VRAM + (160*25); v++)
-//        *v = 0x0700;
-//}
-
 void clearScreen() {
     for (long* v = (long*) VRAM; v < (long*) VRAM + (160*25); v++)
         *v = 0x0700070007000700;
