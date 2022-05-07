@@ -3,7 +3,7 @@
 static char* cur = (char*) VRAM;
 
 void clearScreen() {
-    for (long* v = (long*) VRAM; v < (long*) VRAM + (160*25); v++)
+    for (long* v = (long*) VRAM; v < (long*) VRAM + 160/8*25; v++)
         *v = 0x0700070007000700;
 }
 
@@ -13,6 +13,9 @@ static void advanceLine() {
     for (int i=0; i<24; i++)
         for (int j=0; j<160; j++)
             vram[i*160+j] = vram[(i+1)*160+j];
+
+    for (long* v = (long*) VRAM + 160/8*24; v < (long*) VRAM + 160/8*25; v++)
+         *v = 0x0700070007000700;
 }
 
 void printColor(char* s, char c) {

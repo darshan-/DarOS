@@ -5,101 +5,36 @@ section .text
 
 section .data
 lin1: dd 0xb8000
-msg1: db "This is DarOS.... in theory, anyway!",0
-
-lin2: dd 0xb8000 + 160 + 160 + 160 + 6
-msg2: db "Anyway, I hope you have a nice day!",0
-
-lin3: dd 0xb8000 + 640 + 640 + 32
-msg3: db "(It's pretty darn cool, though, right???)",0
-
-lin4: dd 0xb8000 + 640 + 640 + 320
-msg4: db "start: 0x",0
-
-lin5: dd 0xb8000 + 640 + 640 + 640
-msg5: db "esp: 0x",0
-
-lin6: dd 0xb8000 + 640 + 640 + 640 + 320
-msg6: db "lin1: 0x",0
-
-lin7: dd 0xb8000 + 640 + 640 + 640 + 640
-msg7: db "stack_top: 0x",0
-
-lin8: dd 0xb8000 + 640 + 640 + 640 + 640 + 320
-msg8: db "Ready! esp now: 0x",0
+msg1: db "Loading...",0
 
 bits 32
 start:
-        ; I want to see what's in esp before I set it...
-        ; Was a small stack already set up for me by the assembler?
-        ; Was it dangerous to issue the `call' instruction before I set up a stack?
+        ; Disable the cursor, after so much digging, thanks to: https://wiki.osdev.org/Text_Mode_Cursor
+	pushf
+	push eax
+	push edx
+	mov dx, 0x3D4
+	mov al, 0xA	; low cursor shape register
+	out dx, al
+	inc dx
+	mov al, 0x20	; bits 6-7 unused, bit 5 disables the cursor, bits 0-4 control the cursor shape
+	out dx, al
+	pop edx
+	pop eax
+	popf
 
         mov eax, [lin1]
         mov ebx, msg1
         mov ch, 0x0f
         call print
 
-        mov eax, [lin2]
-        mov ebx, msg2
-        mov ch, 0x07
-        call print
-
-        mov eax, [lin3]
-        mov ebx, msg3
-        mov ch, 0x15
-        call print
-
-        mov eax, [lin4]
-        mov ebx, msg4
-        mov ch, 0x0f
-        call print
-
-        ;mov edx, 0x12345678
-        ;mov edx, 0x09abcdef
-        mov edx, start
-        call print_edx
-
-        mov eax, [lin5]
-        mov ebx, msg5
-        mov ch, 0x0f
-        call print
-
-        mov edx, esp
-        call print_edx
-
-        mov eax, [lin6]
-        mov ebx, msg6
-        mov ch, 0x0f
-        call print
-
-        mov edx, lin1
-        call print_edx
-
-        mov eax, [lin7]
-        mov ebx, msg7
-        mov ch, 0x0f
-        call print
-
-        mov edx, stack_top
-        call print_edx
-
         mov esp, stack_top
 
         call setup_page_tables
 	call enable_paging
 
-        mov eax, [lin8]
-        mov ebx, msg8
-        mov ch, 0x0f
-        call print
-
-        mov edx, esp
-        call print_edx
-
         lgdt [gdt64.pointer]
 	jmp gdt64.code_segment:long_mode_start
-
-	;hlt
 
 print:
         mov cl, [ebx]
