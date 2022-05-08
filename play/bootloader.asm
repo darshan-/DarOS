@@ -31,20 +31,22 @@ done:
         ; 3: Direction for data (0 grows up, 1 grows down) / conforming for code (0 this ring only, 1 this or lower)
         ; 2: Readable (for code) / writable (for data)
         ; 1: CPU access (leave clear)
-        PRESENT equ 1<<7
+
+        ; Access byte is bits 40-47, so bit shift from 40 to 47 for bits 0-7 of access byte
+        PRESENT equ 1<<47
         RING0 equ 0
-        RING1 equ 1<<5
-        RING2 equ 2<<5
-        RING3 equ 3<<5
-        NONTSS equ 1<<4
+        RING1 equ 1<<45
+        RING2 equ 2<<45
+        RING3 equ 3<<45
+        NONTSS equ 1<<44
         TSS equ 0
-        CODESEG equ 1<<3
+        CODESEG equ 1<<43
         DATASEG equ 0
-        DATADOWN equ 1<<2
+        DATADOWN equ 1<<42
         DATAUP equ 0
-        CONFORMING equ 1<<2
-        READABLE equ 1<<1
-        WRITABLE equ 1<<1
+        CONFORMING equ 1<<42
+        READABLE equ 1<<41
+        WRITABLE equ 1<<41
 
         ; Flags nibble format:
         ; 4: Granularity (0 for 1-byte blocks; 1 for 4-KiB blocks)
@@ -52,41 +54,20 @@ done:
         ; 2: Long mode (1 for 64-bit protected mode segment: clear bit 3 if turning this bit on; 64 is not 32 or 16)
         ; 1: Reserved
 
-        GRAN4K equ 1<<7
+        ; Flags nibble is bits 52-55, so bit shift from 52 to 55 for bits 0-3 of access byte
+        GRAN4K equ 1<<55
         GRANBYTE equ 0
         MODE16 equ 0
-        MODE32 equ 1<<6
-        MODE64 equ 1<<5
+        MODE32 equ 1<<54
+        MODE64 equ 1<<53
 
-gdt_start:
-        dq 0
-gdt_code:
-        dd 0
-        db 0
-        db PRESENT | RING0 | NONTSS | CODESEG | READABLE ; Access byte
-        db GRAN4K | MODE64                               ; Flags
-        db 0
-; gdt_code:
-;         dw 0xffff               ; Limit (top) of segment (16 of 20 bits)
-;         dw 0x0000               ; Base of segment (16 of 32 bits)
-;         db 0x00                 ; 8 more bits of base
-;         db PRESENT | RING0 | NONTSS | CODESEG | READABLE ; Access byte
-;         db GRAN4K | MODE64 + 0xff ; 4 bits of flags and last 4 bits of limit
-;         db 0x00                 ; 8 more bits of base
-; gdt_data:
-;         dw 0xffff
-;         dw 0x0000
-;         db 0x00
-;         db PRESENT | RING0 | NONTSS | DATASEG | WRITABLE
-;         db GRAN4K | MODE64 + 0xff
-;         db 0x00
-gdt_end:
-gdt_pointer:
-        dw gdt_end - gdt_start-1
-        dd gdt_start
-
-        CODE_SEG equ gdt_code - gdt_start
-        ;DATA_SEG equ gdt_data - gdt_start
+gdt64:
+	dq 0
+.code_segment: equ $ - gdt64
+        dq PRESENT | RING0 | NONTSS | CODESEG | READABLE | GRAN4K | MODE64
+.pointer:
+	dw $ - gdt64 - 1        ; Length in bytes minus 1
+	dq gdt64                ; Address
 
 start:
         ; Clear screen by setting VGA mode (to the normal mode we're already in)
@@ -128,7 +109,6 @@ start:
         mov bx, loaded
         call teleprint
 
-
         ; Enable A20 bit
         mov ax, 0x2401
         int 0x15
@@ -143,47 +123,8 @@ start:
         call setup_page_tables
 	call enable_paging
 
-        lgdt [gdt_pointer]
-
-        ;lgdt [gdt64.pointer]
-	;jmp gdt64.code_segment:long_mode_start
-
-        jmp CODE_SEG:start64
-
-;bits 32
-
-; print:
-;         mov cl, [ebx]
-;         cmp cl, 0
-;         jz .done
-
-;         mov byte [eax], cl
-;         inc eax
-;         mov byte [eax], ch
-;         inc eax
-;         inc ebx
-;         jmp print
-; .done:
-;         ret
-
-; start32:
-;         ; Set up segment registers (The far jump down here set up CS)
-;         mov ax, DATA_SEG
-;         ;xor ax, ax
-;         mov ds, ax
-;         mov es, ax
-;         mov fs, ax
-;         mov gs, ax
-;         mov ss, ax
-
-;         mov eax, 0xb8000+320
-;         mov ebx, msg32bit
-;         mov ch, 0x05
-;         call print
-
-;         mov esp, stack_top
-
-;         hlt
+        lgdt [gdt64.pointer]
+	jmp gdt64.code_segment:start64
 
 setup_page_tables:
 	mov eax, page_table_l3
@@ -247,13 +188,6 @@ print:
         ret
 
 start64:
-        ; mov ax, 0
-        ; mov ss, ax
-        ; mov ds, ax
-        ; mov es, ax
-        ; mov fs, ax
-        ; mov gs, ax
-
         ; Set up segment registers (The far jump down here set up CS)
         ;mov ax, DATA_SEG
         xor ax, ax
