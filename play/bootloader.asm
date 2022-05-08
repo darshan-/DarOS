@@ -30,42 +30,48 @@ done:
         ; 3: Direction for data (0 grows up, 1 grows down) / conforming for code (0 this ring only, 1 this or lower)
         ; 2: Readable (for code) / writable (for data)
         ; 1: CPU access (leave clear)
-        PRESENT equ 0b1000_0000
-        RING0 equ 0b0000_0000
-        RING1 equ 0b0010_0000
-        RING2 equ 0b0100_0000
-        RING3 equ 0b0110_0000
-        NONTSS equ 0b0001_0000
-        TSS equ 0b0000_0000
-        CODESEG equ 0b0000_1000
-        DATASEG equ 0b0000_0000
-        DATADOWN equ 0b0000_0100
-        DATAUP equ 0b0000_0000
-        CONFORMING equ 0b0000_0100
-        READABLE equ 0b0000_0010
-        WRITABLE equ 0b0000_0010
+        PRESENT equ 1<<7
+        RING0 equ 0
+        RING1 equ 1<<5
+        RING2 equ 2<<5
+        RING3 equ 3<<5
+        NONTSS equ 1<<4
+        TSS equ 0
+        CODESEG equ 1<<3
+        DATASEG equ 0
+        DATADOWN equ 1<<2
+        DATAUP equ 0
+        CONFORMING equ 1<<2
+        READABLE equ 1<<1
+        WRITABLE equ 1<<1
 
-gdt_start:
-        dq 0
-gdt_code:
-        dw 0xFFFF               ; Limit (top) of segment (16 of 20 bits)
-        dw 0x0000               ; Base of segment (16 of 32 bits)
-        db 0x00                 ; 8 more bits of base
-        db PRESENT | RING0 | NONTSS | CODESEG | READABLE ; Access byte
-        ;db 1001_1010b           ; Access byte
-        db 1100_1111b           ; 4 bits of flags, and last 4 bits of limit
+        ; Flags nibble format:
         ; 4: Granularity (0 for 1-byte blocks; 1 for 4-KiB blocks)
         ; 3: Size (0 for 16-bit protected-mode segment; 1 for 32-bit protected-mode segment)
         ; 2: Long mode (1 for 64-bit protected mode segment: clear bit 3 if turning this bit on; 64 is not 32 or 16)
         ; 1: Reserved
+
+        GRAN4K equ 1<<8
+        GRANBYTE equ 0
+        MODE16 equ 0
+        MODE32 equ 1<<7
+        MODE64 equ 1<<6
+
+gdt_start:
+        dq 0
+gdt_code:
+        dw 0xffff               ; Limit (top) of segment (16 of 20 bits)
+        dw 0x0000               ; Base of segment (16 of 32 bits)
+        db 0x00                 ; 8 more bits of base
+        db PRESENT | RING0 | NONTSS | CODESEG | READABLE ; Access byte
+        db GRAN4K | MODE32 + 0xff ; 4 bits of flags and last 4 bits of limit
         db 0x00                 ; 8 more bits of base
 gdt_data:
-        dw 0xFFFF
+        dw 0xffff
         dw 0x0000
         db 0x00
         db PRESENT | RING0 | NONTSS | DATASEG | WRITABLE
-        ;db 1001_0010b
-        db 1100_1111b
+        db GRAN4K | MODE32 + 0xff
         db 0x00
 gdt_end:
 gdt_pointer:
