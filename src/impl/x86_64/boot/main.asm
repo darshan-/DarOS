@@ -5,30 +5,24 @@ section .text
 
 section .data
 lin1: dd 0xb8000
-msg1: db "Loading...",0
+msg1: db "Loading...       ",0  ; Extra spaces to clear Grub output
 
 bits 32
 start:
+        mov esp, stack_top
+
         ; Disable the cursor, after so much digging, thanks to: https://wiki.osdev.org/Text_Mode_Cursor
-	pushf
-	push eax
-	push edx
 	mov dx, 0x3D4
 	mov al, 0xA	; low cursor shape register
 	out dx, al
 	inc dx
-	mov al, 0x20	; bits 6-7 unused, bit 5 disables the cursor, bits 0-4 control the cursor shape
+	mov al, 0b0010_0000	; bits 6-7 unused, bit 5 disables the cursor, bits 0-4 control the cursor shape
 	out dx, al
-	pop edx
-	pop eax
-	popf
 
         mov eax, [lin1]
         mov ebx, msg1
-        mov ch, 0x0f
+        mov ch, 0x05
         call print
-
-        mov esp, stack_top
 
         call setup_page_tables
 	call enable_paging

@@ -1,8 +1,9 @@
 #include "console.h"
 
 void kernel_main() {
-    clearScreen();
-    print("Kernel launched!\n");
+    //clearScreen();
+    //print("Kernel launched!\n");
+    printColor("Kernel launched!\n", 0x0d);
 
     //print("\n\n\n\n\n                  ");
     //printColor("Cool!", 0x3f);
