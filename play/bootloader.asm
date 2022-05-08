@@ -5,12 +5,9 @@ top:
 
         jmp start
 
-loading:
-        db "Loading subsequent sectors...", 0x0d, 0x0a, 0
-loaded:
-        db "Loaded!", 0x0d, 0x0a, 0
-msg32bit:
-        db "In 32-bit protected mode!",0
+loading: db "Loading subsequent sectors...", 0x0d, 0x0a, 0
+loaded: db "Loaded!", 0x0d, 0x0a, 0
+msg32bit: db "In 32-bit protected mode!",0
 
 teleprint:
         mov ah, 0x0e            ; Teletype output
@@ -24,74 +21,6 @@ teleprint:
         jmp .loop
 done:
         ret
-
-start:
-        ; ; Move cursor to first position at upper left
-        ; mov ah, 2               ; set cursor position
-        ; mov bh, 0               ; page
-        ; mov dh, 0               ; row
-        ; mov dl, 0               ; column
-        ; int 0x10
-
-        ; ; Then clear screen by filling with spaces
-        ; mov ah, 0x0a            ; write character
-        ; mov al, ' '             ; character
-        ; mov cx, 80*25           ; how many times to print it
-        ; int 10h
-
-        ; Clear screen by setting VGA mode (to the normal mode we're already in)
-        mov ax, 0x3             ; ah: 0 (set video mode); al: 3 (80x25 text with colors)
-        int 0x10
-
-        ; Turn off the cursor
-        mov ah, 1               ; set cursor size
-        mov ch, 1<<5            ; bit 5 disables cursor
-        int 10h
-
-        mov bx, loading
-        call teleprint
-
-        ;; Based on https://en.wikipedia.org/wiki/INT_13H
-        xor ax, ax    ; Idiomatic, and better in some ways than mov ax, 0
-        mov ds, ax    ; ds and es need to be set to 0, and mov needs another register
-        mov es, ax
-        cld
-        mov ah, 2     ; Int 13h function 2: "Read sectors from drive"
-        mov al, 8     ; How many sectors to read -- change as necessary
-        mov ch, 0     ; Cylinder
-        mov cl, 2     ; 1-indexed sector to start reading from
-        pop dx        ; dl is drive number, and BIOS set it to the drive number we're loaded from (which we
-                      ;   want to keep reading from).  We pushed dx first thing so we can restore it now.
-        mov dh, 0     ; Head
-        mov bx, top+512 ; Let's load it right after us
-        int 13h
-        jmp top+512
-
-        ; I just checked, and as expected and hoped, NASM will complain if we put too much above, because
-        ;  this vaule will end up being negative, so we can't assemble.  So go ahead and put as much above
-        ;  here as feels right; we'll find out if we pass 510 bytes and need to move some stuff down.
-        times 510 - ($-$$) db 0
-        dw 0xaa55
-
-        ; Now past the 512-byte limitation; do what you need to do, for the most part
-
-        mov bx, loaded
-        call teleprint
-
-
-        ; Enable A20 bit
-        mov ax, 0x2401
-        int 0x15
-
-        cli
-        lgdt [gdt_pointer]
-
-        ; Set the protected mode bit of CR0
-        mov eax, cr0
-        or eax, 1
-        mov cr0, eax
-
-        jmp CODE_SEG:start2
 
         ; Access byte format:
         ; 8: Segment is present (1)
@@ -146,23 +75,62 @@ gdt_pointer:
         CODE_SEG equ gdt_code - gdt_start
         DATA_SEG equ gdt_data - gdt_start
 
-bits 32
+start:
+        ; Clear screen by setting VGA mode (to the normal mode we're already in)
+        mov ax, 0x3             ; ah: 0 (set video mode); al: 3 (80x25 text with colors)
+        int 0x10
 
-start2:
-        ; Set up segment registers
-        mov ax, DATA_SEG
-        mov ds, ax
+        ; Turn off the cursor
+        mov ah, 1               ; set cursor size
+        mov ch, 1<<5            ; bit 5 disables cursor
+        int 10h
+
+        mov bx, loading
+        call teleprint
+
+        ;; Based on https://en.wikipedia.org/wiki/INT_13H
+        xor ax, ax    ; Idiomatic, and better in some ways than mov ax, 0
+        mov ds, ax    ; ds and es need to be set to 0, and mov needs another register
         mov es, ax
-        mov fs, ax
-        mov gs, ax
-        mov ss, ax
+        cld
+        mov ah, 2     ; Int 13h function 2: "Read sectors from drive"
+        mov al, 8     ; How many sectors to read -- change as necessary
+        mov ch, 0     ; Cylinder
+        mov cl, 2     ; 1-indexed sector to start reading from
+        pop dx        ; dl is drive number, and BIOS set it to the drive number we're loaded from (which we
+                      ;   want to keep reading from).  We pushed dx first thing so we can restore it now.
+        mov dh, 0     ; Head
+        mov bx, top+512 ; Let's load it right after us
+        int 13h
+        jmp top+512
 
-        mov eax, 0xb8000+320
-        mov ebx, msg32bit
-        mov ch, 0x05
-        call print
+        ; I just checked, and as expected and hoped, NASM will complain if we put too much above, because
+        ;  this vaule will end up being negative, so we can't assemble.  So go ahead and put as much above
+        ;  here as feels right; we'll find out if we pass 510 bytes and need to move some stuff down.
+        times 510 - ($-$$) db 0
+        dw 0xaa55
 
-        hlt
+        ; Now past the 512-byte limitation; do what you need to do, for the most part
+
+        mov bx, loaded
+        call teleprint
+
+
+        ; Enable A20 bit
+        mov ax, 0x2401
+        int 0x15
+
+        cli
+        lgdt [gdt_pointer]
+
+        ; Set the protected mode bit of CR0
+        mov eax, cr0
+        or eax, 1
+        mov cr0, eax
+
+        jmp CODE_SEG:start32
+
+bits 32
 
 print:
         mov cl, [ebx]
@@ -177,3 +145,19 @@ print:
         jmp print
 .done:
         ret
+
+start32:
+        ; Set up segment registers (The far jump down here set up CS)
+        mov ax, DATA_SEG
+        mov ds, ax
+        mov es, ax
+        mov fs, ax
+        mov gs, ax
+        mov ss, ax
+
+        mov eax, 0xb8000+320
+        mov ebx, msg32bit
+        mov ch, 0x05
+        call print
+
+        hlt
