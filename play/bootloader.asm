@@ -8,6 +8,7 @@ top:
 loading: db "Loading subsequent sectors...", 0x0d, 0x0a, 0
 loaded: db "Loaded!", 0x0d, 0x0a, 0
 msg32bit: db "In 32-bit protected mode!",0
+msg64bit: db "In 64-bit protected mode?",0
 
 teleprint:
         mov ah, 0x0e            ; Teletype output
@@ -51,35 +52,41 @@ done:
         ; 2: Long mode (1 for 64-bit protected mode segment: clear bit 3 if turning this bit on; 64 is not 32 or 16)
         ; 1: Reserved
 
-        GRAN4K equ 1<<8
+        GRAN4K equ 1<<7
         GRANBYTE equ 0
         MODE16 equ 0
-        MODE32 equ 1<<7
-        MODE64 equ 1<<6
+        MODE32 equ 1<<6
+        MODE64 equ 1<<5
 
 gdt_start:
         dq 0
 gdt_code:
-        dw 0xffff               ; Limit (top) of segment (16 of 20 bits)
-        dw 0x0000               ; Base of segment (16 of 32 bits)
-        db 0x00                 ; 8 more bits of base
+        dd 0
+        db 0
         db PRESENT | RING0 | NONTSS | CODESEG | READABLE ; Access byte
-        db GRAN4K | MODE32 + 0xff ; 4 bits of flags and last 4 bits of limit
-        db 0x00                 ; 8 more bits of base
-gdt_data:
-        dw 0xffff
-        dw 0x0000
-        db 0x00
-        db PRESENT | RING0 | NONTSS | DATASEG | WRITABLE
-        db GRAN4K | MODE32 + 0xff
-        db 0x00
+        db GRAN4K | MODE64                               ; Flags
+        db 0
+; gdt_code:
+;         dw 0xffff               ; Limit (top) of segment (16 of 20 bits)
+;         dw 0x0000               ; Base of segment (16 of 32 bits)
+;         db 0x00                 ; 8 more bits of base
+;         db PRESENT | RING0 | NONTSS | CODESEG | READABLE ; Access byte
+;         db GRAN4K | MODE64 + 0xff ; 4 bits of flags and last 4 bits of limit
+;         db 0x00                 ; 8 more bits of base
+; gdt_data:
+;         dw 0xffff
+;         dw 0x0000
+;         db 0x00
+;         db PRESENT | RING0 | NONTSS | DATASEG | WRITABLE
+;         db GRAN4K | MODE64 + 0xff
+;         db 0x00
 gdt_end:
 gdt_pointer:
         dw gdt_end - gdt_start-1
         dd gdt_start
 
         CODE_SEG equ gdt_code - gdt_start
-        DATA_SEG equ gdt_data - gdt_start
+        ;DATA_SEG equ gdt_data - gdt_start
 
 start:
         ; Clear screen by setting VGA mode (to the normal mode we're already in)
@@ -127,17 +134,104 @@ start:
         int 0x15
 
         cli
-        lgdt [gdt_pointer]
 
         ; Set the protected mode bit of CR0
         mov eax, cr0
         or eax, 1
         mov cr0, eax
 
-        jmp CODE_SEG:start32
+        call setup_page_tables
+	call enable_paging
 
-bits 32
+        lgdt [gdt_pointer]
 
+        ;lgdt [gdt64.pointer]
+	;jmp gdt64.code_segment:long_mode_start
+
+        jmp CODE_SEG:start64
+
+;bits 32
+
+; print:
+;         mov cl, [ebx]
+;         cmp cl, 0
+;         jz .done
+
+;         mov byte [eax], cl
+;         inc eax
+;         mov byte [eax], ch
+;         inc eax
+;         inc ebx
+;         jmp print
+; .done:
+;         ret
+
+; start32:
+;         ; Set up segment registers (The far jump down here set up CS)
+;         mov ax, DATA_SEG
+;         ;xor ax, ax
+;         mov ds, ax
+;         mov es, ax
+;         mov fs, ax
+;         mov gs, ax
+;         mov ss, ax
+
+;         mov eax, 0xb8000+320
+;         mov ebx, msg32bit
+;         mov ch, 0x05
+;         call print
+
+;         mov esp, stack_top
+
+;         hlt
+
+setup_page_tables:
+	mov eax, page_table_l3
+	or eax, 0b11 ; present, writable
+	mov [page_table_l4], eax
+
+	mov eax, page_table_l2
+	or eax, 0b11 ; present, writable
+	mov [page_table_l3], eax
+
+	mov ecx, 0 ; counter
+.loop:
+
+	mov eax, 0x200000 ; 2MiB
+	mul ecx
+	or eax, 0b10000011 ; present, writable, huge page
+	mov [page_table_l2 + ecx * 8], eax
+
+	inc ecx ; increment counter
+	cmp ecx, 512 ; checks if the whole table is mapped
+	jne .loop ; if not, continue
+
+	ret
+
+enable_paging:
+	; pass page table location to cpu
+	mov eax, page_table_l4
+	mov cr3, eax
+
+	; enable PAE
+	mov eax, cr4
+	or eax, 1 << 5
+	mov cr4, eax
+
+	; enable long mode
+	mov ecx, 0xC0000080
+	rdmsr
+	or eax, 1 << 8
+	wrmsr
+
+	; enable paging
+	mov eax, cr0
+	or eax, 1 << 31
+	mov cr0, eax
+
+	ret
+
+bits 64
 print:
         mov cl, [ebx]
         cmp cl, 0
@@ -152,18 +246,41 @@ print:
 .done:
         ret
 
-start32:
+start64:
+        ; mov ax, 0
+        ; mov ss, ax
+        ; mov ds, ax
+        ; mov es, ax
+        ; mov fs, ax
+        ; mov gs, ax
+
         ; Set up segment registers (The far jump down here set up CS)
-        mov ax, DATA_SEG
+        ;mov ax, DATA_SEG
+        xor ax, ax
         mov ds, ax
         mov es, ax
         mov fs, ax
         mov gs, ax
         mov ss, ax
 
+        mov esp, stack_top
+
         mov eax, 0xb8000+320
-        mov ebx, msg32bit
+        mov ebx, msg64bit
         mov ch, 0x05
         call print
 
         hlt
+
+
+section .bss
+align 4096
+page_table_l4:
+	resb 4096
+page_table_l3:
+	resb 4096
+page_table_l2:
+	resb 4096
+stack_bottom:
+	resb 4096 * 4
+stack_top:
