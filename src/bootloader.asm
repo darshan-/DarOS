@@ -130,13 +130,27 @@ sect2:
 
         cli
 
-        ; Set the protected mode bit of CR0
-        mov eax, cr0
-        or eax, 1
-        mov cr0, eax
-
         call setup_page_tables
-	call enable_paging
+
+        ; Let CPU know where page table is
+	mov eax, page_table_l4
+	mov cr3, eax
+
+	; Enable PAE
+	mov eax, cr4
+	or eax, 1 << 5
+	mov cr4, eax
+
+	; Enable long mode
+	mov ecx, 0xC0000080
+	rdmsr
+	or eax, 1 << 8
+	wrmsr
+
+	; Enable paging and protected mode
+	mov eax, cr0
+	or eax, 1 << 31 | 1
+	mov cr0, eax
 
         lgdt [gdt64.pointer]
 	jmp gdt64.code_segment:start64
@@ -161,29 +175,6 @@ setup_page_tables:
 	inc ecx ; increment counter
 	cmp ecx, 512 ; checks if the whole table is mapped
 	jne .loop ; if not, continue
-
-	ret
-
-enable_paging:
-	; pass page table location to cpu
-	mov eax, page_table_l4
-	mov cr3, eax
-
-	; enable PAE
-	mov eax, cr4
-	or eax, 1 << 5
-	mov cr4, eax
-
-	; enable long mode
-	mov ecx, 0xC0000080
-	rdmsr
-	or eax, 1 << 8
-	wrmsr
-
-	; enable paging
-	mov eax, cr0
-	or eax, 1 << 31
-	mov cr0, eax
 
 	ret
 
@@ -224,4 +215,3 @@ start64:
         hlt
 
 kernel_entry:
-; C object file appended here, to be loaded from third sector to 0x1f0000 (2M)
