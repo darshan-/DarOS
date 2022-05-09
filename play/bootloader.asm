@@ -7,8 +7,9 @@ top:
 
 loading: db "Loading subsequent sectors...", 0x0d, 0x0a, 0
 loaded: db "Loaded!", 0x0d, 0x0a, 0
-msg32bit: db "In 32-bit protected mode!",0
-msg64bit: db "In 64-bit protected mode?",0
+msg32bit: db "In 32-bit protected mode!", 0
+msg64bit: db "In 64-bit protected mode!", 0
+never: db "This should never be printed...", 0
 
 teleprint:
         mov ah, 0x0e            ; Teletype output
@@ -187,6 +188,29 @@ print:
 .done:
         ret
 
+
+        ; Aha!!!  The assembler puts this at the bottom!  Like, as far as how these adddresses are calculated.
+        ; Hmm, okay, so if we just ("just") resb enough bytes for our C kernel *first* at start of bss
+        ;   section, thigns should work?????
+section .bss
+align 4096
+resb 1024*16      ; Can't do much for some reason...  But 16 Kb should be enough for moving forward for now
+page_table_l4:
+	resb 4096
+        ;times 4096 db 0
+page_table_l3:
+	resb 4096
+        ;times 4096 db 0
+page_table_l2:
+	resb 4096
+        ;times 4096 db 0
+stack_bottom:
+	resb 4096 * 4
+        ;times 4096*4 db 0
+stack_top:
+
+section .text
+
 start64:
         ; Set up segment registers (The far jump down here set up CS)
         ;mov ax, DATA_SEG
@@ -204,17 +228,16 @@ start64:
         mov ch, 0x05
         call print
 
+        call kernel_start
+
         hlt
 
+        mov eax, 0xb8000+320+160
+        mov ebx, never
+        mov ch, 0x05
+        call print
 
-section .bss
-align 4096
-page_table_l4:
-	resb 4096
-page_table_l3:
-	resb 4096
-page_table_l2:
-	resb 4096
-stack_bottom:
-	resb 4096 * 4
-stack_top:
+        hlt
+
+kernel_start:
+; Linked C code object file appended here...

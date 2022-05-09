@@ -1,14 +1,9 @@
-ENTRY(start)
+ENTRY(kernel_main)
+
+OUTPUT_FORMAT("binary")
 
 SECTIONS
 {
-	. = 1M;
-
-	.boot :
-	{
-		KEEP(*(.multiboot_header))
-	}
-
 	.text :
 	{
 		*(.text)
