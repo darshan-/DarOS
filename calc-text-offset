@@ -1,0 +1,3 @@
+#!/bin/bash
+
+echo $((31744+`wc build/bootloader | awk '{print $3}'`))

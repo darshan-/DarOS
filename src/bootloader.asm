@@ -7,9 +7,7 @@ top:
 
 loading: db "Loading subsequent sectors...", 0x0d, 0x0a, 0
 loaded: db "Loaded!", 0x0d, 0x0a, 0
-msg32bit: db "In 32-bit protected mode!", 0
 msg64bit: db "In 64-bit protected mode!", 0
-never: db "This should never be printed...", 0
 
 teleprint:
         mov ah, 0x0e            ; Teletype output
@@ -229,13 +227,6 @@ start64:
         call print
 
         call kernel_start
-
-        hlt
-
-        mov eax, 0xb8000+320+160
-        mov ebx, never
-        mov ch, 0x05
-        call print
 
         hlt
 
