@@ -6,6 +6,16 @@
 void print_at();
 void print_percent();
 
+// NOTE: With my current setup, I need my entry point to come first after linking, so:
+//  1. Make sure this file comes first alphabetically (hence 00_ at start of file name) (ld generates
+//     output in order of files listed on command line, and we use a glob to capture all object files for
+//     linking, so it's kludgy but simple and effective), and
+//  2. Make sure not to define any functions before kernel_entry() (so declare any helper functions
+//     above and define them after kernel_entry().
+//  It may be straightforward to have linker script put kernel_entry first, but ENTRY(kernel_entry) doesn't
+//   do it for some reason, at least with OUTPUT_FORMAT("binary"), even though various sources suggest it
+//   should.  So for now, the kludge.
+
 void kernel_entry() {
     print_at();
     print_percent();

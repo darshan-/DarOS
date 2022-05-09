@@ -1,27 +1,3 @@
-bits 16
-org 0x7c00
-top:
-        push dx                 ; dl is set by BIOS to drive number we're loaded from, and we want it for int 13h
-
-        jmp start
-
-loading: db "Loading subsequent sectors...", 0x0d, 0x0a, 0
-loaded: db "Loaded!", 0x0d, 0x0a, 0
-msg64bit: db "In 64-bit protected mode!", 0
-
-teleprint:
-        mov ah, 0x0e            ; Teletype output
-.loop:
-        mov al, [bx]
-        cmp al, 0
-        jz done
-
-        int 10h
-        inc bx
-        jmp .loop
-done:
-        ret
-
         ; Access byte format:
         ; 8: Segment is present (1)
         ; 7-6: ring (0)
@@ -60,6 +36,39 @@ done:
         MODE32 equ 1<<54
         MODE64 equ 1<<53
 
+        ; 0x500-0x7bff available and a good place for stack and page tables
+        ; Page tables need to be 0x1000 aligned.  Wasting 0x500 from 0x500 to 0x1000 is better
+        ;   than wasting 0xbff from 0x7000 to 0x7bff, so doing it this way.
+        page_table_l4 equ 0x1000
+        page_table_l3 equ 0x2000
+        page_table_l2 equ 0x3000
+        stack_bottom equ 0x4000
+        stack_top equ 0x7bff
+
+bits 16
+org 0x7c00
+top:
+        push dx                 ; dl is set by BIOS to drive number we're loaded from, and we want it for int 13h
+
+        jmp start
+
+loading: db "Loading subsequent sectors...", 0x0d, 0x0a, 0
+loaded: db "Loaded!", 0x0d, 0x0a, 0
+msg64bit: db "In 64-bit protected mode!", 0
+
+teleprint:
+        mov ah, 0x0e            ; Teletype output
+.loop:
+        mov al, [bx]
+        cmp al, 0
+        jz done
+
+        int 10h
+        inc bx
+        jmp .loop
+done:
+        ret
+
 gdt64:
 	dq 0
 .code_segment: equ $ - gdt64
@@ -93,9 +102,11 @@ start:
         pop dx        ; dl is drive number, and BIOS set it to the drive number we're loaded from (which we
                       ;   want to keep reading from).  We pushed dx first thing so we can restore it now.
         mov dh, 0     ; Head
-        mov bx, top+512 ; Let's load it right after us
+        mov bx, sect2 ; Let's load it right after us
         int 13h
-        jmp top+512
+
+        ; TODO: Check CF to see if error?
+        jmp sect2
 
         ; I just checked, and as expected and hoped, NASM will complain if we put too much above, because
         ;  this vaule will end up being negative, so we can't assemble.  So go ahead and put as much above
@@ -103,13 +114,18 @@ start:
         times 510 - ($-$$) db 0
         dw 0xaa55
 
-        ; Now past the 512-byte limitation; do what you need to do, for the most part
+sect2:
 
         mov bx, loaded
         call teleprint
 
         ; Enable A20 bit
         mov ax, 0x2401
+        int 0x15
+
+        ; Let BIOS know we're going to long mode, per https://wiki.osdev.org/X86-64
+        mov ax, 0xec00
+        mov bl, 2               ; We'll switch to long mode and stay there
         int 0x15
 
         cli
@@ -186,29 +202,6 @@ print:
 .done:
         ret
 
-
-        ; Aha!!!  The assembler puts this at the bottom!  Like, as far as how these adddresses are calculated.
-        ; Hmm, okay, so if we just ("just") resb enough bytes for our C kernel *first* at start of bss
-        ;   section, thigns should work?????
-section .bss
-align 4096
-resb 1024*16      ; Can't do much for some reason...  But 16 Kb should be enough for moving forward for now
-page_table_l4:
-	resb 4096
-        ;times 4096 db 0
-page_table_l3:
-	resb 4096
-        ;times 4096 db 0
-page_table_l2:
-	resb 4096
-        ;times 4096 db 0
-stack_bottom:
-	resb 4096 * 4
-        ;times 4096*4 db 0
-stack_top:
-
-section .text
-
 start64:
         ; Set up segment registers (The far jump down here set up CS)
         ;mov ax, DATA_SEG
@@ -226,9 +219,9 @@ start64:
         mov ch, 0x05
         call print
 
-        call kernel_start
+        call kernel_entry
 
         hlt
 
-kernel_start:
-; Linked C code object file appended here...
+kernel_entry:
+; C object file appended here, to be loaded from third sector to 0x1f0000 (2M)
