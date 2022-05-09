@@ -6,7 +6,7 @@
 void print_at();
 void print_percent();
 
-void kernel_main() {
+void kernel_entry() {
     print_at();
     print_percent();
     //clearScreen();
@@ -22,6 +22,9 @@ void kernel_main() {
 
 
     print("\n\n('@' printed by inline assembly!)");
+
+    print("\n\n");
+    printColor("And things are moving forward!", 0x12);
 
     //print("\n\n\n\n\n                  ");
     //printColor("Cool!", 0x3f);

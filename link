@@ -1,0 +1,3 @@
+#!/bin/bash
+
+ld -n -o build/kernel.bin -T src/linker.ld -Ttext $((31744+`wc build/bootloader | awk '{print $3}'`)) build/*.o

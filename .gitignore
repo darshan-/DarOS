@@ -1,7 +1,3 @@
 *~
 build
-dist
-*.iso
-*.bin
-hi
-bootloader
+out

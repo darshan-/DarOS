@@ -1,4 +1,4 @@
-ENTRY(kernel_main)
+ENTRY(kernel_entry)
 
 OUTPUT_FORMAT("binary")
 
