@@ -44,6 +44,7 @@
         page_table_l2 equ 0x3000
         stack_bottom equ 0x4000
         stack_top equ 0x7bff
+        idt equ 0               ; 0-0x1000 available in long mode
 
         PTABLE_PRESENT equ 1
         PTABLE_WRITABLE equ 1<<1
@@ -60,6 +61,9 @@ loading: db "Loading sectors after boot sector...", 0x0d, 0x0a, 0
 loaded: db "Sectors loaded!", 0x0d, 0x0a, 0
 sect2running: db "Running from second sector code!", 0x0d, 0x0a, 0
 msg64bit: db "In 64-bit protected mode!", 0
+trap_gate_s: db "Trap gate0", 0
+interrupt_gate_s: db "Interrupt gate", 0
+;trap_count: db 0
 
 teleprint:
         mov ah, 0x0e            ; Teletype output
@@ -197,6 +201,24 @@ print:
 .done:
         ret
 
+trap_gate:
+        mov eax, trap_gate_s
+        mov ebx, [trap_gate_s+9]
+        inc ebx
+        mov [eax+9], ebx
+        mov eax, 0xb8000+960
+        mov ebx, trap_gate_s
+        mov ch, 0x07
+        call print
+        iretq
+
+interrupt_gate:
+        mov eax, 0xb8000+1120
+        mov ebx, interrupt_gate_s
+        mov ch, 0x07
+        call print
+        iretq
+
 start64:
         ; Set up segment registers (The far jump down here set up CS)
         ;mov ax, DATA_SEG
@@ -213,6 +235,39 @@ start64:
         mov ebx, msg64bit
         mov ch, 0x05
         call print
+
+        ; Set up 31 trap gate entries starting at 0x0
+        ; Then set up the rest (225) as interrupt gates?
+        ; I guess have two routines, as they need to work slightly differently, one for traps, one for interrupts
+        ; So for now make them all the same, of those two, and have them just print "trap gate" or "interrupt gate"?
+
+        mov ebx, idt
+        mov ecx, 31
+loop_idt:
+        mov rax, trap_gate
+        mov [ebx], ax
+        shr rax, 16
+        mov [ebx+6], rax
+        mov word [ebx+2], gdt64.code_segment
+        mov word [ebx+4], 1<<15 | 0b1111 << 8
+        add ebx, 16
+        loop loop_idt
+
+        mov ecx, 225
+loop_idt2:
+        mov rax, interrupt_gate
+        mov [ebx], ax
+        shr rax, 16
+        mov [ebx+6], rax
+        mov word [ebx+2], gdt64.code_segment
+        mov word [ebx+4], 1<<15 | 0b1110 << 8
+        add ebx, 16
+        loop loop_idt2
+
+        sti
+
+        mov bl, 0
+        div bl
 
         ; mov edi, 0xB8000              ; Set the destination index to 0xB8000.
         ; mov rax, 0x1720272037204720   ; Set the A-register to 0x1F201F201F201F20.
