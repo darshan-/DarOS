@@ -143,12 +143,10 @@ sect2:
 	mov [page_table_l3], eax
 
         ; l2 identity maps first 1 GB of memory with huge pages (512*2MB)
-	xor eax, eax
+        mov eax, PTABLE_PRESENT | PTABLE_WRITABLE | PTABLE_HUGE
         mov ebx, page_table_l2
 	mov ecx, 512
 .loop:
-	or eax, PTABLE_PRESENT | PTABLE_WRITABLE | PTABLE_HUGE
-	mov [ebx], eax
         mov [ebx], eax
 	add eax, 0x200000       ; Huge page bit makes for 2MB pages, so each page is this far apart
         add ebx, 8
