@@ -56,8 +56,9 @@ top:
 
         jmp start
 
-loading: db "Loading subsequent sectors...", 0x0d, 0x0a, 0
-loaded: db "Loaded!", 0x0d, 0x0a, 0
+loading: db "Loading sectors after boot sector...", 0x0d, 0x0a, 0
+loaded: db "Sectors loaded!", 0x0d, 0x0a, 0
+sect2running: db "Running from second sector code!", 0x0d, 0x0a, 0
 msg64bit: db "In 64-bit protected mode!", 0
 
 teleprint:
@@ -110,18 +111,12 @@ start:
         int 13h
 
         ; TODO: Check CF to see if error?
-        jmp sect2
-
-        ; I just checked, and as expected and hoped, NASM will complain if we put too much above, because
-        ;  this vaule will end up being negative, so we can't assemble.  So go ahead and put as much above
-        ;  here as feels right; we'll find out if we pass 510 bytes and need to move some stuff down.
-        times 510 - ($-$$) db 0
-        dw 0xaa55
-
-sect2:
 
         mov bx, loaded
         call teleprint
+
+        ; Apparently I'll want to ask BIOS about memory (https://wiki.osdev.org/Detecting_Memory_(x86))
+        ;   while I'm still in real mode, probably somewhere around here, at some point.
 
         ; Enable A20 bit
         mov ax, 0x2401
@@ -167,7 +162,19 @@ sect2:
 	or eax, 1 << 8
 	wrmsr
 
-	; Enable paging and protected mode
+        jmp sect2
+
+        ; I just checked, and as expected and hoped, NASM will complain if we put too much above, because
+        ;  this vaule will end up being negative, so we can't assemble.  So go ahead and put as much above
+        ;  here as feels right; we'll find out if we pass 510 bytes and need to move some stuff down.
+        times 510 - ($-$$) db 0
+        dw 0xaa55
+
+sect2:
+        mov bx, sect2running
+        call teleprint
+
+	; Enable paging and enter protected mode
 	mov eax, cr0
 	or eax, 1 << 31 | 1
 	mov cr0, eax
@@ -202,7 +209,7 @@ start64:
 
         mov esp, stack_top
 
-        mov eax, 0xb8000+320
+        mov eax, 0xb8000+480
         mov ebx, msg64bit
         mov ch, 0x05
         call print

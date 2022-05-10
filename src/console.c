@@ -2,7 +2,7 @@
 
 #define VRAM 0xb8000
 
-static uint8_t* cur = (uint8_t*) VRAM + 640 + 320;
+static uint8_t* cur = (uint8_t*) VRAM + (160*4);
 
 void clearScreen() {
     for (uint64_t* v = (uint64_t*) VRAM; v < (uint64_t*) VRAM + 160/8*25; v++)
