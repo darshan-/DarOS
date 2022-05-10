@@ -45,6 +45,10 @@
         stack_bottom equ 0x4000
         stack_top equ 0x7bff
 
+        PTABLE_PRESENT equ 1
+        PTABLE_WRITABLE equ 1<<1
+        PTABLE_HUGE equ 1<<7
+
 bits 16
 org 0x7c00
 top:
@@ -130,9 +134,12 @@ sect2:
 
         cli
 
-        call setup_page_tables
-
-        ; Let CPU know where page table is
+        ; Set up page tables
+	mov eax, page_table_l3 | PTABLE_PRESENT | PTABLE_WRITABLE
+	mov [page_table_l4], eax
+	mov eax, page_table_l2 | PTABLE_PRESENT | PTABLE_WRITABLE
+	mov [page_table_l3], eax
+        call identity_map_ptl2
 	mov eax, page_table_l4
 	mov cr3, eax
 
@@ -155,27 +162,17 @@ sect2:
         lgdt [gdt64.pointer]
 	jmp gdt64.code_segment:start64
 
-setup_page_tables:
-	mov eax, page_table_l3
-	or eax, 0b11 ; present, writable
-	mov [page_table_l4], eax
-
-	mov eax, page_table_l2
-	or eax, 0b11 ; present, writable
-	mov [page_table_l3], eax
-
-	mov ecx, 0 ; counter
+        ; Identity map first 1 GB of memory with huge pages (512*2MB)
+identity_map_ptl2:
+	mov ecx, 0
 .loop:
-
-	mov eax, 0x200000 ; 2MiB
+	mov eax, 0x200000       ; Huge page bit makes for 2MB pages, so each page is this far apart
 	mul ecx
-	or eax, 0b10000011 ; present, writable, huge page
+	or eax, PTABLE_PRESENT | PTABLE_WRITABLE | PTABLE_HUGE
 	mov [page_table_l2 + ecx * 8], eax
-
-	inc ecx ; increment counter
-	cmp ecx, 512 ; checks if the whole table is mapped
-	jne .loop ; if not, continue
-
+	inc ecx
+	cmp ecx, 512
+	jne .loop
 	ret
 
 bits 64
@@ -209,6 +206,11 @@ start64:
         mov ebx, msg64bit
         mov ch, 0x05
         call print
+
+        ; mov edi, 0xB8000              ; Set the destination index to 0xB8000.
+        ; mov rax, 0x1720272037204720   ; Set the A-register to 0x1F201F201F201F20.
+        ; mov ecx, 80*25*2/8            ; How many times to rep
+        ; rep stosq
 
         call kernel_entry
 
