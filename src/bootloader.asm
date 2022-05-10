@@ -134,12 +134,27 @@ sect2:
 
         cli
 
-        ; Set up page tables
+        ; l4 page has just the one entry for l3
 	mov eax, page_table_l3 | PTABLE_PRESENT | PTABLE_WRITABLE
 	mov [page_table_l4], eax
+
+        ; l3 page has just the one entry for l2
 	mov eax, page_table_l2 | PTABLE_PRESENT | PTABLE_WRITABLE
 	mov [page_table_l3], eax
-        call identity_map_ptl2
+
+        ; l2 identity maps first 1 GB of memory with huge pages (512*2MB)
+	xor eax, eax
+        mov ebx, page_table_l2
+	mov ecx, 512
+.loop:
+	or eax, PTABLE_PRESENT | PTABLE_WRITABLE | PTABLE_HUGE
+	mov [ebx], eax
+        mov [ebx], eax
+	add eax, 0x200000       ; Huge page bit makes for 2MB pages, so each page is this far apart
+        add ebx, 8
+        loop .loop
+
+        ; Now we're ready to load and use tables
 	mov eax, page_table_l4
 	mov cr3, eax
 
@@ -161,19 +176,6 @@ sect2:
 
         lgdt [gdt64.pointer]
 	jmp gdt64.code_segment:start64
-
-        ; Identity map first 1 GB of memory with huge pages (512*2MB)
-identity_map_ptl2:
-	mov ecx, 0
-.loop:
-	mov eax, 0x200000       ; Huge page bit makes for 2MB pages, so each page is this far apart
-	mul ecx
-	or eax, PTABLE_PRESENT | PTABLE_WRITABLE | PTABLE_HUGE
-	mov [page_table_l2 + ecx * 8], eax
-	inc ecx
-	cmp ecx, 512
-	jne .loop
-	ret
 
 bits 64
 print:
