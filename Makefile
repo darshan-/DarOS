@@ -3,11 +3,11 @@
 c_source_files := $(shell find src -name *.c)
 c_object_files := $(patsubst src/%.c, build/%.o, $(c_source_files))
 
-build/bootloader: src/bootloader.asm
+build/bootloader: Makefile src/bootloader.asm
 	mkdir -p build && nasm src/bootloader.asm && mv src/bootloader build/
 
-$(c_object_files): build/%.o : src/%.c
-	gcc -c -ffreestanding $(patsubst build/%.o, src/%.c, $@) -o $@
+$(c_object_files): build/%.o : Makefile src/%.c
+	gcc -c -ffreestanding -fno-stack-protector $(patsubst build/%.o, src/%.c, $@) -o $@
 
 .PHONY: run
 run: out/boot.img

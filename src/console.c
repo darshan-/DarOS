@@ -1,6 +1,5 @@
 #include <stdint.h>
-
-#define VRAM 0xb8000
+#include "console.h"
 
 static uint8_t* cur = (uint8_t*) VRAM + (160*4);
 

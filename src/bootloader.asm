@@ -86,6 +86,10 @@ gdt64:
 	dw $ - gdt64 - 1        ; Length in bytes minus 1
 	dq gdt64                ; Address
 
+idtr:
+        dw 4095                 ; Size of IDT minus 1
+        dq 0                    ; Address
+
 start:
         ; Clear screen by setting VGA mode (to the normal mode we're already in)
         mov ax, 0x3             ; ah: 0 (set video mode); al: 3 (80x25 text with colors)
@@ -202,21 +206,49 @@ print:
         ret
 
 trap_gate:
+        push rax
+        push rbx
+        push rcx
+
         mov eax, trap_gate_s
-        mov ebx, [trap_gate_s+9]
-        inc ebx
-        mov [eax+9], ebx
+        mov bl, [trap_gate_s+9]
+        inc bl
+        mov [eax+9], bl
         mov eax, 0xb8000+960
         mov ebx, trap_gate_s
         mov ch, 0x07
         call print
+
+        in al, 0x60
+
+        mov al, 0x20
+        out 0x20, al
+        out 0xa0, al
+
+        pop rcx
+        pop rbx
+        pop rax
+
         iretq
 
 interrupt_gate:
+        push rax
+        push rbx
+        push rcx
+
+        mov eax, interrupt_gate_s
+        mov bl, [interrupt_gate_s+9]
+        inc bl
+        mov [eax+9], bl
         mov eax, 0xb8000+1120
         mov ebx, interrupt_gate_s
         mov ch, 0x07
         call print
+
+        pop rcx
+        pop rbx
+        pop rax
+
         iretq
 
 start64:
@@ -242,32 +274,45 @@ start64:
         ; So for now make them all the same, of those two, and have them just print "trap gate" or "interrupt gate"?
 
         mov ebx, idt
-        mov ecx, 31
+        mov ecx, 32
 loop_idt:
         mov rax, trap_gate
         mov [ebx], ax
-        shr rax, 16
-        mov [ebx+6], rax
+        mov [ebx+4], rax
         mov word [ebx+2], gdt64.code_segment
         mov word [ebx+4], 1<<15 | 0b1111 << 8
         add ebx, 16
         loop loop_idt
 
-        mov ecx, 225
+        mov ecx, 224
 loop_idt2:
         mov rax, interrupt_gate
         mov [ebx], ax
-        shr rax, 16
-        mov [ebx+6], rax
+        mov [ebx+4], rax
         mov word [ebx+2], gdt64.code_segment
         mov word [ebx+4], 1<<15 | 0b1110 << 8
         add ebx, 16
         loop loop_idt2
 
+        ; xor rax, rax
+        ; mov ebx, idt
+        ; mov [ebx], rax
+
+        mov al, 0xfd
+        out 0x21, al
+        mov al, 0xff
+        out 0xa1, al
+
+        ; mov al, 0
+        ; out 0x21, al
+        ; out 0xa1, al
+
+        lidt [idtr]
+
         sti
 
-        mov bl, 0
-        div bl
+        ;mov bl, 0
+        ;div bl
 
         ; mov edi, 0xB8000              ; Set the destination index to 0xB8000.
         ; mov rax, 0x1720272037204720   ; Set the A-register to 0x1F201F201F201F20.
