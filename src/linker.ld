@@ -6,6 +6,7 @@ SECTIONS
 {
 	.text :
 	{
+                *(.kernel_entry)
 		*(.text)
 	}
 }

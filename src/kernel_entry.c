@@ -3,20 +3,20 @@
 
 #define VRAM 0xb8000
 
-void print_at();
-void print_percent();
+void print_at() {
+    __asm__(
+        "movl $0xb8000+640, %eax\n"
+        "movb $0x40, %cl\n"
+        "movb %cl, (%eax)\n"
+        );
+}
 
-// NOTE: With my current setup, I need my entry point to come first after linking, so:
-//  1. Make sure this file comes first alphabetically (hence 00_ at start of file name) (ld generates
-//     output in order of files listed on command line, and we use a glob to capture all object files for
-//     linking, so it's kludgy but simple and effective), and
-//  2. Make sure not to define any functions before kernel_entry() (so declare any helper functions
-//     above and define them after kernel_entry().
-//  It may be straightforward to have linker script put kernel_entry first, but ENTRY(kernel_entry) doesn't
-//   do it for some reason, at least with OUTPUT_FORMAT("binary"), even though various sources suggest it
-//   should.  So for now, the kludge.
+void print_percent() {
+    uint8_t* loc = (uint8_t*) VRAM + 640 + 160;
+    *loc = '%';
+}
 
-void kernel_entry() {
+void __attribute__((section(".kernel_entry"))) kernel_entry() {
     print_at();
     print_percent();
     //clearScreen();
@@ -44,18 +44,6 @@ void kernel_entry() {
     //print("01234567890123456789012345678901234567890123456789012345678901234567890123456789\n");
 }
 
-void print_at() {
-    __asm__(
-        "movl $0xb8000+640, %eax\n"
-        "movb $0x40, %cl\n"
-        "movb %cl, (%eax)\n"
-        );
-}
-
-void print_percent() {
-    uint8_t* loc = (uint8_t*) VRAM + 640 + 160;
-    *loc = '%';
-}
 
 /*
   Delete to 400 works

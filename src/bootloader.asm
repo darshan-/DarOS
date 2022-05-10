@@ -214,6 +214,10 @@ start64:
 
         call kernel_entry
 
+        ; After handling an interrupt, we come back and execute the first instruction after hlt -- so loop
+        ;   and hlt again
+halt_loop:
         hlt
+        jmp halt_loop
 
 kernel_entry:

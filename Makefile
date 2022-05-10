@@ -17,5 +17,5 @@ run: out/boot.img
 clean:
 	rm -rf out build
 
-out/boot.img: build/bootloader $(c_object_files)
+out/boot.img: build/bootloader src/linker.ld $(c_object_files)
 	mkdir -p out && ld -n -o build/kernel.bin -T src/linker.ld -Ttext $(shell ./calc-text-offset) build/*.o && cat build/bootloader build/kernel.bin >out/boot.img
