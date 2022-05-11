@@ -31,7 +31,10 @@ void __attribute__((section(".kernel_entry"))) kernel_entry() {
     //print("Kernel launched!\n");
     //return;
 
+    __asm__("int $3");
     printColor("Running 64-bit kernel written in C!\n", 0x0d);
+    __asm__("int $3");
+    __asm__("int $3");
 
     //dumpMem(0, 16*40);
 

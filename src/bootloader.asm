@@ -50,6 +50,14 @@
         PTABLE_WRITABLE equ 1<<1
         PTABLE_HUGE equ 1<<7
 
+        PIC_PRIMARY_CMD equ 0x20
+        PIC_PRIMARY_DATA equ 0x21
+        PIC_SECONDARY_CMD equ 0xa0
+        PIC_SECONDARY_DATA equ 0xa1
+
+        ICW1 equ 1<<4
+        ICW1_ICW4_NEEDED equ 1
+
 bits 16
 org 0x7c00
 top:
@@ -61,8 +69,8 @@ loading: db "Loading sectors after boot sector...", 0x0d, 0x0a, 0
 loaded: db "Sectors loaded!", 0x0d, 0x0a, 0
 sect2running: db "Running from second sector code!", 0x0d, 0x0a, 0
 msg64bit: db "In 64-bit protected mode!", 0
-trap_gate_s: db "Trap gate0", 0
-interrupt_gate_s: db "Interrupt gate", 0
+trap_gate_s: db "Trap gate: 0", 0
+interrupt_gate_s: db "Interrupt gate: 0", 0
 ;trap_count: db 0
 
 teleprint:
@@ -211,24 +219,19 @@ trap_gate:
         push rcx
 
         mov eax, trap_gate_s
-        mov bl, [trap_gate_s+9]
+        mov bl, [trap_gate_s+11]
         inc bl
-        mov [eax+9], bl
+        mov [eax+11], bl
         mov eax, 0xb8000+960
         mov ebx, trap_gate_s
         mov ch, 0x07
         call print
 
-        in al, 0x60
-
-        mov al, 0x20
-        out 0x20, al
-        out 0xa0, al
-
         pop rcx
         pop rbx
         pop rax
 
+        ; Don't return from divide-by-zero handler?  Others not to return from?
         iretq
 
 interrupt_gate:
@@ -236,14 +239,22 @@ interrupt_gate:
         push rbx
         push rcx
 
+        int 3                   ; Cool, seems to work fine!
+
         mov eax, interrupt_gate_s
-        mov bl, [interrupt_gate_s+9]
+        mov bl, [interrupt_gate_s+16]
         inc bl
-        mov [eax+9], bl
+        mov [eax+16], bl
         mov eax, 0xb8000+1120
         mov ebx, interrupt_gate_s
         mov ch, 0x07
         call print
+
+        in al, 0x60
+
+        mov al, 0x20
+        out PIC_PRIMARY_CMD, al
+        out PIC_SECONDARY_CMD, al
 
         pop rcx
         pop rbx
@@ -294,25 +305,41 @@ loop_idt2:
         add ebx, 16
         loop loop_idt2
 
-        ; xor rax, rax
-        ; mov ebx, idt
-        ; mov [ebx], rax
+        mov al, ICW1 | ICW1_ICW4_NEEDED
+        out PIC_PRIMARY_CMD, al
+        out PIC_SECONDARY_CMD, al
+
+        mov al, 0x20
+        out PIC_PRIMARY_DATA, al        ; Map primary PIC to 0x20 - 0x27
+        mov al, 0x28
+        out PIC_SECONDARY_DATA, al      ; Map secondary PIC to 0x28 - 0x2f
+
+        mov al, 0x04
+        out PIC_PRIMARY_DATA, al
+        mov al, 0x02
+        out PIC_SECONDARY_DATA, al
+
+        mov al, 0x01
+        out PIC_PRIMARY_DATA, al
+        out PIC_SECONDARY_DATA, al
+
+        xor al, al
+        out PIC_PRIMARY_DATA, al
+        out PIC_SECONDARY_DATA, al
 
         mov al, 0xfd
-        out 0x21, al
+        out PIC_PRIMARY_DATA, al
         mov al, 0xff
-        out 0xa1, al
-
-        ; mov al, 0
-        ; out 0x21, al
-        ; out 0xa1, al
+        out PIC_SECONDARY_DATA, al
 
         lidt [idtr]
 
         sti
 
-        ;mov bl, 0
-        ;div bl
+        int 3
+
+        ; mov bl, 0
+        ; div bl
 
         ; mov edi, 0xB8000              ; Set the destination index to 0xB8000.
         ; mov rax, 0x1720272037204720   ; Set the A-register to 0x1F201F201F201F20.
