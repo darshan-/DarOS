@@ -20,28 +20,52 @@ static void advanceLine() {
          *v = 0x0700070007000700;
 }
 
+static inline void curAdvanced() {
+    if (cur < (uint8_t*) VRAM + (160*25))
+        return;
+
+    advanceLine();
+    cur = (uint8_t*) VRAM + (160*24);
+}
+
+static inline void printCharColor(uint8_t c, uint8_t color) {
+    *cur++ = c;
+    *cur++ = color;
+    curAdvanced();
+}
+
+static inline void printChar(uint8_t c) {
+    printCharColor(c, 0x07);
+}
+
 void printColor(char* s, uint8_t c) {
     while (*s != 0) {
         if (*s == '\n') {
-            for (uint64_t n = 160 - ((uint64_t) cur - VRAM) % 160; n > 0; n -= 2) {
-                *cur++ = 0;
-                *cur++ = c;
-            }
+            for (uint64_t n = 160 - ((uint64_t) cur - VRAM) % 160; n > 0; n -= 2)
+                printCharColor(0, c);
             *s++;
         } else {
-            *cur++ = *s++;
-            *cur++ = c;
-        }
-
-        if (cur >= (uint8_t*) VRAM + (160*25)) {
-            advanceLine();
-            cur = (uint8_t*) VRAM + (160*24);
+            printCharColor(*s++, c);
         }
     }
 }
 
 void print(char* s) {
     printColor(s, 0x07);
+}
+
+static inline void nibbleToHex(uint8_t* n) {
+    if (*n > '9')
+        *n += 'A' - '9' - 1;
+}
+
+void printByte(uint8_t b) {
+        uint8_t bh = (b >> 4) + '0';
+        uint8_t bl = (b & 0x0f) + '0';
+        nibbleToHex(&bh);
+        nibbleToHex(&bl);
+        printChar(bh);
+        printChar(bl);
 }
 
 // Have bottom line be a solid color background and have a clock and other status info?  (Or top line?)

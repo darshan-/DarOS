@@ -42,6 +42,7 @@ struct interrupt_frame
  */
 void __attribute__((interrupt)) kbd_irq(struct interrupt_frame *frame) {
     uint8_t code;
+    // Need double percent signs when using contraints!
     __asm__ __volatile__(
                          "in $0x60, %%al\n"
                          "mov %%al, %0\n"
@@ -49,9 +50,9 @@ void __attribute__((interrupt)) kbd_irq(struct interrupt_frame *frame) {
                          "out %%al, $0x20\n"
                          :"=m"(code)
     );
-    char* s = "C keyboard interrupt handler... \n";
-    s[31] = code;
-    printColor(s, 0x0d);
+    printColor("C keyboard interrupt handler: ", 0x0d);
+    printByte(code);
+    print("\n");
     //__asm__("in $0x60, %al\n"
     //        "movl %%eax, %0\n" :"=r"(code));
 }
