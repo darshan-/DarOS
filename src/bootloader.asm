@@ -71,6 +71,7 @@ sect2running: db "Running from second sector code!", 0x0d, 0x0a, 0
 msg64bit: db "In 64-bit protected mode!", 0
 trap_gate_s: db "Trap gate: 0", 0
 interrupt_gate_s: db "Interrupt gate: 0", 0
+keyboard_gate_s: db "Got a key, not telling you what      (fine, a hint:  )", 0
 ;trap_count: db 0
 
 teleprint:
@@ -234,12 +235,29 @@ trap_gate:
         ; Don't return from divide-by-zero handler?  Others not to return from?
         iretq
 
-interrupt_gate:
+interrupt_gate_maybe_0x00:
         push rax
         push rbx
         push rcx
 
-        int 3                   ; Cool, seems to work fine!
+        ;mov rax, 0x00 ; The byte moved to rax is the only differentiator
+        ;shl rax, 3    ; vector number times 8, as addresses are 64 bits
+        ;call [rax]
+
+        mov al, 0x20
+        out PIC_PRIMARY_CMD, al
+        ;out PIC_SECONDARY_CMD, al ; This one too?
+
+        pop rcx
+        pop rbx
+        pop rax
+
+        iretq
+
+interrupt_gate:
+        push rax
+        push rbx
+        push rcx
 
         mov eax, interrupt_gate_s
         mov bl, [interrupt_gate_s+16]
@@ -250,11 +268,37 @@ interrupt_gate:
         mov ch, 0x07
         call print
 
+        mov al, 0x20
+        out PIC_PRIMARY_CMD, al
+        ;out PIC_SECONDARY_CMD, al ; This one too?
+
+        pop rcx
+        pop rbx
+        pop rax
+
+        iretq
+
+keyboard_gate:
+        push rax
+        push rbx
+        push rcx
+
+        mov eax, 0xb8000+1280
+        mov ebx, keyboard_gate_s
+        mov ch, 0x02
+        call print
+
         in al, 0x60
+
+        mov ebx, 0xb8000+1280+104
+        mov [ebx], al
+        mov byte [ebx+1], 0x04
+
+        ;int 3
 
         mov al, 0x20
         out PIC_PRIMARY_CMD, al
-        out PIC_SECONDARY_CMD, al
+        ;out PIC_SECONDARY_CMD, al ; This one too?
 
         pop rcx
         pop rbx
@@ -305,6 +349,12 @@ loop_idt2:
         add ebx, 16
         loop loop_idt2
 
+        mov rax, keyboard_gate
+        mov ebx, idt + (16 * 0x21)
+        mov [ebx], ax
+        shr rax, 16
+        mov [ebx+6], rax
+
         mov al, ICW1 | ICW1_ICW4_NEEDED
         out PIC_PRIMARY_CMD, al
         out PIC_SECONDARY_CMD, al
@@ -336,7 +386,7 @@ loop_idt2:
 
         sti
 
-        int 3
+        ;int 3
 
         ; mov bl, 0
         ; div bl
