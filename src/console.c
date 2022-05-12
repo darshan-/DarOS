@@ -68,5 +68,26 @@ void printByte(uint8_t b) {
         printChar(bl);
 }
 
+void printWord(uint16_t w) {
+    uint8_t b = (uint8_t) (w >> 8);
+    printByte(b);
+    b = (uint8_t) w;
+    printByte(b);
+}
+
+void printDword(uint32_t d) {
+    uint16_t w = (uint16_t) (d >> 16);
+    printWord(w);
+    w = (uint16_t) d;
+    printWord(w);
+}
+
+void printQword(uint64_t q) {
+    uint32_t d = (uint32_t) (q >> 32);
+    printDword(d);
+    d = (uint32_t) q;
+    printDword(d);
+}
+
 // Have bottom line be a solid color background and have a clock and other status info?  (Or top line?)
 //   Easy enough if this file supports it (with cur, clearScreen, and advanceLine (and printColor, if at bottom).

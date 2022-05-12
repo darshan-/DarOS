@@ -7,7 +7,7 @@ build/bootloader: Makefile src/bootloader.asm
 	mkdir -p build && nasm src/bootloader.asm && mv src/bootloader build/
 
 $(c_object_files): build/%.o : Makefile src/%.c
-	gcc -c -ffreestanding -fno-stack-protector -mgeneral-regs-only $(patsubst build/%.o, src/%.c, $@) -o $@
+	gcc -c -ffreestanding -fno-stack-protector -mgeneral-regs-only -mno-red-zone $(patsubst build/%.o, src/%.c, $@) -o $@
 
 .PHONY: run
 run: out/boot.img
