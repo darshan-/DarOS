@@ -1,13 +1,22 @@
 .DEFAULT_GOAL := out/boot.img
 
-c_source_files := $(shell find src -name [^.]*.c)
-c_object_files := $(patsubst src/%.c, build/%.o, $(c_source_files))
+c_objects := $(patsubst src/%.c, build/%.o, $(wildcard src/*.c))
 
-build/bootloader: Makefile src/bootloader.asm
-	mkdir -p build && nasm src/bootloader.asm && mv src/bootloader build/
+build out:
+	mkdir -p $@
 
-$(c_object_files): build/%.o : Makefile src/%.c
-	gcc -c -ffreestanding -fno-stack-protector -mgeneral-regs-only -mno-red-zone $(patsubst build/%.o, src/%.c, $@) -o $@
+build/bootloader: Makefile src/bootloader.asm | build
+	nasm src/bootloader.asm -o build/bootloader
+
+build/*.o: Makefile
+build/%.o: src/%.c | build
+	gcc -c -ffreestanding -fno-stack-protector -mgeneral-regs-only -mno-red-zone $< -o $@
+
+build/kernel.bin: $(c_objects) build/bootloader
+	ld -n -o build/kernel.bin -T src/linker.ld -Ttext $(shell ./calc-text-offset) $(c_objects)
+
+out/boot.img: build/bootloader src/linker.ld build/kernel.bin | out
+	cat build/bootloader build/kernel.bin >out/boot.img
 
 .PHONY: run
 run: out/boot.img
@@ -16,6 +25,3 @@ run: out/boot.img
 .PHONY: clean
 clean:
 	rm -rf out build
-
-out/boot.img: build/bootloader src/linker.ld $(c_object_files)
-	mkdir -p out && ld -n -o build/kernel.bin -T src/linker.ld -Ttext $(shell ./calc-text-offset) build/*.o && cat build/bootloader build/kernel.bin >out/boot.img
