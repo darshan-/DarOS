@@ -1,6 +1,7 @@
 #include <stdint.h>
 #include "console.h"
 #include "interrupt.h"
+#include "serial.h"
 
 void dumpMem(uint8_t* start, int count) {
     char* s = " ";
@@ -30,7 +31,17 @@ void dumpMem(uint8_t* start, int count) {
 void __attribute__((section(".kernel_entry"))) kernel_entry() {
     printColor("Running 64-bit kernel written in C!\n", 0x0d);
 
+    print_com1("This is a test!\nI wonder if control characters are supported?");
+    print_com1("\r\nYes, it appears they are -- albeit with the caveat that newline is ");
+    print_com1("*just* newline, so let's try with carriage return as well...\r\n");
+
+    for (int i = 0; i < 50; i++)
+        print_com1("Let's see if QEMU does scrolling for us...  Seems likely, and would suck if not.\n");
+
+    print_com1("So, how'd we do???\n");
+
     init_idt();
+
     waitloop();
 
     //waitloop();
