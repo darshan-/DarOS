@@ -1,6 +1,6 @@
 .DEFAULT_GOAL := out/boot.img
 
-c_source_files := $(shell find src -name *.c)
+c_source_files := $(shell find src -name [^.]*.c)
 c_object_files := $(patsubst src/%.c, build/%.o, $(c_source_files))
 
 build/bootloader: Makefile src/bootloader.asm
