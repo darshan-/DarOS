@@ -3,6 +3,7 @@
 #include "serial.h"
 #include "hex.h"
 #include "io.h"
+#include "keyboard.h"
 
 #define TYPE_TRAP 0b1111
 #define TYPE_INT 0b1110
@@ -136,6 +137,8 @@ static void __attribute__((interrupt)) kbd_irq(struct interrupt_frame *frame) {
     log(bs);
     log("\n");
     dumpFrame(frame);
+
+    keyScanned(code);
 }
 
 static void set_handler(uint16_t* idt_entry, void* handler, uint8_t type) {

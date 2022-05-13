@@ -70,5 +70,10 @@ void print(char* s) {
     printColor(s, 0x07);
 }
 
+void printc(char c) {
+    printCharColor(c, 0x07);
+    updateCursorPosition();
+}
+
 // Have bottom line be a solid color background and have a clock and other status info?  (Or top line?)
 //   Easy enough if this file supports it (with cur, clearScreen, and advanceLine (and printColor, if at bottom).
