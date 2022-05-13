@@ -1,12 +1,6 @@
 #include <stdint.h>
 #include "hex.h"
 
-// static inline void nibbleToHex(char* n) {
-//     if (*n > '9')
-//         *n += 'A' - '9' - 1;
-// }
-
-//#define nibbleToHex(n) if (*n > '9') n += 'A' - '9' - 1
 #define nibbleToHex(n) n > '9' ? n + 'A' - '9' - 1 : n
 
 void byteToHex(uint8_t b, char* s) {
@@ -14,10 +8,6 @@ void byteToHex(uint8_t b, char* s) {
     char bl = (b & 0x0f) + '0';
     s[0] = nibbleToHex(bh);
     s[1] = nibbleToHex(bl);
-    // nibbleToHex(bh);
-    // nibbleToHex(bl);
-    // s[0] = bh;
-    // s[1] = bl;
 }
 
 void wordToHex(uint16_t w, char* s) {
