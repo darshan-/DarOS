@@ -93,9 +93,9 @@ start:
         int 0x10
 
         ; Turn off the cursor
-        mov ah, 1               ; set cursor size
-        mov ch, 1<<5            ; bit 5 disables cursor
-        int 10h
+        ; mov ah, 1               ; set cursor size
+        ; mov ch, 1<<5            ; bit 5 disables cursor
+        ; int 10h
 
         mov bx, loading
         call teleprint
