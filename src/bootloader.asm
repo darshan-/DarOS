@@ -50,14 +50,6 @@
         PTABLE_WRITABLE equ 1<<1
         PTABLE_HUGE equ 1<<7
 
-        PIC_PRIMARY_CMD equ 0x20
-        PIC_PRIMARY_DATA equ 0x21
-        PIC_SECONDARY_CMD equ 0xa0
-        PIC_SECONDARY_DATA equ 0xa1
-
-        ICW1 equ 1<<4
-        ICW1_ICW4_NEEDED equ 1
-
 bits 16
 org 0x7c00
 top:
@@ -69,10 +61,6 @@ loading: db "Loading sectors after boot sector...", 0x0d, 0x0a, 0
 loaded: db "Sectors loaded!", 0x0d, 0x0a, 0
 sect2running: db "Running from second sector code!", 0x0d, 0x0a, 0
 msg64bit: db "In 64-bit protected mode!", 0
-trap_gate_s: db "Trap gate: 0", 0
-interrupt_gate_s: db "Interrupt gate: 0", 0
-keyboard_gate_s: db "Got a key, not telling you what      (fine, a hint:  )", 0
-;trap_count: db 0
 
 teleprint:
         mov ah, 0x0e            ; Teletype output
@@ -214,101 +202,8 @@ print:
 .done:
         ret
 
-trap_gate:
-        push rax
-        push rbx
-        push rcx
-
-        mov eax, trap_gate_s
-        mov bl, [trap_gate_s+11]
-        inc bl
-        mov [eax+11], bl
-        mov eax, 0xb8000+960
-        mov ebx, trap_gate_s
-        mov ch, 0x07
-        call print
-
-        pop rcx
-        pop rbx
-        pop rax
-
-        ; Don't return from divide-by-zero handler?  Others not to return from?
-        iretq
-
-interrupt_gate_maybe_0x00:
-        push rax
-        push rbx
-        push rcx
-
-        ;mov rax, 0x00 ; The byte moved to rax is the only differentiator
-        ;shl rax, 3    ; vector number times 8, as addresses are 64 bits
-        ;call [rax]
-
-        mov al, 0x20
-        out PIC_PRIMARY_CMD, al
-        ;out PIC_SECONDARY_CMD, al ; This one too?
-
-        pop rcx
-        pop rbx
-        pop rax
-
-        iretq
-
-interrupt_gate:
-        push rax
-        push rbx
-        push rcx
-
-        mov eax, interrupt_gate_s
-        mov bl, [interrupt_gate_s+16]
-        inc bl
-        mov [eax+16], bl
-        mov eax, 0xb8000+1120
-        mov ebx, interrupt_gate_s
-        mov ch, 0x07
-        call print
-
-        mov al, 0x20
-        out PIC_PRIMARY_CMD, al
-        ;out PIC_SECONDARY_CMD, al ; This one too?
-
-        pop rcx
-        pop rbx
-        pop rax
-
-        iretq
-
-keyboard_gate:
-        push rax
-        push rbx
-        push rcx
-
-        mov eax, 0xb8000+1280
-        mov ebx, keyboard_gate_s
-        mov ch, 0x02
-        call print
-
-        in al, 0x60
-
-        mov ebx, 0xb8000+1280+104
-        mov [ebx], al
-        mov byte [ebx+1], 0x04
-
-        ;int 3
-
-        mov al, 0x20
-        out PIC_PRIMARY_CMD, al
-        ;out PIC_SECONDARY_CMD, al ; This one too?
-
-        pop rcx
-        pop rbx
-        pop rax
-
-        iretq
-
 start64:
-        ; Set up segment registers (The far jump down here set up CS)
-        ;mov ax, DATA_SEG
+        ; Set up segment registers (the far jump down here set up cs)
         xor ax, ax
         mov ds, ax
         mov es, ax
@@ -323,85 +218,12 @@ start64:
         mov ch, 0x05
         call print
 
-        ; Set up 31 trap gate entries starting at 0x0
-        ; Then set up the rest (225) as interrupt gates?
-        ; I guess have two routines, as they need to work slightly differently, one for traps, one for interrupts
-        ; So for now make them all the same, of those two, and have them just print "trap gate" or "interrupt gate"?
-
+        ; Set Segment Selector for IDT entries, leaving the rest of IDT set up for C kernel
         mov ebx, idt
-        mov ecx, 32
+        mov ecx, 256
 loop_idt:
-        mov rax, trap_gate
-        mov [ebx], ax
-        mov [ebx+4], rax
         mov word [ebx+2], gdt64.code_segment
-        mov word [ebx+4], 1<<15 | 0b1111 << 8
         add ebx, 16
         loop loop_idt
 
-        mov ecx, 224
-loop_idt2:
-        mov rax, interrupt_gate
-        mov [ebx], ax
-        mov [ebx+4], rax
-        mov word [ebx+2], gdt64.code_segment
-        mov word [ebx+4], 1<<15 | 0b1110 << 8
-        add ebx, 16
-        loop loop_idt2
-
-        mov rax, keyboard_gate
-        mov ebx, idt + (16 * 0x21)
-        mov [ebx], ax
-        shr rax, 16
-        mov [ebx+6], rax
-
-        mov al, ICW1 | ICW1_ICW4_NEEDED
-        out PIC_PRIMARY_CMD, al
-        out PIC_SECONDARY_CMD, al
-
-        mov al, 0x20
-        out PIC_PRIMARY_DATA, al        ; Map primary PIC to 0x20 - 0x27
-        mov al, 0x28
-        out PIC_SECONDARY_DATA, al      ; Map secondary PIC to 0x28 - 0x2f
-
-        mov al, 0x04
-        out PIC_PRIMARY_DATA, al
-        mov al, 0x02
-        out PIC_SECONDARY_DATA, al
-
-        mov al, 0x01
-        out PIC_PRIMARY_DATA, al
-        out PIC_SECONDARY_DATA, al
-
-        xor al, al
-        out PIC_PRIMARY_DATA, al
-        out PIC_SECONDARY_DATA, al
-
-        mov al, 0xfd
-        out PIC_PRIMARY_DATA, al
-        mov al, 0xff
-        out PIC_SECONDARY_DATA, al
-
         lidt [idtr]
-
-        sti
-
-        ;int 3
-
-        ; mov bl, 0
-        ; div bl
-
-        ; mov edi, 0xB8000              ; Set the destination index to 0xB8000.
-        ; mov rax, 0x1720272037204720   ; Set the A-register to 0x1F201F201F201F20.
-        ; mov ecx, 80*25*2/8            ; How many times to rep
-        ; rep stosq
-
-        call kernel_entry
-
-        ; After handling an interrupt, we come back and execute the first instruction after hlt -- so loop
-        ;   and hlt again
-halt_loop:
-        hlt
-        jmp halt_loop
-
-kernel_entry:

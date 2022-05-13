@@ -20,7 +20,7 @@ static void advanceLine() {
          *v = 0x0700070007000700;
 }
 
-static inline void curAdvanced() {
+static void curAdvanced() {
     if (cur < (uint8_t*) VRAM + (160*25))
         return;
 
@@ -28,15 +28,18 @@ static inline void curAdvanced() {
     cur = (uint8_t*) VRAM + (160*24);
 }
 
-static inline void printCharColor(uint8_t c, uint8_t color) {
+static void printCharColor(uint8_t c, uint8_t color) {
     *cur++ = c;
     *cur++ = color;
     curAdvanced();
 }
 
-static inline void printChar(uint8_t c) {
+static void printChar(uint8_t c) {
     printCharColor(c, 0x07);
 }
+
+//void (*cprintChar)(uint8_t) = &printChar;
+//cprintChar = &printChar;
 
 void printColor(char* s, uint8_t c) {
     while (*s != 0) {
@@ -54,40 +57,17 @@ void print(char* s) {
     printColor(s, 0x07);
 }
 
-static inline void nibbleToHex(uint8_t* n) {
-    if (*n > '9')
-        *n += 'A' - '9' - 1;
-}
-
-void printByte(uint8_t b) {
-        uint8_t bh = (b >> 4) + '0';
-        uint8_t bl = (b & 0x0f) + '0';
-        nibbleToHex(&bh);
-        nibbleToHex(&bl);
-        printChar(bh);
-        printChar(bl);
-}
-
-void printWord(uint16_t w) {
-    uint8_t b = (uint8_t) (w >> 8);
-    printByte(b);
-    b = (uint8_t) w;
-    printByte(b);
-}
-
-void printDword(uint32_t d) {
-    uint16_t w = (uint16_t) (d >> 16);
-    printWord(w);
-    w = (uint16_t) d;
-    printWord(w);
-}
-
-void printQword(uint64_t q) {
-    uint32_t d = (uint32_t) (q >> 32);
-    printDword(d);
-    d = (uint32_t) q;
-    printDword(d);
-}
+// void printConsoleFuncs() {
+//     print("0x");
+//     hexoutQword(printChar, printChar);
+//     print("\n");
+//     print("0x");
+//     hexoutQword(print, printChar);
+//     print("\n");
+//     print("0x");
+//     hexoutQword(ptr_printChar, printChar);
+//     print("\n");
+// }
 
 // Have bottom line be a solid color background and have a clock and other status info?  (Or top line?)
 //   Easy enough if this file supports it (with cur, clearScreen, and advanceLine (and printColor, if at bottom).
