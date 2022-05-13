@@ -43,9 +43,18 @@ static inline void curAdvanced() {
     //updateCursorPosition();
 }
 
+#define printcc(c, cl) *cur++ = c; *cur++ = cl
+
 static inline void printCharColor(uint8_t c, uint8_t color) {
-    *cur++ = c;
-    *cur++ = color;
+    if (c == '\n') {
+        for (uint64_t n = 160 - ((uint64_t) cur - VRAM) % 160; n > 0; n -= 2) {
+            printcc(0, color);
+        }
+    } else {
+        printcc(c, color);
+    }
+
+    curAdvanced();
 }
 
 static inline void printChar(uint8_t c) {
@@ -53,15 +62,8 @@ static inline void printChar(uint8_t c) {
 }
 
 void printColor(char* s, uint8_t c) {
-    while (*s != 0) {
-        if (*s == '\n') {
-            for (uint64_t n = 160 - ((uint64_t) cur - VRAM) % 160; n > 0; n -= 2)
-                printCharColor(0, c);
-            *s++;
-        } else {
-            printCharColor(*s++, c);
-        }
-    }
+    while (*s != 0)
+        printCharColor(*s++, c);
 
     updateCursorPosition();
 }
