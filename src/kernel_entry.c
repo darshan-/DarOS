@@ -95,7 +95,7 @@ void __attribute__((section(".kernel_entry"))) kernel_entry() {
     // dumpMem(0, 16*40);
 
     clearScreen();
-    print("Ready...");
+    print("Ready...\n");
     waitloop();
 
     //waitloop();
