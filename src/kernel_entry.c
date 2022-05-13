@@ -1,6 +1,6 @@
 #include <stdint.h>
 #include "console.h"
-#include "hexoutput.h"
+#include "hex.h"
 #include "interrupt.h"
 #include "serial.h"
 
@@ -50,15 +50,17 @@ void __attribute__((section(".kernel_entry"))) kernel_entry() {
 
     init_idt();
 
-    cprintChar('H');
-    cprintChar('i');
-    cprintChar('?');
-    cprintChar('\n');
+    //void (*printChar)(uint8_t) = consolePrintChar;
+    // ccprintChar('H');
+    // ccprintChar('i');
+    // ccprintChar('?');
+    // ccprintChar('\n');
 
     // printChar('T');
     // printChar('e');
     // printChar('s');
     // printChar('t');
+    // printChar('\n');
 
     // myPrintChar('w');
     // void (*printCharf)(uint8_t) = myPrintChar;

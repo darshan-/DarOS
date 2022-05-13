@@ -1,6 +1,7 @@
 #include <stdint.h>
-#include "console.h"
-#include "hexoutput.h"
+//#include "console.h"
+#include "serial.h"
+#include "hex.h"
 #include "io.h"
 
 #define TYPE_TRAP 0b1111
@@ -25,21 +26,31 @@ struct interrupt_frame
     uint64_t ss;
 };
 
-void cprintChar(uint8_t) {
+static inline void log(char* s) {
+    //print(s);
+    print_com1(s);
 }
 
 static void dumpFrame(struct interrupt_frame *frame) {
-    print("ip: 0x");
-    hexoutQword(frame->ip, cprintChar);
-    print("    cs: 0x");
-    hexoutQword(frame->cs, cprintChar);
-    print(" flags: 0x");
-    hexoutQword(frame->flags, cprintChar);
-    print("\nsp: 0x");
-    hexoutQword(frame->sp, cprintChar);
-    print("    ss: 0x");
-    hexoutQword(frame->ss, cprintChar);
-    print("\n");
+    char qs[17];
+    qs[16] = '\0';
+
+    log("ip: 0x");
+    qwordToHex(frame->ip, qs);
+    log(qs);
+    log("    cs: 0x");
+    qwordToHex(frame->cs, qs);
+    log(qs);
+    log(" flags: 0x");
+    qwordToHex(frame->flags, qs);
+    log(qs);
+    log("\nsp: 0x");
+    qwordToHex(frame->sp, qs);
+    log(qs);
+    log("    ss: 0x");
+    qwordToHex(frame->ss, qs);
+    log(qs);
+    log("\n");
 }
 
 static void init_pic() {
@@ -75,43 +86,55 @@ void __attribute__((naked)) waitloop() {
 static void __attribute__((interrupt)) default_interrupt_handler(struct interrupt_frame *frame) {
     outb(PIC_PRIMARY_CMD, PIC_ACK);
 
-    printColor("Default interrupt handler\n", 0x0d);
+    log("Default interrupt handler\n");
     dumpFrame(frame);
 }
 
 static void __attribute__((interrupt)) divide_by_zero_handler(struct interrupt_frame *frame) {
-    printColor("Divide by zero handler\n", 0x0e);
+    log("Divide by zero handler\n");
     frame->ip = (uint64_t) waitloop;
     dumpFrame(frame);
 }
 
 static void __attribute__((interrupt)) default_trap_handler(struct interrupt_frame *frame) {
-    printColor("Default trap handler\n", 0x0e);
+    log("Default trap handler\n");
     dumpFrame(frame);
 }
 
 static void __attribute__((interrupt)) default_trap_with_error_handler(struct interrupt_frame *frame,
                                                                        uint64_t error_code) {
-    printColor("Default trap handler with error on stack; error: 0x", 0x0e);
-    hexoutQword(error_code, cprintChar);
-    print("\n");
+    char qs[17];
+    qs[16] = '\0';
+
+    log("Default trap handler with error on stack; error: 0x");
+    qwordToHex(error_code, qs);
+    log(qs);
+    log("\n");
     dumpFrame(frame);
 }
 
 static void __attribute__((interrupt)) double_fault_handler(struct interrupt_frame *frame, uint64_t error_code) {
-    printColor("Double fault; error should be zero.  error: 0x", 0x3e);
-    hexoutQword(error_code, cprintChar);
-    print("\n");
+    char qs[17];
+    qs[16] = '\0';
+
+    log("Double fault; error should be zero.  error: 0x");
+    qwordToHex(error_code, qs);
+    log(qs);
+    log("\n");
     dumpFrame(frame);
 }
 
 static void __attribute__((interrupt)) kbd_irq(struct interrupt_frame *frame) {
+    char bs[3];
+    bs[2] = '\0';
+
     uint8_t code = inb(0x60);
     outb(PIC_PRIMARY_CMD, PIC_ACK);
 
-    printColor("C keyboard interrupt handler: ", 0x0d);
-    hexoutByte(code, cprintChar);
-    print("\n");
+    log("C keyboard interrupt handler: ");
+    byteToHex(code, bs);
+    log(bs);
+    log("\n");
     dumpFrame(frame);
 }
 

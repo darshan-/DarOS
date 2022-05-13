@@ -9,7 +9,7 @@ void clearScreen() {
     cur = (uint8_t*) VRAM;
 }
 
-static void advanceLine() {
+static inline void advanceLine() {
     uint8_t* vram = (uint8_t*) VRAM;
 
     for (int i=0; i<24; i++)
@@ -20,7 +20,7 @@ static void advanceLine() {
          *v = 0x0700070007000700;
 }
 
-static void curAdvanced() {
+static inline void curAdvanced() {
     if (cur < (uint8_t*) VRAM + (160*25))
         return;
 
@@ -28,18 +28,15 @@ static void curAdvanced() {
     cur = (uint8_t*) VRAM + (160*24);
 }
 
-static void printCharColor(uint8_t c, uint8_t color) {
+static inline void printCharColor(uint8_t c, uint8_t color) {
     *cur++ = c;
     *cur++ = color;
     curAdvanced();
 }
 
-static void printChar(uint8_t c) {
+static inline void printChar(uint8_t c) {
     printCharColor(c, 0x07);
 }
-
-//void (*cprintChar)(uint8_t) = &printChar;
-//cprintChar = &printChar;
 
 void printColor(char* s, uint8_t c) {
     while (*s != 0) {
