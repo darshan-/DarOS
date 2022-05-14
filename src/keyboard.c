@@ -10,9 +10,12 @@
 // Let's ignore caps lock for now, but keep track of shift
 static uint8_t shift_down = 0;
 
+static void (*listenerCallback)(char);
+
 // Call for characters that count as input (for now just print them...)
 static inline void gotInput(char c) {
-    printc(c);
+    //printc(c);
+    listenerCallback(c);
 }
 
 void keyScanned(uint8_t c) {
@@ -43,6 +46,10 @@ void keyScanned(uint8_t c) {
         map(0x09, '8', '*');
         map(0x0a, '9', '(');
         map(0x0b, '0', ')');
+        //case 0x0b:
+        //__asm__ __volatile__("int $0x23");
+        //int n = 1/0;
+        //break;
         map(0x0c, '-', '_');
         map(0x0d, '=', '+');
 
@@ -88,4 +95,10 @@ void keyScanned(uint8_t c) {
     default:
         break;
     }
+}
+
+// Have dynamic list of listeners, so more than one thing can listen, I think.
+// For now have just one, or an array of 3 potential ones or something?
+void registerKbdListener(void (*gotChar)(char)) {
+    listenerCallback = gotChar;
 }

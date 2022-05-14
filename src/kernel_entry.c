@@ -2,9 +2,10 @@
 #include "console.h"
 #include "hex.h"
 #include "interrupt.h"
+#include "keyboard.h"
 #include "serial.h"
 
-void dumpMem(uint8_t* start, int count) {
+static void dumpMem(uint8_t* start, int count) {
     char* s = " ";
     for (int i = 0; i < count; i++) {
         uint8_t ch = (*start >> 4) + '0';
@@ -29,12 +30,17 @@ void dumpMem(uint8_t* start, int count) {
     }
 }
 
-//extern void (*ptr_printChar)(uint8_t);
-
-void myPrintChar(uint8_t c) {
-    //printChar(c);
-    //cprintChar(c);
+static void gotChar(char c) {
+    //printc(':');
+    printc(c);
 }
+
+static void startTty() {
+    registerKbdListener(&gotChar);
+    //hellothere();
+    //gotChar('%');
+    //keyScanned(0x0d);
+};
 
 void __attribute__((section(".kernel_entry"))) kernel_entry() {
     printColor("Running 64-bit kernel written in C!\n", 0x0d);
@@ -95,7 +101,8 @@ void __attribute__((section(".kernel_entry"))) kernel_entry() {
     // dumpMem(0, 16*40);
 
     clearScreen();
-    print("Ready...\n");
+    printColor("Ready!\n", 0x0d);
+    startTty();
     waitloop();
 
     //waitloop();

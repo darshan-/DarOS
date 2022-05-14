@@ -20,6 +20,11 @@ void clearScreen() {
         *v = 0x0700070007000700;
     cur = (uint8_t*) VRAM;
     updateCursorPosition();
+
+    // outb(0x3D4, 0x0A);
+    // outb(0x3D5, (inb(0x3D5) & 0xC0) | 0);
+    // outb(0x3D4, 0x0B);
+    // outb(0x3D5, (inb(0x3D5) & 0xE0) | 15);
 }
 
 static inline void advanceLine() {
@@ -76,6 +81,13 @@ void printc(char c) {
     printCharColor(c, 0x07);
     updateCursorPosition();
 }
+
+//void readline(void (*lineread)(char*))) { // how would we pass it back without dynamic memory allocation?
+    // Set read start cursor location (which scrolls up with screen if input is over one line (with issue of
+    //    what to do if it's a whole screenful undecided for now)).
+    // Tell keyboard we're in input mode; when newline is entered (or ctrl-c, ctrl-d, etc.?), it calls a
+    //   different callback that we pass to it? (Which calls this callback?)
+//}
 
 // Have bottom line be a solid color background and have a clock and other status info?  (Or top line?)
 //   Easy enough if this file supports it (with cur, clearScreen, and advanceLine (and printColor, if at bottom).

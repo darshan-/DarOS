@@ -4,7 +4,8 @@
 #define COM1 0x3f8
 
 static void write_com1(char c) {
-    while (inb(COM1 + 5) & 0x20 == 0) // Wait until transmitter holding register is empty and ready for data
+    //while (inb(COM1 + 5) & 0x20 == 0) // Wait until transmitter holding register is empty and ready for data
+    while ((inb(COM1 + 5) & 0x20) == 0) // Wait until transmitter holding register is empty and ready for data
         ;
 
     // Qemu's serial port display interprets control characters, but \n just drops down a line, so we want a
