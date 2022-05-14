@@ -41,3 +41,4 @@ clean:
 #     alter assembled bootloader to read exactly what's necessary.  Reading half a meg should be pretty much
 #     instantaneous.  I *can* and *should* have build system complain if boot.img is any larger than
 #     961*512 (bootloader plus 240*4, leaving one possible to read unread) = 492,032 bytes.
+#   Ah, file:///home/darshan/asm/asm_024.3.html says I can do 128 sectors max at a time.

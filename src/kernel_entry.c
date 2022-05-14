@@ -32,7 +32,29 @@ static void dumpMem(uint8_t* start, int count) {
 
 static void gotChar(char c) {
     //printc(':');
+    if (c == '%')
+        unregisterKbdListener(&gotChar);
     printc(c);
+}
+
+static void gotChar2(char c) {
+    if (c == '^')
+        unregisterKbdListener(&gotChar2);
+    printc(c);
+}
+
+static void gotChar3(char c) {
+    if (c == '&')
+        unregisterKbdListener(&gotChar3);
+    printc(c);
+}
+
+static void startTty3() {
+    registerKbdListener(&gotChar3);
+}
+
+static void startTty2() {
+    registerKbdListener(&gotChar2);
 }
 
 static void startTty() {
@@ -103,6 +125,8 @@ void __attribute__((section(".kernel_entry"))) kernel_entry() {
     clearScreen();
     printColor("Ready!\n", 0x0d);
     startTty();
+    startTty2();
+    startTty3();
     waitloop();
 
     //waitloop();

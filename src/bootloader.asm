@@ -106,7 +106,7 @@ start:
         mov es, ax
         cld
         mov ah, 2     ; Int 13h function 2: "Read sectors from drive"
-        mov al, 32     ; How many sectors to read -- change as necessary
+        mov al, 0x80  ; How many sectors to read -- change as necessary
         mov ch, 0     ; Cylinder
         mov cl, 2     ; 1-indexed sector to start reading from
         pop dx        ; dl is drive number, and BIOS set it to the drive number we're loaded from (which we

@@ -1,6 +1,7 @@
 #include <stdint.h>
 #include "console.h"
 #include "keyboard.h"
+#include "list.h"
 
 // https://www.win.tue.nl/~aeb/linux/kbd/scancodes-1.html
 
@@ -10,12 +11,17 @@
 // Let's ignore caps lock for now, but keep track of shift
 static uint8_t shift_down = 0;
 
-static void (*listenerCallback)(char);
+static struct list* inputCallbackList = (struct list*) 0;
 
 // Call for characters that count as input (for now just print them...)
 static inline void gotInput(char c) {
-    //printc(c);
-    listenerCallback(c);
+    forEachListItem(inputCallbackList, ({
+        void __fn__ (void* item) {
+            void (*cb)(char) = (void (*)(char)) item;
+            cb(c);
+        }
+        __fn__;
+    }));
 }
 
 void keyScanned(uint8_t c) {
@@ -100,5 +106,14 @@ void keyScanned(uint8_t c) {
 // Have dynamic list of listeners, so more than one thing can listen, I think.
 // For now have just one, or an array of 3 potential ones or something?
 void registerKbdListener(void (*gotChar)(char)) {
-    listenerCallback = gotChar;
+    if (!inputCallbackList)
+        inputCallbackList = newList();
+
+    addToList(inputCallbackList, (void*) gotChar);
+}
+
+void unregisterKbdListener(void (*gotChar)(char)) {
+    if (!inputCallbackList) return;
+
+    removeFromList(inputCallbackList, (void*) gotChar);
 }
