@@ -145,10 +145,8 @@ l2_loop:
 
         jmp sect2
 
-loading: db "Loading sectors after boot sector...", 0x0d, 0x0a, 0
 loaded: db "Sectors loaded!", 0x0d, 0x0a, 0
 sect2running: db "Running from second sector code!", 0x0d, 0x0a, 0
-msg64bit: db "In 64-bit protected mode!", 0
 lba_error_s: db "LBA returned an error; please check AH for return code", 0x0d, 0x0a, 0
 
 teleprint:
@@ -202,13 +200,13 @@ sect2:
         ;   fine on real-world hardware, including AMD processors, despite the manual.  So let's leave it.
 
         lgdt [gdtr]
+
 	; Enable paging and enter protected mode
 	mov eax, cr0
 	or eax, 1 << 31 | 1
 	mov cr0, eax
 
-        ;lgdt [gdtr]             ; AMD manual says next instruction after mov CR0 must be a branch, so do this earlier
-        jmp 8:start64
+        jmp CODE_SEG:start64
 
 bits 64
 start64:
