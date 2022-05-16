@@ -34,8 +34,9 @@ char* M_sprintf(char* fmt, ...) {
     va_start(ap, fmt);
 
     for (char* p = fmt; *p; p++) {
-        // if (t - s > slen)
-        //     remalloc
+        int b;
+        char c;
+
         if (slen - i < 2) {
             slen *= 2;
             s = realloc(s, slen);
@@ -46,7 +47,42 @@ char* M_sprintf(char* fmt, ...) {
             continue;
         }
 
-        switch (*++p) { // Skip past '%'
+        // *p is '%'
+        c = *++p;
+        switch (c) {
+        case 'h':
+        case 'u':
+            // if (*p < '0' || *p > '9') {
+            //     s[i++] = c;
+            //     s[i++] = *p;
+            //     continue;
+            // }
+            // b = c + '0';
+            switch (*p) {
+            case '1':
+            case '2':
+            case '4':
+            case '8':
+                b = c + '0';
+                break;
+            deafult:
+                s[i++] = c;
+                s[i++] = *p;
+                continue;
+            }
+            break;
+        }
+
+        switch (c) {
+        case 'u':
+            break;
+        case 'h':
+            switch (b) {
+            case 1:
+                u1 = va_arg(ap, uint8_t);
+                break;
+            }
+            break;
         case 's':
             // malloc and copy -- so need strlen and strcopy
             break;
