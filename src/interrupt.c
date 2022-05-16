@@ -38,9 +38,7 @@ static inline void log(char* s) {
 }
 
 void __attribute__((naked)) waitloop() {
-    print_com1("starting waitloop\n");
     __asm__ __volatile__(
-//      "mov $0x7bff, %esp\n" // We'll never return anywhere or use anything currently on the stack, so reset it
         "mov $"
         QUOTE(KERNEL_STACK_TOP)
         ", %esp\n" // We'll never return anywhere or use anything currently on the stack, so reset it

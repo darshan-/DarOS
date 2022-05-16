@@ -1,5 +1,4 @@
 #include <stdint.h>
-#include "console.h"
 #include "keyboard.h"
 #include "list.h"
 
@@ -106,48 +105,14 @@ void keyScanned(uint8_t c) {
 // Have dynamic list of listeners, so more than one thing can listen, I think.
 // For now have just one, or an array of 3 potential ones or something?
 void registerKbdListener(void (*gotChar)(char)) {
-    print_com1("registerKbdListner top\n");
     if (!inputCallbackList)
         inputCallbackList = newList();
 
-    print_com1("registerKbdListner: we have a list: 0x");
-    char qs[17];
-    qs[16] = '\0';
-    qwordToHex(inputCallbackList, qs);
-    print_com1(qs);
-    print_com1("\n");
-
     addToList(inputCallbackList, (void*) gotChar);
-    print_com1("registerKbdListner bottom\n");
 }
 
 void unregisterKbdListener(void (*gotChar)(char)) {
     if (!inputCallbackList) return;
 
     removeFromList(inputCallbackList, (void*) gotChar);
-}
-
-void dumpKeyboardStaticInits() {
-    char qs[17];
-    qs[16] = '\0';
-
-    print_com1("&inputCallbackList: 0x");
-    qwordToHex(&inputCallbackList, qs);
-    print_com1(qs);
-    print_com1("\n");
-
-    print_com1("inputCallbackList: 0x");
-    qwordToHex(inputCallbackList, qs);
-    print_com1(qs);
-    print_com1("\n");
-
-    print_com1("&shift_down: 0x");
-    qwordToHex(&shift_down, qs);
-    print_com1(qs);
-    print_com1("\n");
-
-    print_com1("shift_down: 0x");
-    qwordToHex(shift_down, qs);
-    print_com1(qs);
-    print_com1("\n");
 }

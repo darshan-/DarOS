@@ -20,11 +20,6 @@ void clearScreen() {
         *v = 0x0700070007000700;
     cur = (uint8_t*) VRAM;
     updateCursorPosition();
-
-    // outb(0x3D4, 0x0A);
-    // outb(0x3D5, (inb(0x3D5) & 0xC0) | 0);
-    // outb(0x3D4, 0x0B);
-    // outb(0x3D5, (inb(0x3D5) & 0xE0) | 15);
 }
 
 static inline void advanceLine() {
@@ -44,8 +39,8 @@ static inline void curAdvanced() {
 
     advanceLine();
     cur = (uint8_t*) VRAM + (160*24);
-    // Currently don't offer character-at-a-time printing externally, so let's not call this here.
-    //updateCursorPosition();
+    // We don't want to waste time updating VGA cursor position for every character of a string, so don't
+    //  call updateCursorPosition() here, but only at end of exported functions that move cursor.
 }
 
 #define printcc(c, cl) *cur++ = c; *cur++ = cl
@@ -80,12 +75,6 @@ void print(char* s) {
 void printc(char c) {
     printCharColor(c, 0x07);
     updateCursorPosition();
-}
-
-void printPrintc() {
-    char* t3 = "&printc: 0x0000000000000000\n";
-    qwordToHex(&printc, &t3[11]);
-    print(t3);
 }
 
 //void readline(void (*lineread)(char*))) { // how would we pass it back without dynamic memory allocation?
