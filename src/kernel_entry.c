@@ -3,7 +3,9 @@
 #include "hex.h"
 #include "interrupt.h"
 #include "keyboard.h"
+#include "malloc.h"
 #include "serial.h"
+#include "strings.h"
 
 // static void dumpMem(uint8_t* start, int count) {
 //     char* s = " ";
@@ -42,8 +44,12 @@ void __attribute__((section(".kernel_entry"))) kernel_entry() {
     init_idt();
     clearScreen();
 
-
     printColor("Ready!\n", 0x0d);
+
+    char* s = M_sprintf("Hi %s okay!\n");
+    print(s);
+    free(s);
+
     print_com1("starting tty\n");
     startTty();
     print_com1("going to waitloop\n");
