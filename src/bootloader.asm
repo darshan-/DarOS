@@ -57,6 +57,8 @@
         PT_HUGE equ 1<<7
 
         CR4_PAE equ 1<<5
+        CR0_PROTECTION equ 1
+        CR0_PAGING equ 1 << 31
 
         ; Let's load 960 sectors, 120 at a time (128 is max at a time, 961 total is max in safe area)
         SECT_PER_LOAD equ 120
@@ -99,14 +101,11 @@ lba_success:
         ; Apparently I'll want to ask BIOS about memory (https://wiki.osdev.org/Detecting_Memory_(x86))
         ;   while I'm still in real mode, probably somewhere around here, at some point.
 
-        ; Enable A20 bit
-        mov ax, 0x2401
-        int 0x15
-
+        ; I can't really find anything else recommending or even documenting this, so I'm getting rid of it for now
         ; Let BIOS know we're going to long mode, per https://wiki.osdev.org/X86-64
-        mov ax, 0xec00
-        mov bl, 2               ; We'll switch to long mode and stay there
-        int 0x15
+        ; mov ax, 0xec00
+        ; mov bl, 2               ; We'll switch to long mode and stay there
+        ; int 0x15
 
         cli
 
@@ -203,7 +202,7 @@ sect2:
 
 	; Enable paging and enter protected mode
 	mov eax, cr0
-	or eax, 1 << 31 | 1
+	or eax, CR0_PAGING | CR0_PROTECTION
 	mov cr0, eax
 
         jmp CODE_SEG:start64
