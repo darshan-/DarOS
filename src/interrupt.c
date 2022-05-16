@@ -5,6 +5,8 @@
 #include "io.h"
 #include "keyboard.h"
 
+#define IDT 0
+#define CODE_SEG 8 // 1 quadword past null descriptor; next segment would be 16, etc.
 #define TYPE_TRAP 0b1111
 #define TYPE_INT 0b1110
 
@@ -92,7 +94,7 @@ static inline void generic_trap_n(struct interrupt_frame *frame, int n) {
 // Is there an easier/cleaner/more efficient way to do this?  Macros are weird, clunky, too powerful and too
 //   limited at the same time...
 
-#define SET_GTRAP_N(nn) set_handler((uint16_t*) (16 * 0x##nn), trap_handler_0x##nn, TYPE_TRAP);
+#define SET_GTRAP_N(nn) set_handler(0x##nn, trap_handler_0x##nn, TYPE_TRAP);
 
 #define TRAP_N(nn) static void __attribute__((interrupt)) trap_handler_0x##nn(struct interrupt_frame *frame) {\
     generic_trap_n(frame, 0x##nn);\
@@ -244,7 +246,8 @@ static void __attribute__((interrupt)) kbd_irq(struct interrupt_frame *frame) {
     keyScanned(code);
 }
 
-static void set_handler(uint16_t* idt_entry, void* handler, uint8_t type) {
+static void set_handler(uint64_t vec, void* handler, uint8_t type) {
+    uint16_t* idt_entry = (uint16_t*) (IDT + 16 * vec);
     uint64_t offset = (uint64_t) handler;
     *idt_entry = (uint16_t) (offset & 0xffff);
     offset >>= 16;
@@ -257,28 +260,25 @@ static void set_handler(uint16_t* idt_entry, void* handler, uint8_t type) {
 
 void init_idt() {
     for (int i = 0; i < 32; i++)
-        set_handler((uint16_t*) (uint64_t) (16 * i), default_trap_handler, TYPE_TRAP);
+        set_handler(i, default_trap_handler, TYPE_TRAP);
     for (int i = 32; i < 256; i++)
-        set_handler((uint16_t*) (uint64_t)  (16 * i), default_interrupt_handler, TYPE_INT);
+        set_handler(i, default_interrupt_handler, TYPE_INT);
 
-    set_handler((uint16_t*) (16 * 0x21), kbd_irq, TYPE_INT);
+    set_handler(0x21, kbd_irq, TYPE_INT);
 
     // These are the traps with errors on stack according to https://wiki.osdev.org/Exceptions, 
-    set_handler((uint16_t*) (16 * 8), double_fault_handler, TYPE_TRAP);
+    set_handler(8, double_fault_handler, TYPE_TRAP);
     for (int i = 10; i <= 14; i++)
-        set_handler((uint16_t*)  (uint64_t) (16 * i), default_trap_with_error_handler, TYPE_TRAP);
-    set_handler((uint16_t*) (16 * 17), default_trap_with_error_handler, TYPE_TRAP);
-    set_handler((uint16_t*) (16 * 21), default_trap_with_error_handler, TYPE_TRAP);
-    set_handler((uint16_t*) (16 * 29), default_trap_with_error_handler, TYPE_TRAP);
-    set_handler((uint16_t*) (16 * 30), default_trap_with_error_handler, TYPE_TRAP);
-
-    //set_handler((uint16_t*) (16 * 0), divide_by_zero_handler, TYPE_TRAP);
-    //set_handler((uint16_t*) (16 * 0), trap_handler_0x00, TYPE_TRAP);
+        set_handler(i, default_trap_with_error_handler, TYPE_TRAP);
+    set_handler(17, default_trap_with_error_handler, TYPE_TRAP);
+    set_handler(21, default_trap_with_error_handler, TYPE_TRAP);
+    set_handler(29, default_trap_with_error_handler, TYPE_TRAP);
+    set_handler(30, default_trap_with_error_handler, TYPE_TRAP);
 
     TRAPS(SET_GTRAP_N, 0);
     TRAPS(SET_GTRAP_N, 1);
 
-    set_handler((uint16_t*) (16 * 0), divide_by_zero_handler, TYPE_TRAP);
+    set_handler(0, divide_by_zero_handler, TYPE_TRAP);
 
     init_pic();
 }
