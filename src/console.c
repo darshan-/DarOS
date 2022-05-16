@@ -82,6 +82,12 @@ void printc(char c) {
     updateCursorPosition();
 }
 
+void printPrintc() {
+    char* t3 = "&printc: 0x0000000000000000\n";
+    qwordToHex(&printc, &t3[11]);
+    print(t3);
+}
+
 //void readline(void (*lineread)(char*))) { // how would we pass it back without dynamic memory allocation?
     // Set read start cursor location (which scrolls up with screen if input is over one line (with issue of
     //    what to do if it's a whole screenful undecided for now)).

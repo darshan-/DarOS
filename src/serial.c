@@ -1,5 +1,6 @@
 #include "io.h"
 #include "serial.h"
+//#include //"strings.h"
 
 #define COM1 0x3f8
 
@@ -20,3 +21,8 @@ void print_com1(char* s) {
     while (*s != 0)
         write_com1(*s++);
 }
+
+// void printf_com1(char* s, ...) {
+//     printf(print_com1, s, ...);// However you pass along varargs
+//     // Calls printf (from strings) with 
+// }

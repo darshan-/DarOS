@@ -18,6 +18,11 @@
 #define PIC_SECONDARY_CMD 0xa0
 #define PIC_SECONDARY_DATA 0xa1
 
+#define KERNEL_STACK_TOP 0xeffff
+// Need extra level of indirection to quote a macro value, due to a special rule around argument prescan.
+#define QUOT(v) #v
+#define QUOTE(v) QUOT(v)
+
 struct interrupt_frame
 {
     uint64_t ip;
@@ -33,8 +38,12 @@ static inline void log(char* s) {
 }
 
 void __attribute__((naked)) waitloop() {
+    print_com1("starting waitloop\n");
     __asm__ __volatile__(
-        "mov $0x7bff, %esp\n" // We'll never return anywhere or use anything currently on the stack, so reset it
+//      "mov $0x7bff, %esp\n" // We'll never return anywhere or use anything currently on the stack, so reset it
+        "mov $"
+        QUOTE(KERNEL_STACK_TOP)
+        ", %esp\n" // We'll never return anywhere or use anything currently on the stack, so reset it
         "loop:\n"
         "sti\n"
         "hlt\n"

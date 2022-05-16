@@ -2,31 +2,47 @@
 
 c_objects := $(patsubst src/%.c, build/%.o, $(wildcard src/*.c))
 
+GCC_OPTS := -Wall -Wextra -c -ffreestanding -fno-stack-protector -mgeneral-regs-only -mno-red-zone #-fno-zero-initialized-in-bss
+
+LD_OPTS := -N --warn-common -T src/linker.ld # --print-map
+
+include build/headers.mk
+
 build out:
 	mkdir -p $@
+
+# TODO: Doesn't account for headers including other local headers (could use gcc --freestanding -M instead?)
+#   For now let's just have a rule against doing that, and deal with it if I ever need to do it.
+build/headers.mk: src/*.c src/*.h | build
+	cd src && for cf in *.c; do echo -n "build/$$cf" | sed 's/\.c$$/\.o: /'; grep "#include \"" "$$cf" | awk '{print $$2}' | awk -F '"' '{print "src/"$$2}' | xargs; done >../build/headers.mk
 
 build/bootloader: Makefile src/bootloader.asm | build
 	nasm src/bootloader.asm -o build/bootloader
 
 build/*.o: Makefile
 build/%.o: src/%.c | build
-	gcc -Wall -Wextra -c -ffreestanding -fno-stack-protector -mgeneral-regs-only -mno-red-zone $< -o $@
+	gcc $(GCC_OPTS) $< -o $@
 
-# --print-map
-build/kernel.bin: $(c_objects) build/bootloader
-	ld -o build/kernel.bin -N --warn-common -T src/linker.ld -Ttext $(shell echo $$((`wc -c <build/bootloader`))) $(c_objects)
+build/kernel.bin: $(c_objects) src/linker.ld build/bootloader
+	ld -o build/kernel.bin $(LD_OPTS) -Ttext $(shell echo $$((`wc -c <build/bootloader`))) $(c_objects)
 
-out/boot.img: build/bootloader src/linker.ld build/kernel.bin | out
+out/boot.img: build/bootloader build/kernel.bin | out
 	cat build/bootloader build/kernel.bin >out/boot.img
 
 .PHONY: run
 run: out/boot.img
-	qemu-system-x86_64 -drive format=raw,file=out/boot.img
+	qemu-system-x86_64 -enable-kvm -drive format=raw,file=out/boot.img
+
+double-run: out/boot.img
+	cat out/boot.img out/boot.img >out/double-boot.img
+	qemu-system-x86_64 -enable-kvm -drive format=raw,file=out/double-boot.img
+bigrun: out/boot.img
+	cat out/boot.img out/3.img out/3.img >out/big.img
+	qemu-system-x86_64 -enable-kvm -drive format=raw,file=out/big.img
 
 .PHONY: clean
 clean:
 	rm -rf out build
-
 
 # TODO: I guess with C I need to have each object file list any .h files the .c file includes as prereq
 # And I want to set bootloader up to read the right number of sectors.  Oh, er, hmm... BIOS can only

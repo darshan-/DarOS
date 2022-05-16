@@ -8,12 +8,14 @@
 static uint8_t* cur = BOTTOM;
 
 void *malloc(int nBytes) {
+    print_com1("malloc top\n");
     uint8_t* tentative = cur + nBytes;
 
     if (tentative > TOP)
         return 0;
 
     cur = tentative;
+    print_com1("malloc bottom\n");
     return cur;
 }
 

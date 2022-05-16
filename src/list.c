@@ -11,9 +11,12 @@ struct list {
 };
 
 struct list* newList() {
+    print_com1("newList top\n");
     struct list* l = malloc(sizeof(struct list));
+    print_com1("newList: setting head\n");
     l->head = (struct list_node*) 0;
 
+    print_com1("newList bottom\n");
     return l;
 }
 
