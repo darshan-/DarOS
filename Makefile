@@ -33,13 +33,6 @@ out/boot.img: build/bootloader build/kernel.bin | out
 run: out/boot.img
 	qemu-system-x86_64 -enable-kvm -drive format=raw,file=out/boot.img
 
-double-run: out/boot.img
-	cat out/boot.img out/boot.img >out/double-boot.img
-	qemu-system-x86_64 -enable-kvm -drive format=raw,file=out/double-boot.img
-bigrun: out/boot.img
-	cat out/boot.img out/3.img out/3.img >out/big.img
-	qemu-system-x86_64 -enable-kvm -drive format=raw,file=out/big.img
-
 .PHONY: clean
 clean:
 	rm -rf out build
