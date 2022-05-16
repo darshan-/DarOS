@@ -64,8 +64,8 @@
 
         INT_0X13_LBA_READ equ 0x42
 
+section .boot
 bits 16
-org 0x7c00
         mov cx, LOAD_COUNT
 	mov si, dap
         ; dl is set by BIOS to drive number we're loaded from, so just leave it as is

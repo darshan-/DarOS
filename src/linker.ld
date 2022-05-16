@@ -4,10 +4,13 @@ OUTPUT_FORMAT("binary")
 
 SECTIONS
 {
+        . = 0x7c00;
+
 	.text :
 	{
+                *(.boot)
                 *(.kernel_entry)
-		*(.text)
+                *(.text)
 	}
 
         /*

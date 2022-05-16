@@ -16,18 +16,15 @@ build out:
 build/headers.mk: src/*.c src/*.h | build
 	cd src && for cf in *.c; do echo -n "build/$$cf" | sed 's/\.c$$/\.o: /'; grep "#include \"" "$$cf" | awk '{print $$2}' | awk -F '"' '{print "src/"$$2}' | xargs; done >../build/headers.mk
 
-build/bootloader: Makefile src/bootloader.asm | build
-	nasm src/bootloader.asm -o build/bootloader
+build/bootloader.o: Makefile src/bootloader.asm | build
+	nasm -f elf64 src/bootloader.asm -o build/bootloader.o
 
 build/*.o: Makefile
 build/%.o: src/%.c | build
 	gcc $(GCC_OPTS) $< -o $@
 
-build/kernel.bin: $(c_objects) src/linker.ld build/bootloader
-	ld -o build/kernel.bin $(LD_OPTS) -Ttext $(shell echo $$((`wc -c <build/bootloader`))) $(c_objects)
-
-out/boot.img: build/bootloader build/kernel.bin | out
-	cat build/bootloader build/kernel.bin >out/boot.img
+out/boot.img: $(c_objects) src/linker.ld build/bootloader.o | out
+	ld -o out/boot.img $(LD_OPTS) build/bootloader.o $(c_objects)
 
 .PHONY: run
 run: out/boot.img
