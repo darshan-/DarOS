@@ -25,8 +25,7 @@
 #define QUOT(v) #v
 #define QUOTE(v) QUOT(v)
 
-struct interrupt_frame
-{
+struct interrupt_frame {
     uint64_t ip;
     uint64_t cs;
     uint64_t flags;
@@ -256,6 +255,7 @@ static void set_handler(uint64_t vec, void* handler, uint8_t type) {
     *((uint32_t*) (idt_entry+4)) = (uint32_t) offset;
 
     *(idt_entry+2) = (uint16_t) 1<<15 | type << 8;
+    *(idt_entry+1) = CODE_SEG;
 }
 
 void init_idt() {

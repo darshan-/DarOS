@@ -175,7 +175,7 @@ gdtr:
 
 idtr:
         dw 4095                 ; Size of IDT minus 1
-        dq 0                    ; Address
+        dq idt                  ; Address
 
 dap:
         db 0x10                 ; Size of DAP (Disk Address Packet)
@@ -211,20 +211,6 @@ sect2:
         jmp 8:start64
 
 bits 64
-print:
-        mov cl, [ebx]
-        cmp cl, 0
-        jz .done
-
-        mov byte [eax], cl
-        inc eax
-        mov byte [eax], ch
-        inc eax
-        inc ebx
-        jmp print
-.done:
-        ret
-
 start64:
         ; Set up segment registers (the far jump down here set up cs)
         xor ax, ax
@@ -234,19 +220,6 @@ start64:
         mov gs, ax
         mov ss, ax
 
-        mov esp, stack_top
-
-        mov eax, 0xb8000+480
-        mov ebx, msg64bit
-        mov ch, 0x05
-        call print
-
-        ; Set Segment Selector for IDT entries, leaving the rest of IDT set up for C kernel
-        mov ebx, idt
-        mov ecx, 256
-loop_idt:
-        mov word [ebx+2], CODE_SEG
-        add ebx, 16
-        loop loop_idt
-
         lidt [idtr]
+
+        mov esp, stack_top
