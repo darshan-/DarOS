@@ -60,6 +60,9 @@
         CR0_PROTECTION equ 1
         CR0_PAGING equ 1 << 31
 
+        MSR_IA32_EFER equ 0xC0000080 ; Extended Feature Enable Register
+        EFER_LONG_MODE_ENABLE equ 1<<8
+
         ; Let's load 960 sectors, 120 at a time (128 is max at a time, 961 total is max in safe area)
         SECT_PER_LOAD equ 120
         LOAD_COUNT equ 8
@@ -132,9 +135,9 @@ l2_loop:
 	mov cr4, eax
 
 	; Enable long mode
-	mov ecx, 0xC0000080     ; EFER.LME?
+	mov ecx, MSR_IA32_EFER
 	rdmsr
-	or eax, 1 << 8
+	or eax, EFER_LONG_MODE_ENABLE
 	wrmsr
 
         jmp sect2
