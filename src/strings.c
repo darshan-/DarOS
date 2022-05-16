@@ -57,20 +57,25 @@
  */
 char* M_sprintf(char* fmt, ...) {
     va_list ap;
-    int slen = 64;
-    char* s = malloc(slen);
-    char* t;
-    char* t2;
+    va_start(ap, fmt);
+    char* s = M_vsprintf(fmt, ap);
+    va_end(ap);
+    return s;
+}
+
+char* M_vsprintf(char* fmt, va_list ap) {
+    int scap = 64;
+    char* s = malloc(scap);
+    char c, *t, *t2;
     int i = 0; // Index into s where we will place next character
+    int width;
     char qs[17];
     qs[16] = '\0';
 
-    va_start(ap, fmt);
-
     for (char* p = fmt; *p; p++) {
-        if (slen - i < 2) {
-            slen *= 2;
-            s = realloc(s, slen);
+        if (scap - i < 2) {
+            scap *= 2;
+            s = realloc(s, scap);
         }
 
         if (*p != '%') {
@@ -78,7 +83,11 @@ char* M_sprintf(char* fmt, ...) {
             continue;
         }
 
-        switch (*++p) { // Skip past the '%'
+        c = *++p; // Skip past the '%'
+        if (c >= '0' && c <= '9') {
+        }
+
+        switch (c) {
         case 'u':
             break;
         case 'h':
@@ -104,9 +113,7 @@ char* M_sprintf(char* fmt, ...) {
         }
     }
 
-    va_end(ap);
-
-    // We made sure above there was always enough room for this
+    // We made sure above that there was always enough room for this
     s[i] = '\0';
 
     return s;

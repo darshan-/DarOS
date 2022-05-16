@@ -46,9 +46,11 @@ void __attribute__((section(".kernel_entry"))) kernel_entry() {
 
     printColor("Ready!\n", 0x0d);
 
-    char* s = M_sprintf("Hi %s okay!  Because, if all is well, 0x%h is hex...\n", "are you", 0x0badface);
+    char* s = M_sprintf("Hi, %s okay?  Because, if all is well, 0x%h is hex...\n", "are you", 0x0badface);
     print(s);
     free(s);
+
+    printf("Hi, %s okay!  Because, if all is well, 0x%h is hex...\n", "I am", 0xfacade);
 
     print_com1("starting tty\n");
     startTty();

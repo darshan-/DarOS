@@ -1,6 +1,8 @@
+#include <stdarg.h>
 #include <stdint.h>
 #include "console.h"
 #include "io.h"
+#include "strings.h"
 
 static uint8_t* cur = (uint8_t*) VRAM + (160*4);
 
@@ -75,6 +77,15 @@ void print(char* s) {
 void printc(char c) {
     printCharColor(c, 0x07);
     updateCursorPosition();
+}
+
+void printf(char* fmt, ...) {
+    va_list ap;
+    va_start(ap, fmt);
+    char* s = M_vsprintf(fmt, ap);
+    va_end(ap);
+    print(s);
+    free(s);
 }
 
 //void readline(void (*lineread)(char*))) { // how would we pass it back without dynamic memory allocation?
