@@ -64,7 +64,8 @@
         SECT_PER_LOAD equ 120
         LOAD_COUNT equ 8
 
-        INT_0X13_LBA_READ equ 0x42
+        INT_0x10_TELETYPE equ 0x0e
+        INT_0x13_LBA_READ equ 0x42
 
 section .boot
 bits 16
@@ -72,7 +73,7 @@ bits 16
 	mov si, dap
         ; dl is set by BIOS to drive number we're loaded from, so just leave it as is
 lba_read:
-	mov ah, INT_0X13_LBA_READ      ; Must set on every loop, as ah gets return code
+	mov ah, INT_0x13_LBA_READ      ; Must set on every loop, as ah gets return code
 	int 0x13
 
         mov ax, [dap.toseg]
@@ -100,12 +101,6 @@ lba_success:
 
         ; Apparently I'll want to ask BIOS about memory (https://wiki.osdev.org/Detecting_Memory_(x86))
         ;   while I'm still in real mode, probably somewhere around here, at some point.
-
-        ; I can't really find anything else recommending or even documenting this, so I'm getting rid of it for now
-        ; Let BIOS know we're going to long mode, per https://wiki.osdev.org/X86-64
-        ; mov ax, 0xec00
-        ; mov bl, 2               ; We'll switch to long mode and stay there
-        ; int 0x15
 
         cli
 
@@ -149,7 +144,7 @@ sect2running: db "Running from second sector code!", 0x0d, 0x0a, 0
 lba_error_s: db "LBA returned an error; please check AH for return code", 0x0d, 0x0a, 0
 
 teleprint:
-        mov ah, 0x0e            ; Teletype output
+        mov ah, INT_0x10_TELETYPE
 .loop:
         mov al, [bx]
         cmp al, 0
