@@ -58,80 +58,23 @@
 
         CR4_PAE equ 1<<5
 
-bits 16
-org 0x7c00
-top:
-        push dx                 ; dl is set by BIOS to drive number we're loaded from, and we want it for int 13h
-
-        jmp start
-
-loading: db "Loading sectors after boot sector...", 0x0d, 0x0a, 0
-loaded: db "Sectors loaded!", 0x0d, 0x0a, 0
-sect2running: db "Running from second sector code!", 0x0d, 0x0a, 0
-msg64bit: db "In 64-bit protected mode!", 0
-lba_error_s: db "LBA returned an error; please check AH for return code", 0x0d, 0x0a, 0
-
-teleprint:
-        mov ah, 0x0e            ; Teletype output
-.loop:
-        mov al, [bx]
-        cmp al, 0
-        jz done
-
-        int 0x10
-        inc bx
-        jmp .loop
-done:
-        ret
-
-
-        CODE_SEG equ 0+(8*1)    ; Code segment is 1st (and only, at least for now) segment
-gdt:
-	dq 0
-        dq SD_PRESENT | SD_NONTSS | SD_CODESEG | SD_READABLE | SD_GRAN4K | SD_MODE64 ; Code segment
-gdtr:
-	dw $ - gdt - 1          ; Length in bytes minus 1
-	dq gdt                  ; Address
-
-idtr:
-        dw 4095                 ; Size of IDT minus 1
-        dq 0                    ; Address
-
-
-        ; Let's load 960 sectors, 8 at a time
+        ; Let's load 960 sectors, 120 at a time (128 is max at a time, 961 total is max in safe area)
         SECT_PER_LOAD equ 120
         LOAD_COUNT equ 8
-dap:
-        db 0x10                 ; Size of DAP (Disk Address Packet)
-        db 0                    ; Unused; should be zero
-.cnt:   dw SECT_PER_LOAD        ; Number of sectors to read, 0x80 (128) max; overwritten with number read
-.to:    dw sect2
-.toseg: dw 0                    ; segment
-.from:  dq 1                    ; LBA number (sector to start reading from)
 
+        INT_0X13_LBA_READ equ 0x42
 
-start:
-        ; Clear screen by setting VGA mode (to the normal mode we're already in)
-        mov ax, 0x3             ; ah: 0 (set video mode); al: 3 (80x25 text with colors)
-        int 0x10
-
-        ; Turn off the cursor
-        ; mov ah, 1               ; set cursor size
-        ; mov ch, 1<<5            ; bit 5 disables cursor
-        ; int 10h
-
-        pop dx
+bits 16
+org 0x7c00
         mov cx, LOAD_COUNT
 	mov si, dap
+        ; dl is set by BIOS to drive number we're loaded from, so just leave it as is
 lba_read:
-        mov bx, loading
-        call teleprint
-
-	mov ah, 0x42            ; Which int 13 function we're calling
+	mov ah, INT_0X13_LBA_READ      ; Must set on every loop, as ah gets return code
 	int 0x13
 
         mov ax, [dap.toseg]
-        add ax, (SECT_PER_LOAD*512)>>4 ; Increment segment by number of bytes, (segment is address shifted 4)
+        add ax, (SECT_PER_LOAD*512)>>4 ; Increment segment rather than offset (segment is address shifted 4)
         mov [dap.toseg], ax
 
         mov eax, [dap.from]
@@ -148,37 +91,6 @@ lba_error:
         cli
         hlt
 
-        ; cli
-        ; hlt
-;         pop dx
-;         mov cx, 31
-;         ;mov cx, 13
-; read_sectors:
-;         push cx
-;         push dx
-;         ;mov bx, loading
-;         ;call teleprint
-;         ;; Based on https://en.wikipedia.org/wiki/INT_13H
-;         xor ax, ax    ; Idiomatic, and better in some ways than mov ax, 0
-;         mov ds, ax    ; ds and es need to be set to 0, and mov needs another register
-;         mov es, ax
-;         cld
-;         mov ah, 2     ; Int 13h function 2: "Read sectors from drive"
-;         mov al, 31  ; How many sectors to read -- change as necessary
-;         ;mov al, 74  ; How many sectors to read -- change as necessary
-;         mov ch, 0     ; Cylinder
-;         mov cl, 2     ; 1-indexed sector to start reading from
-;         pop dx        ; dl is drive number, and BIOS set it to the drive number we're loaded from (which we
-;                       ;   want to keep reading from).  We pushed dx first thing so we can restore it now.
-;         mov dh, 0     ; Head
-;         mov bx, sect2 ; Let's load it right after us
-;         ;mov bx, top ; Let's load it right after us
-;         int 0x13
-;         pop dx
-;         pop cx
-;         loop read_sectors
-
-        ; TODO: Check CF to see if error?
 
 lba_success:
         mov bx, loaded
@@ -232,6 +144,46 @@ l2_loop:
 	wrmsr
 
         jmp sect2
+
+loading: db "Loading sectors after boot sector...", 0x0d, 0x0a, 0
+loaded: db "Sectors loaded!", 0x0d, 0x0a, 0
+sect2running: db "Running from second sector code!", 0x0d, 0x0a, 0
+msg64bit: db "In 64-bit protected mode!", 0
+lba_error_s: db "LBA returned an error; please check AH for return code", 0x0d, 0x0a, 0
+
+teleprint:
+        mov ah, 0x0e            ; Teletype output
+.loop:
+        mov al, [bx]
+        cmp al, 0
+        jz done
+
+        int 0x10
+        inc bx
+        jmp .loop
+done:
+        ret
+
+
+        CODE_SEG equ 0+(8*1)    ; Code segment is 1st (and only, at least for now) segment
+gdt:
+	dq 0
+        dq SD_PRESENT | SD_NONTSS | SD_CODESEG | SD_READABLE | SD_GRAN4K | SD_MODE64 ; Code segment
+gdtr:
+	dw $ - gdt - 1          ; Length in bytes minus 1
+	dq gdt                  ; Address
+
+idtr:
+        dw 4095                 ; Size of IDT minus 1
+        dq 0                    ; Address
+
+dap:
+        db 0x10                 ; Size of DAP (Disk Address Packet)
+        db 0                    ; Unused; should be zero
+.cnt:   dw SECT_PER_LOAD        ; Number of sectors to read, 0x80 (128) max; overwritten with number read
+.to:    dw sect2
+.toseg: dw 0                    ; segment
+.from:  dq 1                    ; LBA number (sector to start reading from)
 
         ; I just checked, and as expected and hoped, NASM will complain if we put too much above, because
         ;  this vaule will end up being negative, so we can't assemble.  So go ahead and put as much above
