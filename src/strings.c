@@ -71,8 +71,6 @@ char* M_sprintf(char* fmt, ...) {
     return s;
 }
 
-// We're appending without updateing scap...
-
 char* M_vsprintf(char* fmt, va_list ap) {
     int scap = 64;
     char* s = malloc(scap);
@@ -154,12 +152,6 @@ char* M_vsprintf(char* fmt, va_list ap) {
             s[i++] = *t++;
     }
 
-    // We made sure above that there was always enough room for this
-    //  TODO: Wait, except if I called M_append and reassigned to s, right?
-    //  Oh, but I can have M_append always malloc enough for 1 extra ch.... Wait.
-    //    If the last thing we did was append, then... wait.
-    //  append *should*, but doesn't currently set a 0 at the end.  Once I do, then:
-    //  then s will already have a zero at the end, and i will take us there, so we'll be good.
     s[i] = '\0';
 
     return s;
