@@ -1,7 +1,6 @@
 #include <stdint.h>
 //#include "console.h"
 #include "serial.h"
-#include "hex.h"
 #include "io.h"
 #include "keyboard.h"
 
@@ -54,32 +53,32 @@ static void dumpFrame(struct interrupt_frame *frame) {
     char qs[17];
     qs[16] = '\0';
 
-    log("ip: 0x");
-    qwordToHex(frame->ip, qs);
-    log(qs);
-    log("    cs: 0x");
-    qwordToHex(frame->cs, qs);
-    log(qs);
-    log(" flags: 0x");
-    qwordToHex(frame->flags, qs);
-    log(qs);
-    log("\nsp: 0x");
-    qwordToHex(frame->sp, qs);
-    log(qs);
-    log("    ss: 0x");
-    qwordToHex(frame->ss, qs);
-    log(qs);
-    log("\n");
+    // log("ip: 0x");
+    // qwordToHex(frame->ip, qs);
+    // log(qs);
+    // log("    cs: 0x");
+    // qwordToHex(frame->cs, qs);
+    // log(qs);
+    // log(" flags: 0x");
+    // qwordToHex(frame->flags, qs);
+    // log(qs);
+    // log("\nsp: 0x");
+    // qwordToHex(frame->sp, qs);
+    // log(qs);
+    // log("    ss: 0x");
+    // qwordToHex(frame->ss, qs);
+    // log(qs);
+    // log("\n");
 }
 
 static inline void generic_trap_n(struct interrupt_frame *frame, int n) {
-    char bs[3];
-    bs[2] = '\0';
-    byteToHex(n, bs);
+    // char bs[3];
+    // bs[2] = '\0';
+    // byteToHex(n, bs);
 
-    log("Generic trap handler used for trap vector 0x");
-    log(bs);
-    log("\n");
+    // log("Generic trap handler used for trap vector 0x");
+    // log(bs);
+    // log("\n");
     dumpFrame(frame);
 
     // In generic case, it's not safe to do anything but go to waitloop (well, that may well not be safe either;
@@ -212,9 +211,9 @@ static void __attribute__((interrupt)) default_trap_with_error_handler(struct in
     qs[16] = '\0';
 
     log("Default trap handler with error on stack; error: 0x");
-    qwordToHex(error_code, qs);
-    log(qs);
-    log("\n");
+    // qwordToHex(error_code, qs);
+    // log(qs);
+    // log("\n");
     dumpFrame(frame);
 }
 
@@ -223,9 +222,9 @@ static void __attribute__((interrupt)) double_fault_handler(struct interrupt_fra
     qs[16] = '\0';
 
     log("Double fault; error should be zero.  error: 0x");
-    qwordToHex(error_code, qs);
-    log(qs);
-    log("\n");
+    // qwordToHex(error_code, qs);
+    // log(qs);
+    // log("\n");
     dumpFrame(frame);
 }
 
@@ -237,9 +236,9 @@ static void __attribute__((interrupt)) kbd_irq(struct interrupt_frame *frame) {
     outb(PIC_PRIMARY_CMD, PIC_ACK);
 
     log("C keyboard interrupt handler: ");
-    byteToHex(code, bs);
-    log(bs);
-    log("\n");
+    // byteToHex(code, bs);
+    // log(bs);
+    // log("\n");
     dumpFrame(frame);
 
     keyScanned(code);

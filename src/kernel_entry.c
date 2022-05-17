@@ -1,6 +1,5 @@
 #include <stdint.h>
 #include "console.h"
-#include "hex.h"
 #include "interrupt.h"
 #include "keyboard.h"
 #include "malloc.h"
@@ -51,8 +50,10 @@ void __attribute__((section(".kernel_entry"))) kernel_entry() {
     free(s);
 
     printf("Hi, %s okay!  Because, if all is well, 0x%h is hex...\n", "I am", 0xfacade);
+    printf("Hi, %s okay!  Because, if all is well, 0x%h is hex...\n", "I *could* be", 0);
+    printf("Hi, %s okay!  Because, if all is well, %u is unsigned...\n", "I *might* be", 12345);
 
-    com1_printf("Hi, %s okay!  Because, if all is well, 0x%h is hex...\n", "let's be", 0xa1cafe);
+    com1_printf("Hi, %s okay!  Because, if all is well, 0x%10h is hex...\n", "let's be", 0xa1cafe);
 
     com1_print("starting tty\n");
     startTty();

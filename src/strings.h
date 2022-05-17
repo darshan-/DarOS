@@ -7,8 +7,11 @@ char* M_sprintf(char* fmt, ...);
 char* M_vsprintf(char* fmt, va_list ap);
 int strlen(char* s);
 char* M_append(char* s, char* t);
+// Decimal string to unsigned int
+uint64_t dstoui(char* s);
 
-#define VARIADIC_PRINT(p) va_list ap; \
+#define VARIADIC_PRINT(p) \
+    va_list ap; \
     va_start(ap, fmt); \
     char* s = M_vsprintf(fmt, ap); \
     va_end(ap); \
