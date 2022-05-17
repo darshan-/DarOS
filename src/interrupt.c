@@ -35,7 +35,7 @@ struct interrupt_frame {
 
 static inline void log(char* s) {
     //print(s);
-    print_com1(s);
+    com1_print(s);
 }
 
 void __attribute__((naked)) waitloop() {

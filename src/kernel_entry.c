@@ -52,8 +52,10 @@ void __attribute__((section(".kernel_entry"))) kernel_entry() {
 
     printf("Hi, %s okay!  Because, if all is well, 0x%h is hex...\n", "I am", 0xfacade);
 
-    print_com1("starting tty\n");
+    com1_printf("Hi, %s okay!  Because, if all is well, 0x%h is hex...\n", "let's be", 0xa1cafe);
+
+    com1_print("starting tty\n");
     startTty();
-    print_com1("going to waitloop\n");
+    com1_print("going to waitloop\n");
     waitloop();
 }

@@ -1,3 +1,4 @@
 #pragma once
 
-void print_com1(char* s);
+void com1_print(char* s);
+void com1_printf(char* fmt, ...);
