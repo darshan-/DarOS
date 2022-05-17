@@ -50,35 +50,12 @@ void __attribute__((naked)) waitloop() {
 }
 
 static void dumpFrame(struct interrupt_frame *frame) {
-    char qs[17];
-    qs[16] = '\0';
-
-    // log("ip: 0x");
-    // qwordToHex(frame->ip, qs);
-    // log(qs);
-    // log("    cs: 0x");
-    // qwordToHex(frame->cs, qs);
-    // log(qs);
-    // log(" flags: 0x");
-    // qwordToHex(frame->flags, qs);
-    // log(qs);
-    // log("\nsp: 0x");
-    // qwordToHex(frame->sp, qs);
-    // log(qs);
-    // log("    ss: 0x");
-    // qwordToHex(frame->ss, qs);
-    // log(qs);
-    // log("\n");
+    com1_printf("ip: 0x%16h    cs: 0x%16h flags: 0x%16h\n", frame->ip, frame->cs, frame->flags);
+    com1_printf("sp: 0x%16h    ss: 0x%16h\n", frame->sp, frame->ss);
 }
 
 static inline void generic_trap_n(struct interrupt_frame *frame, int n) {
-    // char bs[3];
-    // bs[2] = '\0';
-    // byteToHex(n, bs);
-
-    // log("Generic trap handler used for trap vector 0x");
-    // log(bs);
-    // log("\n");
+    com1_printf("Generic trap handler used for trap vector 0x%2\n", n);
     dumpFrame(frame);
 
     // In generic case, it's not safe to do anything but go to waitloop (well, that may well not be safe either;
@@ -207,38 +184,20 @@ static void __attribute__((interrupt)) default_trap_handler(struct interrupt_fra
 
 static void __attribute__((interrupt)) default_trap_with_error_handler(struct interrupt_frame *frame,
                                                                        uint64_t error_code) {
-    char qs[17];
-    qs[16] = '\0';
-
-    log("Default trap handler with error on stack; error: 0x");
-    // qwordToHex(error_code, qs);
-    // log(qs);
-    // log("\n");
+    com1_printf("Default trap handler with error on stack;  error: 0x%16h\n", error_code);
     dumpFrame(frame);
 }
 
 static void __attribute__((interrupt)) double_fault_handler(struct interrupt_frame *frame, uint64_t error_code) {
-    char qs[17];
-    qs[16] = '\0';
-
-    log("Double fault; error should be zero.  error: 0x");
-    // qwordToHex(error_code, qs);
-    // log(qs);
-    // log("\n");
+    com1_printf("Double fault; error should be zero.  error: 0x%16h\n", error_code);
     dumpFrame(frame);
 }
 
 static void __attribute__((interrupt)) kbd_irq(struct interrupt_frame *frame) {
-    char bs[3];
-    bs[2] = '\0';
-
     uint8_t code = inb(0x60);
     outb(PIC_PRIMARY_CMD, PIC_ACK);
 
-    log("C keyboard interrupt handler: ");
-    // byteToHex(code, bs);
-    // log(bs);
-    // log("\n");
+    com1_printf("C keyboard interrupt handler: %2h\n", code);
     dumpFrame(frame);
 
     keyScanned(code);
