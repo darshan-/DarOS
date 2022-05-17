@@ -8,6 +8,9 @@
 #define VRAM ((uint8_t*) 0xb8000)
 #define LINES 24
 #define LINE(l) (VRAM + 160 * (l))
+#define LAST_LINE LINE(LINES - 1)
+#define STATUS_LINE LINE(LINES)
+#define VRAM_END LINE(LINES + 1)
 
 static uint8_t* cur = VRAM;
 
@@ -23,12 +26,12 @@ static inline void updateCursorPosition() {
 }
 
 void setStatusBar() {
-    for (uint64_t* v = (uint64_t*) LINE(LINES); v < (uint64_t*) LINE(LINES + 1); v++)
+    for (uint64_t* v = (uint64_t*) STATUS_LINE; v < (uint64_t*) VRAM_END; v++)
         *v = 0x3f003f003f003f00;
 }
 
 void clearScreen() {
-    for (uint64_t* v = (uint64_t*) VRAM; v < (uint64_t*) LINE(LINES); v++)
+    for (uint64_t* v = (uint64_t*) VRAM; v < (uint64_t*) STATUS_LINE; v++)
         *v = 0x0700070007000700;
     cur = VRAM;
     updateCursorPosition();
@@ -40,16 +43,16 @@ static inline void advanceLine() {
         for (int j = 0; j < 160; j++)
             VRAM[i * 160 + j] = VRAM[(i + 1) * 160 + j];
 
-    for (uint64_t* v = (uint64_t*) LINE(LINES - 1); v < (uint64_t*) LINE(LINES); v++)
+    for (uint64_t* v = (uint64_t*) LAST_LINE; v < (uint64_t*) STATUS_LINE; v++)
         *v = 0x0700070007000700;
 }
 
 static inline void curAdvanced() {
-    if (cur < LINE(LINES))
+    if (cur < STATUS_LINE)
         return;
 
     advanceLine();
-    cur = LINE(LINES - 1);
+    cur = LAST_LINE;
     // We don't want to waste time updating VGA cursor position for every character of a string, so don't
     //  call updateCursorPosition() here, but only at end of exported functions that move cursor.
 }
