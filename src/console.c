@@ -15,9 +15,7 @@
 static uint8_t* cur = VRAM;
 
 static inline void updateCursorPosition() {
-    uint64_t c = (uint64_t) cur;
-    c -= (uint64_t) VRAM;
-    c /= 2;
+    uint64_t c = (uint64_t) (cur - VRAM) / 2;
 
     outb(0x3D4, 0x0F);
     outb(0x3D4+1, (uint8_t) (c & 0xff));
@@ -57,7 +55,6 @@ static inline void curAdvanced() {
     //  call updateCursorPosition() here, but only at end of exported functions that move cursor.
 }
 
-//#define printcc(c, cl) *cur++ = c; *cur++ = cl
 static inline void printcc(uint8_t c, uint8_t cl) {
     *cur++ = c;
     *cur++ = cl;
