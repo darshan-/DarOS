@@ -33,6 +33,8 @@
 
 static void gotChar(char c) {
     printc(c);
+    if (c == '0')
+        com1_printf("malloc cur is: %h\n", malloc(0));
 }
 
 static void startTty() {

@@ -5,11 +5,14 @@
 #include "malloc.h"
 #include "strings.h"
 
-static uint8_t* cur = (uint8_t*) VRAM + (160*4);
+#define VRAM ((uint8_t*) 0xb8000)
+#define LINES 24
+
+static uint8_t* cur = VRAM;
 
 static inline void updateCursorPosition() {
     uint64_t c = (uint64_t) cur;
-    c -= VRAM;
+    c -= (uint64_t) VRAM;
     c /= 2;
 
     outb(0x3D4, 0x0F);
@@ -18,39 +21,47 @@ static inline void updateCursorPosition() {
     outb(0x3D4+1, (uint8_t) ((c >> 8) & 0xff));
 }
 
+void setStatusBar() {
+    for (uint64_t* v = (uint64_t*) (VRAM + 160 * LINES); v < (uint64_t*) (VRAM + 160 * (LINES + 1)); v++)
+        *v = 0x3f003f003f003f00;
+}
+
 void clearScreen() {
-    for (uint64_t* v = (uint64_t*) VRAM; v < (uint64_t*) VRAM + 160/8*25; v++)
+    for (uint64_t* v = (uint64_t*) VRAM; v < (uint64_t*) (VRAM + 160 * LINES); v++)
         *v = 0x0700070007000700;
-    cur = (uint8_t*) VRAM;
+    cur = VRAM;
     updateCursorPosition();
+    setStatusBar();
 }
 
 static inline void advanceLine() {
-    uint8_t* vram = (uint8_t*) VRAM;
+    for (int i = 0; i < LINES - 1; i++)
+        for (int j = 0; j < 160; j++)
+            VRAM[i * 160 + j] = VRAM[(i + 1) * 160 + j];
 
-    for (int i=0; i<24; i++)
-        for (int j=0; j<160; j++)
-            vram[i*160+j] = vram[(i+1)*160+j];
-
-    for (uint64_t* v = (uint64_t*) VRAM + 160/8*24; v < (uint64_t*) VRAM + 160/8*25; v++)
-         *v = 0x0700070007000700;
+    for (uint64_t* v = (uint64_t*) (VRAM + 160 * (LINES - 1)); v < (uint64_t*) (VRAM + 160 * LINES); v++)
+        *v = 0x0700070007000700;
 }
 
 static inline void curAdvanced() {
-    if (cur < (uint8_t*) VRAM + (160*25))
+    if (cur < VRAM + (160 * LINES))
         return;
 
     advanceLine();
-    cur = (uint8_t*) VRAM + (160*24);
+    cur = VRAM + (160 * (LINES - 1));
     // We don't want to waste time updating VGA cursor position for every character of a string, so don't
     //  call updateCursorPosition() here, but only at end of exported functions that move cursor.
 }
 
-#define printcc(c, cl) *cur++ = c; *cur++ = cl
+//#define printcc(c, cl) *cur++ = c; *cur++ = cl
+static inline void printcc(uint8_t c, uint8_t cl) {
+    *cur++ = c;
+    *cur++ = cl;
+}
 
 static inline void printCharColor(uint8_t c, uint8_t color) {
     if (c == '\n') {
-        for (uint64_t n = 160 - ((uint64_t) cur - VRAM) % 160; n > 0; n -= 2) {
+        for (uint64_t n = 160 - ((uint64_t) (cur - VRAM)) % 160; n > 0; n -= 2) {
             printcc(0, color);
         }
     } else {
