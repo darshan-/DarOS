@@ -11,6 +11,7 @@ struct list {
 };
 
 struct list* newList() {
+    com1_print("NEWLIST ----- 1\n");
     struct list* l = malloc(sizeof(struct list));
     l->head = (struct list_node*) 0;
 
@@ -20,6 +21,7 @@ struct list* newList() {
 void addToList(struct list* l, void* item) {
     if (!l) return;
 
+    com1_print("ADDTOLIST ----- 1\n");
     struct list_node* n = malloc(sizeof(struct list_node));
     n->item = item;
     n->next = (struct list_node*) 0;

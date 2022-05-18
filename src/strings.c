@@ -43,7 +43,8 @@ char* M_sprintf(char* fmt, ...) {
 }
 
 char* M_vsprintf(char* fmt, va_list ap) {
-    int scap = 64;
+    int scap = 128;
+    com1_print("PRINTF ----- Yep, called again!\n");
     char* s = malloc(scap);
     char c, *t;
     int i = 0; // Index into s where we will place next character
@@ -135,6 +136,7 @@ int strlen(char* s) {
 }
 
 char* M_append(char* s, char* t) {
+    com1_print("MAPPEND ----- 1\n");
     char* u = malloc(strlen(s) + strlen(t) + 1);
 
     char* up = u;

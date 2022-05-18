@@ -33,8 +33,6 @@
 
 static void gotChar(char c) {
     printc(c);
-    if (c == '0')
-        com1_printf("malloc cur is: %h\n", malloc(0));
 }
 
 static void startTty() {
@@ -42,6 +40,7 @@ static void startTty() {
 };
 
 void __attribute__((section(".kernel_entry"))) kernel_entry() {
+    init_heap(100*1024); // Let's just do 100 KB for now, make 100 MB soon.
     init_idt();
     clearScreen();
 

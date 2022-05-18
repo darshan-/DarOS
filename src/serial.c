@@ -24,5 +24,6 @@ void com1_print(char* s) {
 }
 
 void com1_printf(char* fmt, ...) {
+    com1_print("VARIADIC FROM SERIAL PRINTF\n");
     VARIADIC_PRINT(com1_print);
 }

@@ -35,7 +35,7 @@ void updateMallocCur(uint64_t cur) {
     char buf[17];
     buf[16] = 0;
     //uint64_t cur = (uint64_t) malloc(0);
-    qwordToHex(cur, buf);
+    qwordToHex(cur, buf); // Can't use malloc if malloc use triggers this (I'll want a timer, but for now...)
 
     // for (int i = 0; i < 16; i++) {
     // }
@@ -53,7 +53,7 @@ static void setStatusBar() {
     // STATUS_LINE[42 * 2] = 'S';
     writeStatusBar("DarOS", 38);
     //char* mcPre = "malloc cur: 0x";
-    char* mcPre = "heap: 0x";
+    char* mcPre = "M: 0x";
     writeStatusBar(mcPre, 80 - 16 - strlen(mcPre));
     //updateMallocCur();
 }
@@ -121,6 +121,7 @@ void printc(char c) {
 }
 
 void printf(char* fmt, ...) {
+    com1_print("VARIADIC FROM CONSOLE PRINTF");
     VARIADIC_PRINT(print);
 }
 
