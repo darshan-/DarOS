@@ -23,9 +23,39 @@ static inline void updateCursorPosition() {
     outb(0x3D4+1, (uint8_t) ((c >> 8) & 0xff));
 }
 
-void setStatusBar() {
+static void writeStatusBar(char* s, uint8_t loc) {
+    if (loc >= 80) return;
+
+    for (uint8_t l = loc; *s && l < 160; s++, l++)
+        STATUS_LINE[l*2] = *s;
+}
+
+void updateMallocCur(uint64_t cur) {
+    // char buf[16];
+    char buf[17];
+    buf[16] = 0;
+    //uint64_t cur = (uint64_t) malloc(0);
+    qwordToHex(cur, buf);
+
+    // for (int i = 0; i < 16; i++) {
+    // }
+    writeStatusBar(buf, 80-16);
+}
+
+static void setStatusBar() {
     for (uint64_t* v = (uint64_t*) STATUS_LINE; v < (uint64_t*) VRAM_END; v++)
         *v = 0x3f003f003f003f00;
+
+    // STATUS_LINE[38 * 2] = 'D';
+    // STATUS_LINE[39 * 2] = 'a';
+    // STATUS_LINE[40 * 2] = 'r';
+    // STATUS_LINE[41 * 2] = 'O';
+    // STATUS_LINE[42 * 2] = 'S';
+    writeStatusBar("DarOS", 38);
+    //char* mcPre = "malloc cur: 0x";
+    char* mcPre = "heap: 0x";
+    writeStatusBar(mcPre, 80 - 16 - strlen(mcPre));
+    //updateMallocCur();
 }
 
 void clearScreen() {

@@ -14,6 +14,7 @@ void* malloc(int nBytes) {
         return 0;
 
     cur = tentative;
+    updateMallocCur(cur);
 
     return cur;
 }
