@@ -1,3 +1,4 @@
+#include <stdarg.h>
 #include <stdint.h>
 //#include "console.h"
 #include "serial.h"
@@ -32,7 +33,16 @@ struct interrupt_frame {
     uint64_t ss;
 };
 
-#define log com1_printf
+
+//#define log(...) ;
+//#define log com1_printf
+
+void log(char* fmt, ...) {
+    //va_list ap;
+    //va_start(ap, fmt);
+    //M_vsprintf(fmt, ap);
+    //va_end(ap);
+}
 
 void __attribute__((naked)) waitloop() {
     __asm__ __volatile__(

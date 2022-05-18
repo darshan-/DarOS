@@ -4,6 +4,29 @@
 
 
 /*
+
+  Ah, and first thing that popped into my head while making some coffee after getting some sleep
+  is that this doesn't work -- we don't know how many blocks to free in free()!  We either need
+  more than 1 bit per block in the map, or to keep an extra structure (a dynamic one) for tracking
+  allocations that are more than 1 block.
+
+  Hmm, let's see, can we do it with just 2 bits per allocation?  That's 4 states, which seems likely
+  workable?  Yeah, I think three is enough, although it might be helpful to use the 4th?
+
+  00 : block is free
+  01 : block is allocated and is part of a contiguous allocation region that continues further
+  10 : block is allocated and is the end of a contiguous region
+
+  That would be enough, right?  But I can think of at least one way to use the 4th bit that might be useful:
+
+  00 : block is free
+  01 : block is the first in a contiguous region that continues to the right (higher addresses)
+  11 : block is part of a contiguous region with at least one block on each side
+  10 : block is the last in a contiguous region (which is to the left / lower addresses)
+
+  Since this is all in-memory, it seems like it would be fine to change my system at any time.
+
+
   Hmm, perhaps let's have bocks of 128 bytes?
   (/ (* 9 1024 1024) 128) 73728 blocks
   So a bit field to indicate usage (0 = unused, 1 = used) is 1 KB per MB.
@@ -27,6 +50,19 @@
   let's do it that way!
  */
 
+static inline void dumpAddr(char* name, void* addr) {
+    //return;
+    char buf[17];
+    buf[16] = 0;
+    com1_print(name);
+    com1_print(": ");
+    qwordToHex(addr, buf);
+    com1_print(buf);
+    com1_print("\n");
+}
+
+#define dump(v) dumpAddr(#v, v)
+
 #define BLK_SZ 128
 #define START 0x0100000
 
@@ -42,90 +78,40 @@ void init_heap(uint64_t size) {
     for (uint64_t i = 0; i < map_size; i++)
         map[i] = 0;
     heap = map + map_size;
-
-
-    char buf[17];
-    buf[16] = 0;
-
-    com1_print("malloc inited\n");
-    com1_print("factor: ");
-    qwordToHex(factor, buf);
-    com1_print(buf);
-    com1_print("\n");
-    
-    com1_print("map_size: ");
-    qwordToHex(map_size, buf);
-    com1_print(buf);
-    com1_print("\n");
-
-    com1_print("heap: ");
-    qwordToHex(heap, buf);
-    com1_print(buf);
-    com1_print("\n");
 }
 
 void* malloc(uint64_t nBytes) {
-    com1_print("MALLOC ----- 1\n");
+    com1_print("MALLOC ----- START\n");
     if (heap == map) return 0;
-    com1_print("MALLOC ----- 2\n");
-    if (nBytes > 64 * BLK_SZ) return 0;  // Don't support more than 64 pages per call right now
-    com1_print("MALLOC ----- 3\n");
+    if (nBytes > 32 * BLK_SZ) return 0;  // Don't support more than 32 pages per call right now
 
     uint64_t needed = (nBytes / BLK_SZ) + !!(nBytes % BLK_SZ);
     uint64_t mask = 0;
 
-    char buf[17];
-    buf[16] = 0;
-
-    com1_print("nBytes: ");
-    qwordToHex(nBytes, buf);
-    com1_print(buf);
-    com1_print("\n");
-
-    com1_print("needed: ");
-    qwordToHex(needed, buf);
-    com1_print(buf);
-    com1_print("\n");
-
-    com1_print("mask: ");
-    qwordToHex(mask, buf);
-    com1_print(buf);
-    com1_print("\n");
+    dump(nBytes);
+    dump(needed);
 
     for (uint64_t i = 0; i < needed; i++)
         mask = (mask << 1) + 1;
 
-    com1_print("mask: ");
-    qwordToHex(mask, buf);
-    com1_print(buf);
-    com1_print("\n");
+    dump(mask);
 
     for (uint64_t i = 0; i < map_size; i++) {
         uint64_t m = mask;
         for (uint64_t j = 0; j < 64 - needed + 1; j++, m <<= 1) {
-            //m <<= 1;
-            com1_print("   m: ");
-            qwordToHex(m, buf);
-            com1_print(buf);
-            com1_print("\n");
-
-            com1_print("mapi: ");
-            qwordToHex(map[i], buf);
-            com1_print(buf);
-            com1_print("\n");
+            dump(m);
+            dump(map[i]);
             if (!(map[i] & m)) {
+                com1_print("found!\n");
+
+                dump(i);
+                dump(j);
+
                 map[i] |= m;
-            com1_print("mapi: ");
-            qwordToHex(map[i], buf);
-            com1_print(buf);
-            com1_print("\n");
-                void* ret = (void*) (uint64_t) heap + i * 64 * BLK_SZ + j;
-                com1_print(" ret: ");
-                qwordToHex(ret, buf);
-                com1_print(buf);
-                com1_print("\n");
+                dump(map[i]);
+                void* ret = (void*) (uint64_t) heap + (i * 64 + j) * BLK_SZ;
+                dump(ret);
                 return ret;
-                //return (void*) (uint64_t) heap + i * 64 * BLK_SZ + j;
             }
         }
     }
@@ -152,6 +138,8 @@ void* realloc(void* p, int newSize) {
     // We'll want to know the size of p in the future and not copy more than that
     // for (int i = 0; i < newSize / 8 + (newSize % 8 ? 1 : 0); i++) // Nope, not safe
     //     p2[i] = p1[i];
+
+    // With 2 bits per block in the map, we'll know how may blocks p is, so we'll be good.
 
     int i, j;
     for (i = 0; i < newSize / 8; i++)

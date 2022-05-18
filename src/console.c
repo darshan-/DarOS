@@ -121,7 +121,6 @@ void printc(char c) {
 }
 
 void printf(char* fmt, ...) {
-    com1_print("VARIADIC FROM CONSOLE PRINTF");
     VARIADIC_PRINT(print);
 }
 
