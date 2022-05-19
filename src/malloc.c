@@ -78,7 +78,7 @@
   let's do it that way!
  */
 
-static inline void dumpAddr(char* name, void* addr) {
+static inline void dumpAddr(char* name, uint64_t addr) {
     //return;
     char buf[17];
     buf[16] = 0;
@@ -89,7 +89,7 @@ static inline void dumpAddr(char* name, void* addr) {
     com1_print("\n");
 }
 
-#define dump(v) dumpAddr(#v, v)
+#define dump(v) dumpAddr(#v, (uint64_t) (v))
 
 #define BLK_SZ 128
 #define MAP_ENTRY_SZ 2
@@ -128,6 +128,7 @@ void* malloc(uint64_t nBytes) {
 
     dump(nBytes);
     dump(needed);
+    dump(heap);
 
     for (uint64_t i = 0; i < needed; i++)
         mask = (mask << 2) + 0b11;
@@ -136,8 +137,8 @@ void* malloc(uint64_t nBytes) {
 
     for (uint64_t i = 0; i < map_size; i++) {
         uint64_t m = mask;
-        //for (uint64_t j = 0; j < 64 / MAP_ENTRY_SZ - (needed - 1); j++, m <<= 2) {
-        for (uint64_t j = 0; j < 64 - (needed - 1); j += 2, m <<= 2) {
+        for (uint64_t j = 0; j < 64 / MAP_ENTRY_SZ - (needed - 1); j++, m <<= 2) {
+        //for (uint64_t j = 0; j < 64 - (needed - 1); j += 2, m <<= 2) {
             dump(m);
             dump(map[i]);
             if (!(map[i] & m)) {
@@ -156,14 +157,14 @@ void* malloc(uint64_t nBytes) {
 
                 dump(m);
                 com1_print("Transforming m from search mask to allocation mask by turning off last bit\n");
-                //m ^= 1 << (j * 2);
-                m ^= 1 << j;
+                m ^= 1 << (j * 2);
+                //m ^= 1 << j;
                 dump(m);
 
                 map[i] |= m;
                 dump(map[i]);
                 //void* ret = (void*) (uint64_t) heap + (i * (64 / MAP_ENTRY_SZ) + (j * 2)) * BLK_SZ;
-                void* ret = (void*) (uint64_t) heap + (i * 64 + j) * BLK_SZ;
+                void* ret = (void*) (uint64_t) heap + (i * (64 / MAP_ENTRY_SZ) + j) * BLK_SZ;
                 dump(ret);
                 return ret;
             }
@@ -174,8 +175,28 @@ void* malloc(uint64_t nBytes) {
 }
 
 void free(void *p) {
-    if (p < (void*) heap || p > (void*) heap + (map_size * 64 - 1) * BLK_SZ)
+    com1_print("  FREE  FREE  FREE  FREE  FREE  FREE  FREE  FREE ----- START\n");
+    if (p < (void*) heap || p > (void*) heap + (map_size * (64 / MAP_ENTRY_SZ) - 1) * BLK_SZ)
         return;
+
+    dump(p);
+    // Figure map qword that holds the entry for p
+    // Figure the bit pair for it
+    // While that bit pair is BPART, set it to BFREE and increment so that we're pointing at either
+    //   p if that wasn't BPART, or the first one after a BPART
+    // If we're not pointing at BEND, someting is wrong.  Log it in a big way.
+    // If it is BEND, set it to BFREE, and we're done!
+
+    uint64_t b = (uint64_t) p; // 140
+    b -= (uint64_t) heap;      // 128
+    b /= (64 / MAP_ENTRY_SZ) * BLK_SZ;
+
+    com1_print("Okay, theoretically b is the offset into map for the qword we want?\n");
+    dump(b);
+
+    // Okay, now we want to figure out which two bits to look at for the start (and perhaps entirety) of the region.
+    uint64_t m = 0b11;
+    // Which of the 32 locations do we want?
 }
 
 void* realloc(void* p, int newSize) {

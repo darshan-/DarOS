@@ -45,6 +45,21 @@ void __attribute__((section(".kernel_entry"))) kernel_entry() {
     clearScreen();
 
     printColor("Ready!\n", 0x0d);
+    printf("Let's get some malloc() and free() going...\n");
+    void* p1 = malloc(1);
+    void* p2 = malloc(1024);
+    void* p3 = malloc(512);
+    void* p4 = malloc(2048);
+    void* p5 = malloc(2048);
+    void* p6 = malloc(4096);
+    void* p7 = malloc(4096);
+    free(p3);
+    free(p2);
+    free(p1);
+    free(p5);
+    free(p4);
+    free(p6);
+    free(p7);
 
     // printf("Hi, %s okay?  Because, if all is well, 0x%h is hex...\n", "are you", 0x0badface);
     // //printf("Hi, %s okay?  Because, if all is well, 0x%h is hex... And I wuoldd really like this to be long and see if that messes things up....\n", "are you", 0x0badface);
