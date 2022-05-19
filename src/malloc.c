@@ -156,9 +156,13 @@ void* malloc(uint64_t nBytes) {
                 // Hmm, let's rewrite it to keep using j as ones, but += 2 it in the loop...
 
                 dump(m);
-                com1_print("Transforming m from search mask to allocation mask by turning off last bit\n");
-                m ^= 1 << (j * 2);
+                // com1_print("Transforming m from search mask to allocation mask by turning off last bit\n");
+                // m ^= 1 << (j * 2);
                 //m ^= 1 << j;
+
+                // Wait, little endian -- we want to set the leftmost entry to BEND, so turn off the *second*
+                //   on bit... which we should be able to calculate based on needed and j...
+                m ^= 1 << ((needed - 1 + j) * 2);
                 dump(m);
 
                 map[i] |= m;
@@ -189,14 +193,61 @@ void free(void *p) {
 
     uint64_t b = (uint64_t) p; // 140
     b -= (uint64_t) heap;      // 128
-    b /= (64 / MAP_ENTRY_SZ) * BLK_SZ;
+    const uint64_t align = (64 / MAP_ENTRY_SZ) * BLK_SZ;
+    uint64_t o = (b % align) / BLK_SZ * MAP_ENTRY_SZ;
+    b /= align;
 
     com1_print("Okay, theoretically b is the offset into map for the qword we want?\n");
     dump(b);
 
+    com1_print("======================And hopefully o is the offset into that that we want?\n");
+    dump(o);
+
     // Okay, now we want to figure out which two bits to look at for the start (and perhaps entirety) of the region.
-    uint64_t m = 0b11;
-    // Which of the 32 locations do we want?
+    //uint64_t m = 0b11 << o;
+    // Which of the 32 locations do we want?  I guess the remainder of the division above?
+
+    // Okay, that's done (above), should be good to check!
+
+    //while (map[b]|
+
+    // Hmm, wait, simplest to shift a copy of it while we proceed, in case of multi-block region...
+
+    dump(map[b]);
+    uint64_t entry = map[b];
+    dump(entry);
+    entry >>= o;
+    dump(entry);
+    uint64_t free_mask = ~(0b11 << o);
+    dump(free_mask);
+    uint64_t code = entry & 0b11;
+    dump(code);
+
+    if (code == BFREE) {
+        com1_print("Ooooooooooooooooooops!  Page is already free...\n");
+        return;
+    }
+
+    while (code == BPART) {
+        // Huh, well, here it's easier if we hadn't been shifting the copy, but had a mask aligned for freeing...
+        // Well, is it crazy to have that too, and shift it left as we shift entry right here?  Let's try...
+
+        map[b] &= free_mask;
+        dump(map[b]);
+        entry >>= 2;
+        dump(entry);
+        free_mask <<= 2;
+        dump(free_mask);
+        code = entry & 0b11;
+        dump(code);
+    }
+
+    if (code != BEND) {
+        com1_print("Ooooooooooooooooooops!  Contiguous region didn't end with BEND, and we don't yet support multi-entry regions, so this shouldn't happen...\n");
+        return;
+    }
+
+    map[b] &= free_mask;
 }
 
 void* realloc(void* p, int newSize) {

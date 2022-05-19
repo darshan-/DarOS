@@ -45,7 +45,7 @@ void __attribute__((section(".kernel_entry"))) kernel_entry() {
     clearScreen();
 
     printColor("Ready!\n", 0x0d);
-    printf("Let's get some malloc() and free() going...\n");
+    //printf("Let's get some malloc() and free() going...\n");
     void* p1 = malloc(1);
     void* p2 = malloc(1024);
     void* p3 = malloc(512);
