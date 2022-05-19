@@ -1,7 +1,6 @@
 #include <stdint.h>
 #include "keyboard.h"
 #include "list.h"
-#include "strings.h"
 
 // https://www.win.tue.nl/~aeb/linux/kbd/scancodes-1.html
 
@@ -15,31 +14,16 @@ static struct list* inputCallbackList = (struct list*) 0;
 
 // Call for characters that count as input (for now just print them...)
 static inline void gotInput(char c) {
-    com1_print("------------ gI 1\n");
-
-    char buf[17];
-    buf[16] = 0;
-    com1_print("iCL: ");
-    qwordToHex(inputCallbackList, buf);
-    com1_print(buf);
-    com1_print("\n");
-
     forEachListItem(inputCallbackList, ({
         void __fn__ (void* item) {
-    com1_print("tem: ");
-    qwordToHex(item, buf);
-    com1_print(buf);
-    com1_print("\n");
             void (*cb)(char) = (void (*)(char)) item;
             cb(c);
         }
         __fn__;
     }));
-    com1_print("------------ gI 2\n");
 }
 
 void keyScanned(uint8_t c) {
-    com1_print("------------ kS 1\n");
     uint8_t hob = c & 0x80;
     switch (c) {
     case 0x9d: // LCtrl (Or RCtrl if e0 was before this)
@@ -116,7 +100,6 @@ void keyScanned(uint8_t c) {
     default:
         break;
     }
-    com1_print("------------ kS 2\n");
 }
 
 // Have dynamic list of listeners, so more than one thing can listen, I think.

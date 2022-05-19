@@ -24,6 +24,34 @@
   11 : block is part of a contiguous region with at least one block on each side
   10 : block is the last in a contiguous region (which is to the left / lower addresses)
 
+  Wait, almost.  Have the change the meaning slightly.
+
+  What's the code for a single-block allocation?
+  Do I use 11, and have that not imply continuation on either side, or use 01, and have that not imply 
+    continuation to the right?
+
+  I'm pretty down with 00 = free and 10 = region_end
+
+  Hmm, 01 = region_with_more, 10 = region without more, like my original suggestion?
+  That seems simple and good enough, and was my first thought.
+  Otherwise you have five states (free, solitary, first, middle, last) -- you can use middle for solitary,
+    but then you'd need to check both sides of it to see what's going on?
+  I guess the advantage, and probably why I thought of this variation, is that you can start by using
+    the mask of all 1s, and if there is more than 1 block in the region, turn off the first and last.
+  The only change is from how I first wrote it (but not how I first meant it), *don't* take 11 to mean
+    there's necessarily anything on either side.
+  Hmm, I'd prefer it to be hard to accidentally free something in the middle of your region.
+    free(block marked as first) frees the whole region
+  Or
+    free(block marked as middle or last) { doesn't free?  frees whole region if system makes that possible?)
+  But definitely not
+    free(block in the middle a region, with a system that means we can't know that, so we free it)
+
+
+  Well, I *can* have a middle marker if I make the minimum region size 2 blocks, which is an intersting
+    thought, but I think I'll go with just three states for now.
+
+
   Since this is all in-memory, it seems like it would be fine to change my system at any time.
 
 
@@ -64,7 +92,17 @@ static inline void dumpAddr(char* name, void* addr) {
 #define dump(v) dumpAddr(#v, v)
 
 #define BLK_SZ 128
+#define MAP_ENTRY_SZ 2
 #define START 0x0100000
+#define BFREE 0b00
+#define BPART 0b11
+#define BEND  0b10
+
+// Ooh, and that helps, right?
+// Conceptually, the first bit means "in use" and the second bit means "region continues to the right",
+//  although 0b01 would be treated as "taken, unknown", so not fully independent.
+// Anyway, it means that transforming a search mask to a alloc mask just takes turning the last 1 off,
+//  and I like that.
 
 static uint64_t map_size; // Size in quadwords
 static uint64_t* map = (uint64_t*) START;
@@ -73,7 +111,7 @@ static uint64_t* heap = (uint64_t*) START;
 
 // size is number of bytes available to us for (map + heap)
 void init_heap(uint64_t size) {
-    uint64_t factor = 64 * BLK_SZ;
+    uint64_t factor = 64 / MAP_ENTRY_SZ * BLK_SZ;
     map_size = size / (1 + factor);
     for (uint64_t i = 0; i < map_size; i++)
         map[i] = 0;
@@ -83,7 +121,7 @@ void init_heap(uint64_t size) {
 void* malloc(uint64_t nBytes) {
     com1_print("MALLOC ----- START\n");
     if (heap == map) return 0;
-    if (nBytes > 32 * BLK_SZ) return 0;  // Don't support more than 32 pages per call right now
+    if (nBytes > 64 / MAP_ENTRY_SZ * BLK_SZ) return 0;  // For now; later will support more than one qword per alloc
 
     uint64_t needed = (nBytes / BLK_SZ) + !!(nBytes % BLK_SZ);
     uint64_t mask = 0;
@@ -92,13 +130,14 @@ void* malloc(uint64_t nBytes) {
     dump(needed);
 
     for (uint64_t i = 0; i < needed; i++)
-        mask = (mask << 1) + 1;
+        mask = (mask << 2) + 0b11;
 
     dump(mask);
 
     for (uint64_t i = 0; i < map_size; i++) {
         uint64_t m = mask;
-        for (uint64_t j = 0; j < 64 - needed + 1; j++, m <<= 1) {
+        //for (uint64_t j = 0; j < 64 / MAP_ENTRY_SZ - (needed - 1); j++, m <<= 2) {
+        for (uint64_t j = 0; j < 64 - (needed - 1); j += 2, m <<= 2) {
             dump(m);
             dump(map[i]);
             if (!(map[i] & m)) {
@@ -107,8 +146,23 @@ void* malloc(uint64_t nBytes) {
                 dump(i);
                 dump(j);
 
+                // So then this mask (m) will need to change
+                // m should be transformed so that the first 1 becomes a 0, and if there's more than
+                //   one 1 left, the last 1 becomes a 0?
+                //   ...00011 -> ...0001
+                // Let's transform m from a search mask to an allocation mask by turning off the last bit that's on
+                // j * 2 should be the index of the rightmost on bit?
+                // Hmm, let's rewrite it to keep using j as ones, but += 2 it in the loop...
+
+                dump(m);
+                com1_print("Transforming m from search mask to allocation mask by turning off last bit\n");
+                //m ^= 1 << (j * 2);
+                m ^= 1 << j;
+                dump(m);
+
                 map[i] |= m;
                 dump(map[i]);
+                //void* ret = (void*) (uint64_t) heap + (i * (64 / MAP_ENTRY_SZ) + (j * 2)) * BLK_SZ;
                 void* ret = (void*) (uint64_t) heap + (i * 64 + j) * BLK_SZ;
                 dump(ret);
                 return ret;
