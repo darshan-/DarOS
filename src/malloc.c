@@ -78,6 +78,11 @@
   let's do it that way!
  */
 
+void nop(char* s) {
+};
+
+#define com1_print(s) nop(s)
+
 static inline void dumpAddr(char* name, uint64_t addr) {
     //return;
     char buf[17];
@@ -116,6 +121,11 @@ static inline void binQword(uint64_t q) {
         com1_write(((q & (1ull << i)) >> i) + '0');
     }
     com1_write('\n');
+}
+
+void dumpEntries(int n) {
+    for (int i = 0; i < n; i++)
+        binQword(map[i]);
 }
 
 // size is number of bytes available to us for (map + heap)
@@ -200,8 +210,8 @@ void free(void *p) {
     // If we're not pointing at BEND, someting is wrong.  Log it in a big way.
     // If it is BEND, set it to BFREE, and we're done!
 
-    uint64_t b = (uint64_t) p; // 140
-    b -= (uint64_t) heap;      // 128
+    uint64_t b = (uint64_t) p; // 1344
+    b -= (uint64_t) heap;      // 1152
     const uint64_t align = (64 / MAP_ENTRY_SZ) * BLK_SZ;
     uint64_t o = (b % align) / BLK_SZ * MAP_ENTRY_SZ;
     b /= align;
@@ -226,7 +236,7 @@ void free(void *p) {
     uint64_t entry = map[b];
     dump(entry);
     //binQword(0b111111111111111111111111111111111);
-    binQword(entry);
+    //binQword(entry);
     entry >>= o;
     dump(entry);
     uint64_t free_mask = ~(0b11ull << o);
@@ -235,7 +245,7 @@ void free(void *p) {
     dump(code);
 
     if (code == BFREE) {
-        com1_print("Ooooooooooooooooooops!  Page is already free...\n");
+        com1_print("------------------------------Ooooooooooooooooooops!  Page is already free...\n");
         return;
     }
 
@@ -247,14 +257,14 @@ void free(void *p) {
         dump(map[b]);
         entry >>= 2;
         dump(entry);
-        free_mask <<= 2;
+        free_mask = ~((~free_mask) << 2);
         dump(free_mask);
         code = entry & 0b11;
         dump(code);
     }
 
     if (code != BEND) {
-        com1_print("Ooooooooooooooooooops!  Contiguous region didn't end with BEND, and we don't yet support multi-entry regions, so this shouldn't happen...\n");
+        com1_print("------------------------------Ooooooooooooooooooops!  Contiguous region didn't end with BEND, and we don't yet support multi-entry regions, so this shouldn't happen...\n");
         return;
     }
 

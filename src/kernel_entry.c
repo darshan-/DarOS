@@ -39,13 +39,13 @@ static void startTty() {
     registerKbdListener(&gotChar);
 };
 
-void __attribute__((section(".kernel_entry"))) kernel_entry() {
-    init_heap(100*1024); // Let's just do 100 KB for now, make 100 MB soon.
-    init_idt();
-    clearScreen();
+static void stopTty() {
+    unregisterKbdListener(&gotChar);
+};
 
-    printColor("Ready!\n", 0x0d);
-    //printf("Let's get some malloc() and free() going...\n");
+void mTest() {
+    com1_print("Entries before malloc():\n");
+    dumpEntries(8);
     void* p1 = malloc(1);
     void* p2 = malloc(1024);
     void* p3 = malloc(512);
@@ -53,6 +53,9 @@ void __attribute__((section(".kernel_entry"))) kernel_entry() {
     void* p5 = malloc(2048);
     void* p6 = malloc(4096);
     void* p7 = malloc(4096);
+    com1_print("Entries after malloc():\n");
+    dumpEntries(8);
+    //com1_print("Well, that's what that was!\n");
     free(p3);
     free(p2);
     free(p1);
@@ -60,6 +63,19 @@ void __attribute__((section(".kernel_entry"))) kernel_entry() {
     free(p4);
     free(p6);
     free(p7);
+    com1_print("Entries after free():\n");
+    dumpEntries(8);
+}
+
+void __attribute__((section(".kernel_entry"))) kernel_entry() {
+    init_heap(100*1024); // Let's just do 100 KB for now, make 100 MB soon.
+    init_idt();
+    clearScreen();
+
+    printColor("Ready!\n", 0x0d);
+    printf("Let's get some malloc() and free() going...\n");
+
+    mTest();
 
     // printf("Hi, %s okay?  Because, if all is well, 0x%h is hex...\n", "are you", 0x0badface);
     // //printf("Hi, %s okay?  Because, if all is well, 0x%h is hex... And I wuoldd really like this to be long and see if that messes things up....\n", "are you", 0x0badface);
@@ -77,6 +93,47 @@ void __attribute__((section(".kernel_entry"))) kernel_entry() {
 
     com1_print("starting tty\n");
     startTty();
+    mTest();
+
+    void* p1 = malloc(2048);
+    mTest();
+    void* p2 = malloc(1024);
+    mTest();
+    void* p3 = malloc(129);
+    mTest();
+    free(p1);
+    mTest();
+    p1 = malloc(2048);
+    mTest();
+    free(p1);
+    mTest();
+    p1 = malloc(1024);
+    mTest();
+    free(p2);
+    mTest();
+    p2 = malloc(512);
+    mTest();
+    free(p2);
+    p2 = malloc(7*128);
+    mTest();
+    free(p3);
+    p3 = malloc(17*128);
+    mTest();
+    free(p2);
+    mTest();
+    free(p1);
+    mTest();
+    free(p3);
+    mTest();
+
+    com1_print("stopping tty\n");
+    stopTty();
+    mTest();
+
+    com1_print("starting tty\n");
+    startTty();
+    mTest();
+
     com1_print("going to waitloop\n");
     waitloop();
 }
