@@ -109,6 +109,15 @@ static uint64_t* map = (uint64_t*) START;
 //static uint64_t* heap = (uint64_t*) 0;
 static uint64_t* heap = (uint64_t*) START;
 
+static inline void binQword(uint64_t q) {
+    for (uint64_t i = 0; i < 64; i++) {
+        if (i != 0 && !(i % 4))
+            com1_write(' ');
+        com1_write(((q & (1ull << i)) >> i) + '0');
+    }
+    com1_write('\n');
+}
+
 // size is number of bytes available to us for (map + heap)
 void init_heap(uint64_t size) {
     uint64_t factor = 64 / MAP_ENTRY_SZ * BLK_SZ;
@@ -162,7 +171,7 @@ void* malloc(uint64_t nBytes) {
 
                 // Wait, little endian -- we want to set the leftmost entry to BEND, so turn off the *second*
                 //   on bit... which we should be able to calculate based on needed and j...
-                m ^= 1 << ((needed - 1 + j) * 2);
+                m ^= 1ull << ((needed - 1 + j) * 2);
                 dump(m);
 
                 map[i] |= m;
@@ -216,9 +225,11 @@ void free(void *p) {
     dump(map[b]);
     uint64_t entry = map[b];
     dump(entry);
+    //binQword(0b111111111111111111111111111111111);
+    binQword(entry);
     entry >>= o;
     dump(entry);
-    uint64_t free_mask = ~(0b11 << o);
+    uint64_t free_mask = ~(0b11ull << o);
     dump(free_mask);
     uint64_t code = entry & 0b11;
     dump(code);
