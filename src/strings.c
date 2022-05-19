@@ -44,7 +44,6 @@ char* M_sprintf(char* fmt, ...) {
 
 char* M_vsprintf(char* fmt, va_list ap) {
     int scap = 128;
-    com1_print("PRINTF ----- Yep, called again!\n");
     char* s = malloc(scap);
     char c, *t;
     int i = 0; // Index into s where we will place next character

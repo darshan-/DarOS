@@ -30,7 +30,7 @@ static void writeStatusBar(char* s, uint8_t loc) {
         STATUS_LINE[l*2] = *s;
 }
 
-void updateMallocCur(uint64_t cur) {
+void updateMemUse() {
     // char buf[16];
     char buf[17];
     buf[16] = 0;

@@ -55,6 +55,7 @@ void mTest() {
     void* p7 = malloc(4096);
     com1_print("Entries after malloc():\n");
     dumpEntries(8);
+    printf("mem use: %u\n", memUsed());
     //com1_print("Well, that's what that was!\n");
     free(p3);
     free(p2);
@@ -70,26 +71,26 @@ void mTest() {
 void __attribute__((section(".kernel_entry"))) kernel_entry() {
     init_heap(100*1024); // Let's just do 100 KB for now, make 100 MB soon.
     init_idt();
+    uint64_t initBytes = memUsed();
     clearScreen();
-
     printColor("Ready!\n", 0x0d);
     printf("Let's get some malloc() and free() going...\n");
 
     mTest();
 
-    // printf("Hi, %s okay?  Because, if all is well, 0x%h is hex...\n", "are you", 0x0badface);
-    // //printf("Hi, %s okay?  Because, if all is well, 0x%h is hex... And I wuoldd really like this to be long and see if that messes things up....\n", "are you", 0x0badface);
-    // printf("....................................................................\n");
-    // printf("Hi, %s okay?  Because, if all is well, 0x%4h is hex...\n", "are you", 0x0badface);
-    // printf("Hi, %s ___?  Because, if all is well, %0u is badface...\n", "hope", 0x0badfacf);
-    // printf("Hi, %s okay?  Because, if all is well, 0x%h is hex...\n", "are you", 0x0badface);
-    // printf("This is likely borked, or at least to bork what follows... %u (should be unsigned int)\n", 98764);
-    // printf("Hi, %s okay!  Because, if all is well, 0x%h is hex...\n", "I am", 0xfacade);
-    // printf("Hi, %s okay!  Because, if all is well, 0x%h is hex...\n", "I *could* be", 0);
-    // printf("Hi, %s okay!  Because, if all is well, %u is unsigned...\n", "I *might* be", 12345);
+    printf("Hi, %s okay?  Because, if all is well, 0x%h is hex...\n", "are you", 0x0badface);
+    //printf("Hi, %s okay?  Because, if all is well, 0x%h is hex... And I wuoldd really like this to be long and see if that messes things up....\n", "are you", 0x0badface);
+    printf("....................................................................\n");
+    printf("hi, %s okay?  because, if all is well, 0x%4h is hex...\n", "are you", 0x0badface);
+    printf("hi, %s ___?  because, if all is well, %0u is badface...\n", "hope", 0x0badfacf);
+    printf("hi, %s okay?  because, if all is well, 0x%h is hex...\n", "are you", 0x0badface);
+    printf("this is likely borked, or at least to bork what follows... %u (should be unsigned int)\n", 98764);
+    printf("hi, %s okay!  because, if all is well, 0x%h is hex...\n", "i am", 0xfacade);
+    printf("hi, %s okay!  because, if all is well, 0x%h is hex...\n", "i *could* be", 0);
+    printf("hi, %s okay!  because, if all is well, %u is unsigned...\n", "i *might* be", 12345);
 
-    // //printf("Hi, %s okay!  Because, if all is well, 0x%h is hex...\n", "let's be", 0xa1cafe);
-    // printf("Hi, %s okay!  Because, if all is well, 0x%h is hex...\n", "I *could* be", 0);
+    //printf("hi, %s okay!  because, if all is well, 0x%h is hex...\n", "let's be", 0xa1cafe);
+    printf("hi, %s okay!  because, if all is well, 0x%h is hex...\n", "i *could* be", 0);
 
     com1_print("starting tty\n");
     startTty();
@@ -126,14 +127,21 @@ void __attribute__((section(".kernel_entry"))) kernel_entry() {
     free(p3);
     mTest();
 
+    printf("mem use: %u bytes\n", memUsed());
+
     com1_print("stopping tty\n");
     stopTty();
     mTest();
+
+    printf("mem use: %u bytes\n", memUsed());
+
 
     com1_print("starting tty\n");
     startTty();
     mTest();
 
+    printf("mem use: %u bytes\n", memUsed());
+    printf("init mem use: %uk\n", initBytes);
     com1_print("going to waitloop\n");
     waitloop();
 }

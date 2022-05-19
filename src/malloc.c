@@ -137,6 +137,27 @@ void init_heap(uint64_t size) {
     heap = map + map_size;
 }
 
+uint64_t memUsed() {
+    uint64_t p = 0;
+    for (int i = 0; i < map_size; i++) {
+        uint64_t entry = map[i];
+        if (entry == 0) continue;
+
+        // Look at entry in pairs of bits, and for every one that isn't 0, increment page count
+        for (uint64_t j = 0; j < (64 / MAP_ENTRY_SZ); j++, entry >>= MAP_ENTRY_SZ) {
+            //com1_printf("j: %u, entry: 0x%h\n", j, entry);
+            if (entry & 0b11) {
+                //com1_printf("Found a p!  p now %u\n", p);
+                p++;
+            }
+        }
+    }
+
+    //printf("p: %u\n", p);
+
+    return p * 128;
+}
+
 void* malloc(uint64_t nBytes) {
     com1_print("MALLOC ----- START\n");
     if (heap == map) return 0;
