@@ -139,7 +139,6 @@ uint64_t strlen(char* s) {
 }
 
 char* M_append(char* s, char* t) {
-    com1_print("MAPPEND ----- 1\n");
     char* u = malloc(strlen(s) + strlen(t) + 1);
 
     char* up = u;

@@ -5,6 +5,22 @@
 #include "malloc.h"
 #include "strings.h"
 
+/*
+  Hmm, it would be pretty easy to have a scrollback buffer...
+  When advancing a line, before copying the second line into the first, copy the first
+    to the end of the scrollback buffer.  Bind up and down arrows (or however you'd like
+    the UI to be) to a scroll function... well, advanceLine *would* be the scroll down
+    function, essentially.
+  Hmm, either that, or actually waste a little memory if it makes it easier, and have
+    *full* terminal buffer, not just scrollback buffer, and scrolling copies relevant
+    part in.  I like that, and it would make it easier to have multiple terminals --
+    which was the thought that spurred this thought -- I had the thought that I might
+    like a log terminal, to use like I use the serial console, but with color.  I'm not
+    sure, but I like the idea of flagging in red certain things, for example.  So multiple
+    terminals, each with a complete buffer in memory, and scrolling or switching buffers
+    is just a matter of what I copy into vram.
+ */
+
 #define VRAM ((uint8_t*) 0xb8000)
 #define LINES 24
 #define LINE(l) (VRAM + 160 * (l))
