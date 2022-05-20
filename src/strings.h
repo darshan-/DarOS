@@ -35,7 +35,7 @@ static inline void qwordToHex(uint64_t q, char* s) {
 
 char* M_sprintf(char* fmt, ...);
 char* M_vsprintf(char* fmt, va_list ap);
-int strlen(char* s);
+uint64_t strlen(char* s);
 char* M_append(char* s, char* t);
 // Decimal string to unsigned int
 uint64_t dstoui(char* s);

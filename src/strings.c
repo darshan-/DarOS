@@ -95,6 +95,10 @@ char* M_vsprintf(char* fmt, va_list ap) {
         case 's':
             t = va_arg(ap, char*);
             break;
+        default:
+            s[i++] = '%';
+            s[i++] = c;
+            continue;
         }
 
         // Okay, for now let's say width means: pad with zeros if necessary, and drop chars from left if necessary.
@@ -128,8 +132,8 @@ char* M_vsprintf(char* fmt, va_list ap) {
     return s;
 }
 
-int strlen(char* s) {
-    int i = 0;
+uint64_t strlen(char* s) {
+    uint64_t i = 0;
     while (s[i]) i++;
     return i;
 }

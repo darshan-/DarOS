@@ -30,32 +30,33 @@ static void writeStatusBar(char* s, uint8_t loc) {
         STATUS_LINE[l*2] = *s;
 }
 
+#define MAX_MEMLEN 24
 void updateMemUse() {
-    // char buf[16];
-    char buf[17];
-    buf[16] = 0;
-    //uint64_t cur = (uint64_t) malloc(0);
-    qwordToHex(cur, buf); // Can't use malloc if malloc use triggers this (I'll want a timer, but for now...)
+    // Lazy way to just clear area in case new string is shorter than last
+    for (uint8_t l = 80 - MAX_MEMLEN; l < 160; l++)
+        STATUS_LINE[l*2] = ' ';
 
-    // for (int i = 0; i < 16; i++) {
-    // }
-    writeStatusBar(buf, 80-16);
+    char* s;
+    uint64_t m = memUsed();
+    
+    if (m < 1024)
+        s = M_sprintf("Mem used: %u bytes", m);
+    else
+        s = M_sprintf("Mem used: %u K", m / 1024);  // TODO: Round rather than floor and/or decimal point, etc.?
+
+    if (strlen(s) > MAX_MEMLEN)
+        s[MAX_MEMLEN] = 0;
+
+    writeStatusBar(s, 80 - strlen(s));
+    free(s);
 }
 
 static void setStatusBar() {
     for (uint64_t* v = (uint64_t*) STATUS_LINE; v < (uint64_t*) VRAM_END; v++)
         *v = 0x3f003f003f003f00;
 
-    // STATUS_LINE[38 * 2] = 'D';
-    // STATUS_LINE[39 * 2] = 'a';
-    // STATUS_LINE[40 * 2] = 'r';
-    // STATUS_LINE[41 * 2] = 'O';
-    // STATUS_LINE[42 * 2] = 'S';
     writeStatusBar("DarOS", 38);
-    //char* mcPre = "malloc cur: 0x";
-    char* mcPre = "M: 0x";
-    writeStatusBar(mcPre, 80 - 16 - strlen(mcPre));
-    //updateMallocCur();
+    updateMemUse();
 }
 
 void clearScreen() {

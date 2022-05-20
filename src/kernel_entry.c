@@ -33,6 +33,7 @@
 
 static void gotChar(char c) {
     printc(c);
+    updateMemUse();
 }
 
 static void startTty() {
