@@ -95,6 +95,12 @@ char* M_vsprintf(char* fmt, va_list ap) {
         case 's':
             t = va_arg(ap, char*);
             break;
+        case 'p':
+            // Needs at least two more characters: the very next character is what to pad with, and
+            //   then at least one digit.  The digits are then interpretted as decimal and say how
+            //   wide to pad.  So "%p02u" means pad an unsigned integer with zeros to be 2 characters
+            //   wide, and "%p 10s" means pad a string with spaces to be 10 characters wide.
+            break;
         default:
             s[i++] = '%';
             s[i++] = c;

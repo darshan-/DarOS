@@ -3,6 +3,7 @@
 #include "serial.h"
 #include "io.h"
 #include "keyboard.h"
+#include "rtc.h"
 
 #define IDT 0
 #define CODE_SEG 8 // 1 quadword past null descriptor; next segment would be 16, etc.
@@ -33,15 +34,11 @@ struct interrupt_frame {
 };
 
 
-//#define log(...) ;
 #define log com1_printf
 
-//void log(char* fmt, ...) {
-    //va_list ap;
-    //va_start(ap, fmt);
-    //M_vsprintf(fmt, ap);
-    //va_end(ap);
-//}
+// void log(char* fmt, ...) {
+//     fmt = fmt;
+// }
 
 void __attribute__((naked)) waitloop() {
     __asm__ __volatile__(
@@ -153,7 +150,7 @@ static void __attribute__((interrupt)) double_fault_handler(struct interrupt_fra
     dumpFrame(frame);
 }
 
-static void __attribute__((interrupt)) kbd_irq(struct interrupt_frame *frame) {
+static void __attribute__((interrupt)) irq1_kbd(struct interrupt_frame *frame) {
     uint8_t code = inb(0x60);
     outb(PIC_PRIMARY_CMD, PIC_ACK);
 
@@ -161,6 +158,18 @@ static void __attribute__((interrupt)) kbd_irq(struct interrupt_frame *frame) {
     dumpFrame(frame);
 
     keyScanned(code);
+}
+
+static void __attribute__((interrupt)) irq8_rtc(struct interrupt_frame *frame) {
+    __asm__ __volatile__("cli");
+    outb(CMOS_REG_SEL, RTC_SRC);
+    inb(CMOS_IO); // Discard; just need to read from status register C
+    __asm__ __volatile__("sti");
+
+    outb(PIC_PRIMARY_CMD, PIC_ACK);
+
+    log("Default interrupt handler\n");
+    dumpFrame(frame);
 }
 
 static void set_handler(uint64_t vec, void* handler, uint8_t type) {
@@ -182,7 +191,8 @@ void init_idt() {
     for (int i = 32; i < 256; i++)
         set_handler(i, default_interrupt_handler, TYPE_INT);
 
-    set_handler(0x21, kbd_irq, TYPE_INT);
+    set_handler(0x21, irq1_kbd, TYPE_INT);
+    set_handler(0x25, irq8_rtc, TYPE_INT);
 
     // These are the traps with errors on stack according to https://wiki.osdev.org/Exceptions, 
     set_handler(8, double_fault_handler, TYPE_TRAP);
@@ -199,4 +209,5 @@ void init_idt() {
     set_handler(0, divide_by_zero_handler, TYPE_TRAP);
 
     init_pic();
+    //init_rtc_irq();
 }

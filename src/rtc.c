@@ -3,9 +3,6 @@
 #include "io.h"
 #include "rtc.h"
 
-#define CMOS_REG_SEL 0x70
-#define CMOS_IO 0x71
-#define NMI_DISABLED (1<<7)
 #define RTC_SEC 0
 #define RTC_MIN 0x02
 #define RTC_HR 0x04
@@ -14,16 +11,12 @@
 #define RTC_MTH 0x08
 #define RTC_YR 0x09
 #define RTC_CEN 0x32
-#define RTC_STA 0x0a
-#define RTC_STB 0x0a
-#define RTC_STA_UPDATING (1<<7)
-
-#define STATUS_REG_B 8
+#define RTC_SRA_UPDATING (1<<7)
 
 #define PM_BIT (1<<7)
 
 #define HRS24 (1<<1)
-#define BCD (1<<2)
+#define BCD_OFF (1<<2)
 
 #define READ(r) outb(CMOS_REG_SEL, r); \
     *q++ = inb(CMOS_IO)
@@ -33,8 +26,8 @@ static uint8_t* read(uint8_t* p) {
 
     __asm__ __volatile__("cli");
 
-    outb(CMOS_REG_SEL, RTC_STA);
-    while (inb(CMOS_IO) & RTC_STA_UPDATING)
+    outb(CMOS_REG_SEL, RTC_SRA);
+    while (inb(CMOS_IO) & RTC_SRA_UPDATING)
         ;
 
     READ(RTC_SEC);
@@ -45,7 +38,7 @@ static uint8_t* read(uint8_t* p) {
     READ(RTC_MTH);
     READ(RTC_YR);
     READ(RTC_CEN);
-    READ(RTC_STB);
+    READ(RTC_SRB);
 
     __asm__ __volatile__("sti");
 
@@ -74,17 +67,17 @@ void read_rtc(struct rtc_time* t) {
     for (int i = 0; i < 8; i++)
         c[i] = a[i];
 
-    if (!(a[STATUS_REG_B] & HRS24)) {
+    if (!(a[8] & HRS24)) {
         pm = t->hours & PM_BIT;
         t->hours ^= PM_BIT;
     }
 
-    if (a[STATUS_REG_B] & BCD)
+    if (!(a[8] & BCD_OFF))
         for (int i = 0; i < 8; i++)
             c[i] = (c[i] >> 4) * 10 + (c[i] & 0x0f);
 
     if (pm)
         t->hours += 12;
-    if (t->hours == 12) // Midnight
+    if (t->hours == 24) // Midnight
         t->hours = 0;
 }

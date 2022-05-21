@@ -2,6 +2,13 @@
 
 #include <stdint.h>
 
+#define CMOS_REG_SEL 0x70
+#define CMOS_IO 0x71
+#define NMI_DISABLED (1<<7)
+#define RTC_SRA 0x0a
+#define RTC_SRB 0x0b
+#define RTC_SRC 0x0c
+
 struct rtc_time {
     uint8_t seconds : 8;
     uint8_t minutes : 8;
