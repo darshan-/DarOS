@@ -3,6 +3,7 @@
 #include "interrupt.h"
 #include "keyboard.h"
 #include "malloc.h"
+#include "rtc.h"
 #include "serial.h"
 #include "strings.h"
 
@@ -136,9 +137,16 @@ void __attribute__((section(".kernel_entry"))) kernel_entry() {
     com1_print("starting tty\n");
     startTty();
 
+    extern uint8_t *RTC[9];
+    //extern uint8_t *RTC;
+    struct rtc_time rtc;
+
+    read_rtc(&rtc);
     print("hey, I wonder what the byte is at the rtc data location...\n");
-    extern uint8_t *RTC;
-    printf("Maybe it's: %u\n", *RTC);
+    printf("Maybe it's: 0x%h\n", *RTC[0]);
+
+    print("and the next?\n");
+    printf("Maybe it's: 0x%h\n", rtc.minutes);
 
     com1_print("going to waitloop\n");
     waitloop();

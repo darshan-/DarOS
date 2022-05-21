@@ -240,9 +240,13 @@ read_rtc:
         jmp .top
 
 .store_or_compare:
+        out CMOS_REG_SEL, al
+        in al, CMOS_IO
+
         test cl, cl
         jnz .compare
         mov [rbx], al
+        inc rbx
         ret
 
 .compare:
@@ -251,6 +255,7 @@ read_rtc:
         pop rbx
         push read_rtc           ; values were different, we need to start over
 .same:
+        inc rbx
         ret
 
 .top:
@@ -269,8 +274,8 @@ read_rtc:
         ; if they're the same, we're done, otherwise start over from scratch
 
         mov al, RTC_SEC
-        out CMOS_REG_SEL, al
-        in al, CMOS_IO
+        ; out CMOS_REG_SEL, al
+        ; in al, CMOS_IO
         ; So either store it or compare it here.  Maybe have caller (which can be us, and use a helper function,
         ;   so C doesn't have to mess with registers) set bl to 0 for first pass (store) and 1 for second pass
         ;   (compare)?
@@ -280,6 +285,41 @@ read_rtc:
 
         call .store_or_compare
 
+        ;inc rbx
+        mov al, RTC_MIN
+        ; out CMOS_REG_SEL, al
+        ; in al, CMOS_IO
+        call .store_or_compare
+
+        mov al, RTC_HR
+        call .store_or_compare
+
+        mov al, RTC_WKD
+        call .store_or_compare
+
+        mov al, RTC_DAY
+        call .store_or_compare
+
+        mov al, RTC_MTH
+        call .store_or_compare
+
+        mov al, RTC_YR
+        call .store_or_compare
+
+        mov al, RTC_CEN
+        call .store_or_compare
+
+        mov al, RTC_STB
+        call .store_or_compare
+
+        test cl, cl
+        jnz .done
+
+        mov rbx, rtc_loc
+        inc cl
+        jmp .top
+
+.done:
         ret
 
 start64:
