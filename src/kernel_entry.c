@@ -136,6 +136,10 @@ void __attribute__((section(".kernel_entry"))) kernel_entry() {
     com1_print("starting tty\n");
     startTty();
 
+    print("hey, I wonder what the byte is at the rtc data location...\n");
+    extern uint8_t *RTC;
+    printf("Maybe it's: %u\n", *RTC);
+
     com1_print("going to waitloop\n");
     waitloop();
 }

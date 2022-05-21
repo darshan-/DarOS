@@ -47,7 +47,8 @@
         page_table_l4 equ 0x1000
         page_table_l3 equ 0x2000
         page_table_l2 equ 0x3000
-        stack_bottom equ 0x4000
+        ;stack_bottom equ 0x4000
+        rtc_loc equ 0x4000
         stack_top equ 0x7bff
         idt equ 0               ; 0-0x1000 available in long mode
 
@@ -70,8 +71,26 @@
         INT_0x10_TELETYPE equ 0x0e
         INT_0x13_LBA_READ equ 0x42
 
+        CMOS_REG_SEL equ 0x70
+        CMOS_IO equ 0x71
+        NMI_DISABLED equ 1<<7
+        RTC_SEC equ 0
+        RTC_MIN equ 0x02
+        RTC_HR equ 0x04
+        RTC_WKD equ 0x06
+        RTC_DAY equ 0x07
+        RTC_MTH equ 0x08
+        RTC_YR equ 0x09
+        RTC_CEN equ 0x32
+        RTC_STA equ 0x0a
+        RTC_STB equ 0x0a
+        ;RTC_STA_UPDATING equ 7
+        RTC_STA_UPDATING equ 1<<7
+
 section .boot
 bits 16
+        mov esp, stack_top
+
         mov cx, LOAD_COUNT
 	mov si, dap
         ; dl is set by BIOS to drive number we're loaded from, so just leave it as is
@@ -96,7 +115,6 @@ lba_error:
         call teleprint
         cli
         hlt
-
 
 lba_success:
         mov bx, loaded
@@ -150,8 +168,10 @@ teleprint:
         mov ah, INT_0x10_TELETYPE
 .loop:
         mov al, [bx]
-        cmp al, 0
+        test al, al
         jz done
+        ;cmp al, 0
+        ;je done
 
         int 0x10
         inc bx
@@ -171,6 +191,10 @@ gdtr:
 idtr:
         dw 4095                 ; Size of IDT minus 1
         dq idt                  ; Address
+
+        ; Let's make it easy for C to get location for RTC data with this file as the single source of truth
+global RTC
+RTC:    dq rtc_loc
 
 dap:
         db 0x10                 ; Size of DAP (Disk Address Packet)
@@ -206,6 +230,58 @@ sect2:
         jmp CODE_SEG:start64
 
 bits 64
+
+        ; If I ever make read_rtc global/extern, and call it from C, I'll want to cli first and sti last.
+        ; If I call it from assembly, I want to etiher *not* do that, or do it before I've disabled interrupts
+        ;   to set up long mode
+read_rtc:
+        mov rbx, rtc_loc
+        mov cl, 0
+        jmp .top
+
+.store_or_compare:
+        test cl, cl
+        jnz .compare
+        mov [rbx], al
+        ret
+
+.compare:
+        cmp al, [rbx]
+        je .same
+        pop rbx
+        push read_rtc           ; values were different, we need to start over
+.same:
+        ret
+
+.top:
+        mov al, RTC_STA
+        out CMOS_REG_SEL, al
+        in al, CMOS_IO
+        ;cmp al, 0
+        ;jne read_rtc
+        ;shr al, RTC_STA_UPDATING
+        and al, RTC_STA_UPDATING
+        test al, al
+        jnz read_rtc
+
+        ; read each of the registers and store to their locations -- clock stuff and stb (format)
+        ; then do the whole thing again but rather than storing, compare to last stored
+        ; if they're the same, we're done, otherwise start over from scratch
+
+        mov al, RTC_SEC
+        out CMOS_REG_SEL, al
+        in al, CMOS_IO
+        ; So either store it or compare it here.  Maybe have caller (which can be us, and use a helper function,
+        ;   so C doesn't have to mess with registers) set bl to 0 for first pass (store) and 1 for second pass
+        ;   (compare)?
+
+        ;test cl, cl
+        ;jnz
+
+        call .store_or_compare
+
+        ret
+
 start64:
         ; Set up segment registers (the far jump down here set up cs)
         xor ax, ax
@@ -215,6 +291,5 @@ start64:
         mov gs, ax
         mov ss, ax
 
+        call read_rtc
         lidt [idtr]
-
-        mov esp, stack_top

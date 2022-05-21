@@ -85,9 +85,11 @@ void free(void *p) {
 
     uint64_t b = (uint64_t) p;
     b -= (uint64_t) heap;
-    const uint64_t align = (64 / MAP_ENTRY_SZ) * BLK_SZ;
+
+#define align ((64 / MAP_ENTRY_SZ) * BLK_SZ)
     uint64_t o = (b % align) / BLK_SZ * MAP_ENTRY_SZ;
     b /= align;
+#undef align
 
     uint64_t entry = map[b];
     entry >>= o;

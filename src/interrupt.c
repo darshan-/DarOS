@@ -1,6 +1,5 @@
 #include <stdarg.h>
 #include <stdint.h>
-//#include "console.h"
 #include "serial.h"
 #include "io.h"
 #include "keyboard.h"
@@ -67,7 +66,7 @@ static inline void generic_trap_n(struct interrupt_frame *frame, int n) {
 
     // In generic case, it's not safe to do anything but go to waitloop (well, that may well not be safe either;
     //   halting the machine completly is probably best, but for now I'd like to do it this way rather than
-    //   that or risk jumpint to IP.
+    //   that or risk jumping to IP.
     // That means we can ignore whether there is an error code on the stack, as waitloop clears stack anyway.
     // So I think this should be a fine generic trap handler to default to when a specific one isn't available.
     frame->ip = (uint64_t) waitloop;
@@ -82,32 +81,7 @@ static inline void generic_trap_n(struct interrupt_frame *frame, int n) {
     generic_trap_n(frame, 0x##nn);\
 }
 
-//#define TRAP_HL(h, l) TRAP_N(h##l)
-
 #define TRAP_HL(macro, h, l) macro(h##l)
-
-/*
-#define TRAPS_H(h) \
-TRAP_HL(h, 0)\
-TRAP_HL(h, 1)\
-TRAP_HL(h, 2)\
-TRAP_HL(h, 3)\
-TRAP_HL(h, 4)\
-TRAP_HL(h, 5)\
-TRAP_HL(h, 6)\
-TRAP_HL(h, 7)\
-TRAP_HL(h, 8)\
-TRAP_HL(h, 9)\
-TRAP_HL(h, a)\
-TRAP_HL(h, b)\
-TRAP_HL(h, c)\
-TRAP_HL(h, d)\
-TRAP_HL(h, e)\
-TRAP_HL(h, f)
-
-TRAPS_H(0)
-TRAPS_H(1)
-*/
 
 #define TRAPS(macro, h) \
 TRAP_HL(macro, h, 0)\
@@ -129,27 +103,6 @@ TRAP_HL(macro, h, f)
 
 TRAPS(TRAP_N, 0)
 TRAPS(TRAP_N, 1)
-
-// TRAP_N(00)
-// TRAP_N(01)
-// TRAP_N(02)
-// TRAP_N(03)
-// TRAP_N(04)
-// TRAP_N(05)
-// TRAP_N(06)
-// TRAP_N(07)
-// TRAP_N(08)
-// TRAP_N(09)
-// TRAP_N(0a)
-// TRAP_N(0b)
-// TRAP_N(0c)
-// TRAP_N(0d)
-// TRAP_N(0e)
-// TRAP_N(0f)
-
-// static void __attribute__((interrupt)) trap_handler_00(struct interrupt_frame *frame) {
-//     //generic_trap_n(frame, 0x00);
-// }
 
 static void init_pic() {
     outb(PIC_PRIMARY_CMD, ICW1 | ICW1_ICW4_NEEDED);
