@@ -28,7 +28,7 @@ out/boot.img: $(c_objects) src/linker.ld build/bootloader.o | out
 
 .PHONY: run
 run: out/boot.img
-	qemu-system-x86_64 -enable-kvm -drive format=raw,file=out/boot.img
+	qemu-system-x86_64 -rtc base=localtime -enable-kvm -drive format=raw,file=out/boot.img
 
 .PHONY: clean
 clean:

@@ -143,10 +143,12 @@ void __attribute__((section(".kernel_entry"))) kernel_entry() {
 
     read_rtc(&rtc);
     print("hey, I wonder what the byte is at the rtc data location...\n");
-    printf("Maybe it's: 0x%h\n", *RTC[0]);
+    printf("Maybe it's: %u\n", rtc.seconds);
 
     print("and the next?\n");
-    printf("Maybe it's: 0x%h\n", rtc.minutes);
+    printf("Maybe it's: %u\n", rtc.minutes);
+
+    printf("Hours: %u\n", rtc.hours);
 
     com1_print("going to waitloop\n");
     waitloop();
