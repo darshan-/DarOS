@@ -137,18 +137,9 @@ void __attribute__((section(".kernel_entry"))) kernel_entry() {
     com1_print("starting tty\n");
     startTty();
 
-    extern uint8_t *RTC[9];
-    //extern uint8_t *RTC;
     struct rtc_time rtc;
-
     read_rtc(&rtc);
-    print("hey, I wonder what the byte is at the rtc data location...\n");
-    printf("Maybe it's: %u\n", rtc.seconds);
-
-    print("and the next?\n");
-    printf("Maybe it's: %u\n", rtc.minutes);
-
-    printf("Hours: %u\n", rtc.hours);
+    printf("%u:%u:%u\n", rtc.hours, rtc.minutes, rtc.seconds);
 
     com1_print("going to waitloop\n");
     waitloop();

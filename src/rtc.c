@@ -1,71 +1,90 @@
 #include <stdint.h>
+#include "interrupt.h"
+#include "io.h"
 #include "rtc.h"
 
-/*
-        RTC_SEC equ 0
-        RTC_MIN equ 0x02
-        RTC_HR equ 0x04
-        RTC_WKD equ 0x06
-        RTC_DAY equ 0x07
-        RTC_MTH equ 0x08
-        RTC_YR equ 0x09
-        RTC_CEN equ 0x32
-        RTC_STA equ 0x0a
-        RTC_STB equ 0x0a
- */
-// struct rtc {
-//     uint8_t seconds : 8;
-// };
+#define CMOS_REG_SEL 0x70
+#define CMOS_IO 0x71
+#define NMI_DISABLED (1<<7)
+#define RTC_SEC 0
+#define RTC_MIN 0x02
+#define RTC_HR 0x04
+#define RTC_WKD 0x06
+#define RTC_DAY 0x07
+#define RTC_MTH 0x08
+#define RTC_YR 0x09
+#define RTC_CEN 0x32
+#define RTC_STA 0x0a
+#define RTC_STB 0x0a
+#define RTC_STA_UPDATING (1<<7)
 
-
-/*
-  Or just treat it as an array, since it kinda is, all 8-bit values, so we can just have constants for offset?
-  rtc_data[SECONDS] vs rtc_data.seconds -- seems fine either way.
-  Especially since we'll want to stardardize to something usable, this file will interpret raw data according
-  to status register B, so we can have our own struct -- yeah, let's just use an array here for raw data, and
-  export data in our own format.
- */
-
-
-#define SECONDS 0
-#define MINUTES 1
-#define HOURS 2
-#define WEEKDAY 3
-#define DAY_OF_MONTH 4
-#define MONTH 5
-#define YEAR 6
-#define CENTURY 7
 #define STATUS_REG_B 8
 
-#define HRS24 1<<1
-#define BCD 1<<2
+#define PM_BIT (1<<7)
 
-extern uint8_t (*RTC)[9];
-#define rtc (*RTC)
+#define HRS24 (1<<1)
+#define BCD (1<<2)
 
-void read_rtc_asm();
+#define READ(r) outb(CMOS_REG_SEL, r); \
+    *q++ = inb(CMOS_IO)
 
-//void get_rtc_data(struct rtc* data) {
-void read_rtc(struct rtc_time* time) {
+static uint8_t* read(uint8_t* p) {
+    uint8_t* q = p;
+
+    __asm__ __volatile__("cli");
+
+    outb(CMOS_REG_SEL, RTC_STA);
+    while (inb(CMOS_IO) & RTC_STA_UPDATING)
+        ;
+
+    READ(RTC_SEC);
+    READ(RTC_MIN);
+    READ(RTC_HR);
+    READ(RTC_WKD);
+    READ(RTC_DAY);
+    READ(RTC_MTH);
+    READ(RTC_YR);
+    READ(RTC_CEN);
+    READ(RTC_STB);
+
+    __asm__ __volatile__("sti");
+
+    return p;
+}
+
+static int equal(uint8_t* a, uint8_t* b) {
+    for (int i = 0; i < 9; i++)
+        if (a[i] != b[i])
+            return 0;
+
+    return 1;
+}
+
+// Disables interrupts and then reenables them (to prevent potential issue with interrupt happening and
+//  port 0x70 changing before we read from port 0x71), so must not be called until after interrupt
+//  handlers are set up.
+void read_rtc(struct rtc_time* t) {
     uint8_t pm = 0;
+    uint8_t a[9], b[9];
 
-    read_rtc_asm();
+    while (!equal(read(a), read(b)))
+        ;
 
-    if (!(rtc[STATUS_REG_B] & HRS24)) {
-        pm = rtc[HOURS] & (1 << 7);
-        rtc[HOURS] = rtc[HOURS] ^ ( 1 << 7);
+    uint8_t* c = (uint8_t*) t;
+    for (int i = 0; i < 8; i++)
+        c[i] = a[i];
+
+    if (!(a[STATUS_REG_B] & HRS24)) {
+        pm = t->hours & PM_BIT;
+        t->hours ^= PM_BIT;
     }
 
-    if (rtc[STATUS_REG_B] & BCD)
+    if (a[STATUS_REG_B] & BCD)
         for (int i = 0; i < 8; i++)
-            rtc[i] = (rtc[i] >> 4) * 10 + (rtc[i] & 0x0f);
-
-    time->seconds = rtc[SECONDS];
-    time->minutes = rtc[MINUTES];
-    time->hours = rtc[HOURS];
+            c[i] = (c[i] >> 4) * 10 + (c[i] & 0x0f);
 
     if (pm)
-        time->hours += 12;
-    if (time->hours == 12) // Midnight
-        time->hours = 0;
+        t->hours += 12;
+    if (t->hours == 12) // Midnight
+        t->hours = 0;
 }

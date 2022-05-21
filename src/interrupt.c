@@ -61,7 +61,7 @@ static void dumpFrame(struct interrupt_frame *frame) {
 }
 
 static inline void generic_trap_n(struct interrupt_frame *frame, int n) {
-    log("Generic trap handler used for trap vector 0x%2\n", n);
+    log("Generic trap handler used for trap vector 0x%h\n", n);
     dumpFrame(frame);
 
     // In generic case, it's not safe to do anything but go to waitloop (well, that may well not be safe either;
