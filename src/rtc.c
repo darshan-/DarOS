@@ -43,17 +43,29 @@
 extern uint8_t (*RTC)[9];
 #define rtc (*RTC)
 
+void read_rtc_asm();
+
 //void get_rtc_data(struct rtc* data) {
 void read_rtc(struct rtc_time* time) {
-    uint8_t hrs24 = rtc[STATUS_REG_B] & HRS24;
-    uint8_t bcd = rtc[STATUS_REG_B] & BCD;
-    com1_printf("bcd: %u\n", bcd);
+    uint8_t pm = 0;
 
-    if (bcd)
+    read_rtc_asm();
+
+    if (!(rtc[STATUS_REG_B] & HRS24)) {
+        pm = rtc[HOURS] & (1 << 7);
+        rtc[HOURS] = rtc[HOURS] ^ ( 1 << 7);
+    }
+
+    if (rtc[STATUS_REG_B] & BCD)
         for (int i = 0; i < 8; i++)
             rtc[i] = (rtc[i] >> 4) * 10 + (rtc[i] & 0x0f);
 
     time->seconds = rtc[SECONDS];
     time->minutes = rtc[MINUTES];
     time->hours = rtc[HOURS];
+
+    if (pm)
+        time->hours += 12;
+    if (time->hours == 12) // Midnight
+        time->hours = 0;
 }

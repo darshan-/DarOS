@@ -234,7 +234,8 @@ bits 64
         ; If I ever make read_rtc global/extern, and call it from C, I'll want to cli first and sti last.
         ; If I call it from assembly, I want to etiher *not* do that, or do it before I've disabled interrupts
         ;   to set up long mode
-read_rtc:
+global read_rtc_asm
+read_rtc_asm:
         mov rbx, rtc_loc
         mov cl, 0
         jmp .top
@@ -253,7 +254,7 @@ read_rtc:
         cmp al, [rbx]
         je .same
         pop rbx
-        push read_rtc           ; values were different, we need to start over
+        push read_rtc_asm           ; values were different, we need to start over
 .same:
         inc rbx
         ret
@@ -267,7 +268,7 @@ read_rtc:
         ;shr al, RTC_STA_UPDATING
         and al, RTC_STA_UPDATING
         test al, al
-        jnz read_rtc
+        jnz read_rtc_asm
 
         ; read each of the registers and store to their locations -- clock stuff and stb (format)
         ; then do the whole thing again but rather than storing, compare to last stored
@@ -331,5 +332,5 @@ start64:
         mov gs, ax
         mov ss, ax
 
-        call read_rtc
+        ;call read_rtc
         lidt [idtr]
