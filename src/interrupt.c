@@ -189,13 +189,15 @@ static void __attribute__((interrupt)) irq1_kbd(struct interrupt_frame *frame) {
 static uint64_t rtcCount = 0;
 
 static void __attribute__((interrupt)) irq8_rtc(struct interrupt_frame *frame) {
-    read_rtc_reg(RTC_SRC);
+    uint8_t type = irq8_type();
     outb(PIC_SECONDARY_CMD, PIC_ACK);
     outb(PIC_PRIMARY_CMD, PIC_ACK);
 
-    rtcCount += 1;
-    if (rtcCount % 1024 == 0)
-        printf("rtcCount: %u\n", rtcCount);
+    if (type == RTC_INT_PERIODIC) {
+        rtcCount += 1;
+        if (rtcCount % 1024 == 0)
+            printf("rtcCount: %u\n", rtcCount);
+    }
 }
 
 static void __attribute__((interrupt)) irq0_pit(struct interrupt_frame *frame) {

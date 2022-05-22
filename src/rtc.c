@@ -3,29 +3,40 @@
 #include "io.h"
 #include "rtc.h"
 
+#define REG_SEL 0x70
+#define IO 0x71
+
+#define SEC 0
+#define MIN 0x02
+#define HR 0x04
+#define WKD 0x06
+#define DAY 0x07
+#define MTH 0x08
+#define YR 0x09
+#define SRA 0x0a
+#define SRB 0x0b
+#define SRC 0x0c
+#define CEN 0x32
+
 #define NMI_DISABLED (1<<7)
-#define RTC_SEC 0
-#define RTC_MIN 0x02
-#define RTC_HR 0x04
-#define RTC_WKD 0x06
-#define RTC_DAY 0x07
-#define RTC_MTH 0x08
-#define RTC_YR 0x09
-#define RTC_CEN 0x32
-#define RTC_SRA_UPDATING (1<<7)
-#define RTC_SRB_PERIODIC_INT (1<<6)
+#define SRA_UPDATING (1<<7)
+
+#define IRQF (1<<7)
+#define INT_PERIODIC (1<<6)
+#define INT_ALARM (1<<5)
+#define INT_UPDATED (1<<4)
 
 #define PM_BIT (1<<7)
 
 #define HRS24 (1<<1)
 #define BCD_OFF (1<<2)
 
-#define READ(r) outb(CMOS_REG_SEL, r | NMI_DISABLED); \
-    *q++ = inb(CMOS_IO)
+#define READ(r) outb(REG_SEL, r | NMI_DISABLED); \
+    *q++ = inb(IO)
 
 static void reenable_nmi() {
-    outb(CMOS_REG_SEL, RTC_SRB); // Doesn't matter what register we select, just that NMI_DISABLED isn't set.
-    inb(CMOS_IO);                // And doesn't matter what's we read, just *that* we read after selecting.
+    outb(REG_SEL, SRB); // Doesn't matter what register we select, just that NMI_DISABLED isn't set.
+    inb(IO);                // And doesn't matter what's we read, just *that* we read after selecting.
 }
 
 static uint8_t* read(uint8_t* p) {
@@ -33,19 +44,19 @@ static uint8_t* read(uint8_t* p) {
 
     __asm__ __volatile__("cli");
 
-    outb(CMOS_REG_SEL, RTC_SRA | NMI_DISABLED);
-    while (inb(CMOS_IO) & RTC_SRA_UPDATING)
+    outb(REG_SEL, SRA | NMI_DISABLED);
+    while (inb(IO) & SRA_UPDATING)
         ;
 
-    READ(RTC_SEC);
-    READ(RTC_MIN);
-    READ(RTC_HR);
-    READ(RTC_WKD);
-    READ(RTC_DAY);
-    READ(RTC_MTH);
-    READ(RTC_YR);
-    READ(RTC_CEN);
-    READ(RTC_SRB);
+    READ(SEC);
+    READ(MIN);
+    READ(HR);
+    READ(WKD);
+    READ(DAY);
+    READ(MTH);
+    READ(YR);
+    READ(CEN);
+    READ(SRB);
 
     reenable_nmi();
     __asm__ __volatile__("sti");
@@ -90,41 +101,49 @@ void read_rtc(struct rtc_time* t) {
         t->hours = 0;
 }
 
-uint8_t read_rtc_reg(uint8_t reg) {
-    //__asm__ __volatile__("cli");
-
-    outb(CMOS_REG_SEL, reg | NMI_DISABLED);
-    uint8_t ret = inb(CMOS_IO);
+// To be called only from IRQ8 handler; assumes interrupts are disabled (doesn't sti at end)
+uint8_t irq8_type() {
+    outb(REG_SEL, SRC | NMI_DISABLED);
+    uint8_t c = inb(IO);
 
     reenable_nmi();
-    //__asm__ __volatile__("sti");
 
-    return ret;
+    if (!(c & IRQF))
+        return RTC_INT_UNKNOWN;
+
+    if (c & INT_PERIODIC)
+        return RTC_INT_PERIODIC;
+    if (c & INT_PERIODIC)
+        return RTC_INT_PERIODIC;
+    if (c & INT_PERIODIC)
+        return RTC_INT_PERIODIC;
+
+    return RTC_INT_UNKNOWN;
 }
 
 void enable_rtc_timer() {
     __asm__ __volatile__("cli");
 
-    outb(CMOS_REG_SEL, RTC_SRB | NMI_DISABLED);
-    uint8_t regb = inb(CMOS_IO);
+    outb(REG_SEL, SRB | NMI_DISABLED);
+    uint8_t regb = inb(IO);
     com1_printf("regb: 0x%h\n", regb);
-    outb(CMOS_REG_SEL, RTC_SRB | NMI_DISABLED);
-    outb(CMOS_IO, regb | RTC_SRB_PERIODIC_INT);
+    outb(REG_SEL, SRB | NMI_DISABLED);
+    outb(IO, regb | INT_PERIODIC);
 
-    outb(CMOS_REG_SEL, RTC_SRB | NMI_DISABLED);
-    regb = inb(CMOS_IO);
+    outb(REG_SEL, SRB | NMI_DISABLED);
+    regb = inb(IO);
     com1_printf("regb now: 0x%h\n", regb);
 
-    outb(CMOS_REG_SEL, RTC_SRA | NMI_DISABLED);
-    uint8_t rega = inb(CMOS_IO);
+    outb(REG_SEL, SRA | NMI_DISABLED);
+    uint8_t rega = inb(IO);
     com1_printf("rega: 0x%h\n", rega);
 
-    outb(CMOS_REG_SEL, RTC_SRC | NMI_DISABLED);
-    uint8_t regc = inb(CMOS_IO);
+    outb(REG_SEL, SRC | NMI_DISABLED);
+    uint8_t regc = inb(IO);
     com1_printf("regc: 0x%h\n", regc);
 
-    outb(CMOS_REG_SEL, RTC_SRB | NMI_DISABLED);
-    regb = inb(CMOS_IO);
+    outb(REG_SEL, SRB | NMI_DISABLED);
+    regb = inb(IO);
     com1_printf("regb now: 0x%h\n", regb);
 
     reenable_nmi();
