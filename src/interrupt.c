@@ -69,8 +69,8 @@ void waitloop() {
 }
 
 static void dumpFrame(struct interrupt_frame *frame) {
-    log("ip: 0x%16h    cs: 0x%16h flags: 0x%16h\n", frame->ip, frame->cs, frame->flags);
-    log("sp: 0x%16h    ss: 0x%16h\n", frame->sp, frame->ss);
+    log("ip: 0x%p016h    cs: 0x%p016h flags: 0x%p016h\n", frame->ip, frame->cs, frame->flags);
+    log("sp: 0x%p016h    ss: 0x%p016h\n", frame->sp, frame->ss);
 }
 
 static inline void generic_trap_n(struct interrupt_frame *frame, int n) {
@@ -172,12 +172,12 @@ static void __attribute__((interrupt)) default_trap_handler(struct interrupt_fra
 
 static void __attribute__((interrupt)) default_trap_with_error_handler(struct interrupt_frame *frame,
                                                                        uint64_t error_code) {
-    log("Default trap handler with error on stack;  error: 0x%16h\n", error_code);
+    log("Default trap handler with error on stack;  error: 0x%p016h\n", error_code);
     dumpFrame(frame);
 }
 
 static void __attribute__((interrupt)) double_fault_handler(struct interrupt_frame *frame, uint64_t error_code) {
-    log("Double fault; error should be zero.  error: 0x%16h\n", error_code);
+    log("Double fault; error should be zero.  error: 0x%p016h\n", error_code);
     dumpFrame(frame);
 }
 
@@ -185,7 +185,7 @@ static void __attribute__((interrupt)) irq1_kbd(struct interrupt_frame *frame) {
     uint8_t code = inb(0x60);
     outb(PIC_PRIMARY_CMD, PIC_ACK);
 
-    log("C keyboard interrupt handler: %2h\n", code);
+    log("C keyboard interrupt handler: %p02h\n", code);
     dumpFrame(frame);
 
     keyScanned(code);

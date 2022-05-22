@@ -140,6 +140,10 @@ void __attribute__((section(".kernel_entry"))) kernel_entry() {
     com1_print("initializing rtc\n");
     init_rtc();
 
+    printf("Test: '%p 3s' -- how was that?\n", " test, man!");
+    printf("0x%p06h\n", 0x12);
+    printf("0x%p 6h\n", 0x12);
+
     com1_print("going to waitloop\n");
     waitloop();
 }

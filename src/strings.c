@@ -45,9 +45,9 @@ char* M_sprintf(char* fmt, ...) {
 char* M_vsprintf(char* fmt, va_list ap) {
     int scap = 128;
     char* s = malloc(scap);
-    char c, *t;
+    char c, *t, padc;
     int i = 0; // Index into s where we will place next character
-    int width, padw;
+    int padw = 0;
     char buf[21];
     buf[20] = 0;
 
@@ -57,24 +57,23 @@ char* M_vsprintf(char* fmt, va_list ap) {
             s = realloc(s, scap);
         }
 
-        if (*p != '%') {
-            s[i++] = *p;
-            continue;
-        }
+        if (padw == 0) {
+            if (*p != '%') {
+                s[i++] = *p;
+                continue;
+            }
 
-        width = -1;
-        padw = 0;
-
-        c = *++p; // Skip past the '%'
-
-        if (c >= '0' && c <= '9') {
-            width = dstoui(p);
-            while (*p >= '0' && *p <= '9')
-                p++;
+            c = *++p; // Skip past the '%'
+        } else {
             c = *p;
         }
 
         switch (c) {
+        case 'c':
+            t = buf + 19;
+            t[0] = va_arg(ap, int);
+
+            break;
         case 'u':
             uint64_t u = va_arg(ap, uint64_t);
             uint64_t e = ONE_E_19;
@@ -87,36 +86,64 @@ char* M_vsprintf(char* fmt, va_list ap) {
             }
 
             t = buf;
+
             break;
         case 'h':
-            t = buf+4; // Quad word in hex is 16 characters, not 20 as in decimal
+            t = buf + 4; // Quad word in hex is 16 characters, not 20 as in decimal
             qwordToHex(va_arg(ap, uint64_t), t);
+
             break;
         case 's':
             t = va_arg(ap, char*);
+
             break;
         case 'p':
             // Needs at least two more characters: the very next character is what to pad with, and
             //   then at least one digit.  The digits are then interpretted as decimal and say how
             //   wide to pad.  So "%p02u" means pad an unsigned integer with zeros to be 2 characters
             //   wide, and "%p 10s" means pad a string with spaces to be 10 characters wide.
+
+            padc = *++p;
+
+            c = *++p;
+            if (c >= '0' && c <= '9') {
+                padw = dstoui(p);
+
+                while (*p >= '0' && *p <= '9')
+                    p++;
+
+                *p--;
+            } else {
+                // Bad format
+                s[i++] = '%';
+                s[i++] = 'p';
+                s[i++] = c;
+            }
+
+            continue;
+
             break;
         default:
             s[i++] = '%';
             s[i++] = c;
+
             continue;
         }
 
-        // Okay, for now let's say width means: pad with zeros if necessary, and drop chars from left if necessary.
-        if (c == 'u' || c == 'h') {
+        if (c == 'u' || c == 'h')
+            if (padc != '0' || padw <= 0)
+                while (*t == '0' && *(t + 1) != 0) t++;
+
+        if (padw > 0) {
             int l = strlen(t);
 
-            if (width < 0)
-                while (*t == '0' && *(t+1) != 0) t++;
-            else if (width < l)
-                t += l - width;
-            else
-                padw = width - l;
+            if (padw >= l) {
+                padw -= l;
+            } else {
+                if (c == 'u' || c == 'h')
+                    t += l - padw; // Keep the zeros we want rather than stripping and re-adding
+                padw = 0;
+            }
         }
 
         // Okay, no append for s; here is the one place we lengthen it other than the top.
@@ -127,10 +154,12 @@ char* M_vsprintf(char* fmt, va_list ap) {
         }
 
         for (int j = 0; j < padw; j++)
-            s[i++] = '0';
+            s[i++] = padc;
 
         while (*t)
             s[i++] = *t++;
+
+        padw = 0;
     }
 
     s[i] = '\0';

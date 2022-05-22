@@ -72,12 +72,6 @@ static int equal(uint8_t* a, uint8_t* b) {
     return 1;
 }
 
-void get_rtc_time(struct rtc_time* t) {
-    t->seconds = rtc_seconds % 60;
-    t->minutes = rtc_seconds / 60 % 60;
-    t->hours = rtc_seconds / 60 / 60;
-}
-
 // Assumes interrupts are off and leaves them off.  Call either before interrupts are first enabled at boot, or
 //  from a helper function that knows what it's doing and turns them off before calling and back on afterward.
 static void sync_rtc_seconds() {
@@ -130,6 +124,26 @@ uint8_t irq8_type() {
         return RTC_INT_PERIODIC;
 
     return RTC_INT_UNKNOWN;
+}
+
+// To be called only when interrupts are safe to enable.
+void get_rtc_time(struct rtc_time* t) {
+    static last_sync = 0;
+
+    // Not sure why I'm having a lot of drift (and playing with qemu options didn't help), but syncing to
+    //  cmos every 10 seconds seems good enough for now...
+    // Ultimately I'll almost certainly want to use one of the more modern, higher precision timing sources, but
+    //  for now I want to keep it simple and good enough to move forward.
+    if (rtc_seconds - last_sync > 10) {
+        __asm__ __volatile__("cli");
+        sync_rtc_seconds();
+        last_sync = rtc_seconds;
+        __asm__ __volatile__("sti");
+    }
+
+    t->seconds = rtc_seconds % 60;
+    t->minutes = rtc_seconds / 60 % 60;
+    t->hours = rtc_seconds / 60 / 60;
 }
 
 // To be called only before interrupts are first turned on at boot.

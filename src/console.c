@@ -71,7 +71,14 @@ void updateMemUse() {
 void updateClock() {
     struct rtc_time t;
     get_rtc_time(&t);
-    char *s = M_sprintf("%u:%u:%u", t.hours, t.minutes, t.seconds);
+
+    // Let's space-pad the hour, zero-pad the minutes and hours, and do the hour mod 12 and show AM or PM
+    // Bonus: we won't have to worry about clearing space after.  Real reason: I think it'll look nicer
+    //  zero-padded for single-digit hours.
+    char* ampm = t.hours >= 12 ? "PM" : "AM";
+    uint8_t hours = t.hours % 12;
+    if (hours == 0) hours = 12;
+    char *s = M_sprintf("%p 2u:%p02u:%p02u %s", hours, t.minutes, t.seconds, ampm);
 
     writeStatusBar(s, 0);
 
