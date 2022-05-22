@@ -35,8 +35,6 @@ void addToList(struct list* l, void* item) {
     cur->next = n;
 }
 
-// Only to be called when interrupts are enabled (or safe to reenable).
-// For code that touches data structures that interrupts handlers also touch.
 void* atomicPop(struct list* l) {
     void* item = (void *) 0;
 

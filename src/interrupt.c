@@ -4,6 +4,7 @@
 #include "io.h"
 #include "keyboard.h"
 #include "list.h"
+#include "rtc.h"
 #include "rtc_int.h"
 
 /*
@@ -194,7 +195,9 @@ static void __attribute__((interrupt)) irq1_kbd(struct interrupt_frame *frame) {
 }
 
 void secTick() {
-    printf("secTick()\n");
+    struct rtc_time t;
+    get_rtc_time(&t);
+    printf("secTick: %u:%u:%u\n", t.hours, t.minutes, t.seconds);
 }
 
 static uint64_t rtcCount = 0;

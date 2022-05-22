@@ -137,7 +137,9 @@ void __attribute__((section(".kernel_entry"))) kernel_entry() {
     com1_print("starting tty\n");
     startTty();
 
-    enable_rtc_timer();
+    com1_print("initializing rtc\n");
+    init_rtc();
+
     com1_print("going to waitloop\n");
     waitloop();
 }

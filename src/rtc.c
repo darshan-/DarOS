@@ -32,9 +32,7 @@
 #define HRS24 (1<<1)
 #define BCD_OFF (1<<2)
 
-//static struct rtc_time
-//static uint64_t seconds; // Seconds into the day; calculated from RTC when we read it, incremented on timer tick.
-extern uint64_t rtc_seconds = 0;
+uint64_t rtc_seconds = 0;
 
 #define READ(r) outb(REG_SEL, r | NMI_DISABLED); \
     *q++ = inb(IO)
@@ -46,8 +44,6 @@ static void reenable_nmi() {
 
 static uint8_t* read(uint8_t* p) {
     uint8_t* q = p;
-
-    __asm__ __volatile__("cli");
 
     outb(REG_SEL, SRA | NMI_DISABLED);
     while (inb(IO) & SRA_UPDATING)
@@ -64,7 +60,6 @@ static uint8_t* read(uint8_t* p) {
     READ(SRB);
 
     reenable_nmi();
-    __asm__ __volatile__("sti");
 
     return p;
 }
@@ -77,23 +72,29 @@ static int equal(uint8_t* a, uint8_t* b) {
     return 1;
 }
 
-// Disables interrupts and then reenables them (to prevent potential issue with interrupt happening and
-//  port 0x70 changing before we read from port 0x71), so must not be called until after interrupt
-//  handlers are set up.
-void read_rtc(struct rtc_time* t) {
+void get_rtc_time(struct rtc_time* t) {
+    t->seconds = rtc_seconds % 60;
+    t->minutes = rtc_seconds / 60 % 60;
+    t->hours = rtc_seconds / 60 / 60;
+}
+
+// Assumes interrupts are off and leaves them off.  Call either before interrupts are first enabled at boot, or
+//  from a helper function that knows what it's doing and turns them off before calling and back on afterward.
+static void sync_rtc_seconds() {
+    struct rtc_time t;
     uint8_t pm = 0;
     uint8_t a[9], b[9];
 
     while (!equal(read(a), read(b)))
         ;
 
-    uint8_t* c = (uint8_t*) t;
+    uint8_t* c = (uint8_t*) &t;
     for (int i = 0; i < 8; i++)
         c[i] = a[i];
 
     if (!(a[8] & HRS24)) {
-        pm = t->hours & PM_BIT;
-        t->hours ^= PM_BIT;
+        pm = t.hours & PM_BIT;
+        t.hours ^= PM_BIT;
     }
 
     if (!(a[8] & BCD_OFF))
@@ -101,9 +102,14 @@ void read_rtc(struct rtc_time* t) {
             c[i] = (c[i] >> 4) * 10 + (c[i] & 0x0f);
 
     if (pm)
-        t->hours += 12;
-    if (t->hours == 24) // Midnight
-        t->hours = 0;
+        t.hours += 12;
+    if (t.hours == 24) // Midnight
+        t.hours = 0;
+
+    // Now calculate seconds into day
+    rtc_seconds = (t.hours * 60 + t.minutes) * 60 + t.seconds;
+
+    // TODO: Let's also store rest of data.
 }
 
 // To be called only from IRQ8 handler; assumes interrupts are disabled (doesn't sti at end)
@@ -126,9 +132,8 @@ uint8_t irq8_type() {
     return RTC_INT_UNKNOWN;
 }
 
-void enable_rtc_timer() {
-    __asm__ __volatile__("cli");
-
+// To be called only before interrupts are first turned on at boot.
+static void enable_rtc_timer() {
     outb(REG_SEL, SRB | NMI_DISABLED);
     uint8_t regb = inb(IO);
     outb(REG_SEL, SRB | NMI_DISABLED);
@@ -138,5 +143,10 @@ void enable_rtc_timer() {
     inb(IO);
 
     reenable_nmi();
-    __asm__ __volatile__("sti");
+}
+
+// To be called only before interrupts are first turned on at boot.
+void init_rtc() {
+    sync_rtc_seconds();
+    enable_rtc_timer();
 }

@@ -13,4 +13,4 @@ struct rtc_time {
     uint8_t century : 8;
 };
 
-void get_rtc_time(struct rtc_time* time);
+void get_rtc_time(struct rtc_time* t);
