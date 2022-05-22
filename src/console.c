@@ -71,7 +71,11 @@ void updateMemUse() {
 void updateClock() {
     struct rtc_time t;
     get_rtc_time(&t);
-    printf("%u:%u:%u\n", t.hours, t.minutes, t.seconds);
+    char *s = M_sprintf("%u:%u:%u", t.hours, t.minutes, t.seconds);
+
+    writeStatusBar(s, 0);
+
+    free(s);
 }
 
 static void setStatusBar() {
