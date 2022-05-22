@@ -112,7 +112,7 @@ char* M_vsprintf(char* fmt, va_list ap) {
                 while (*p >= '0' && *p <= '9')
                     p++;
 
-                *p--;
+                p--;
             } else {
                 // Bad format
                 s[i++] = '%';

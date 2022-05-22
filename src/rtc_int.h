@@ -8,3 +8,4 @@
 extern uint64_t rtc_seconds;
 
 void init_rtc();
+uint8_t irq8_type();

@@ -55,7 +55,7 @@ static struct list* workQueue = (struct list*) 0;
 void waitloop() {
     for (;;) {
         void (*f)();
-        while (f = (void (*)()) atomicPop(workQueue))
+        while ( (f = (void (*)()) atomicPop(workQueue)) )
             f();
 
         __asm__ __volatile__(
@@ -192,12 +192,13 @@ static void __attribute__((interrupt)) irq1_kbd(struct interrupt_frame *frame) {
 }
 
 void secTick() {
+    // TODO: Use list of callbacks rather than hardcoding what wants to be called
     updateClock();
 }
 
 static uint64_t rtcCount = 0;
 
-static void __attribute__((interrupt)) irq8_rtc(struct interrupt_frame *frame) {
+static void __attribute__((interrupt)) irq8_rtc(struct interrupt_frame *) {
     uint8_t type = irq8_type();
     outb(PIC_SECONDARY_CMD, PIC_ACK);
     outb(PIC_PRIMARY_CMD, PIC_ACK);
@@ -212,7 +213,7 @@ static void __attribute__((interrupt)) irq8_rtc(struct interrupt_frame *frame) {
     }
 }
 
-static void __attribute__((interrupt)) irq0_pit(struct interrupt_frame *frame) {
+static void __attribute__((interrupt)) irq0_pit(struct interrupt_frame *) {
     outb(PIC_PRIMARY_CMD, PIC_ACK);
 
     log("irq0 (PIT!) interrupt handler\n");
@@ -262,4 +263,7 @@ void init_idt() {
     set_handler(0, divide_by_zero_handler, TYPE_TRAP);
 
     init_pic();
+
+    com1_print("initializing rtc\n");
+    init_rtc();
 }

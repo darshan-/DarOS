@@ -128,7 +128,7 @@ uint8_t irq8_type() {
 
 // To be called only when interrupts are safe to enable.
 void get_rtc_time(struct rtc_time* t) {
-    static last_sync = 0;
+    static uint64_t last_sync = 0;
 
     // Not sure why I'm having a lot of drift (and playing with qemu options didn't help), but syncing to
     //  cmos every 10 seconds seems good enough for now...
