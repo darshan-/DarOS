@@ -166,5 +166,5 @@ static void enable_rtc_timer() {
 void init_rtc() {
     sync_rtc_seconds();
     seconds_at_boot = rtc_seconds;
-    enable_rtc_timer();
+    //enable_rtc_timer();
 }

@@ -30,7 +30,17 @@
 #define PIC_SECONDARY_CMD 0xa0
 #define PIC_SECONDARY_DATA 0xa1
 
+#define PIT_CMD 0x43
+#define PIT_CH0_DATA 0x40
+#define PIT_CHAN_0 0
+#define PIT_WORD_RW (0b11<<4) // Read or write low byte then high byte, rather than just one byte
+#define PIT_PERIODIC (0b10<<1)
+//#define PIT_COUNT 65536
+#define PIT_FREQ 1193182
+#define PIT_COUNT (PIT_FREQ / 100)
+
 #define KERNEL_STACK_TOP 0xeffff
+
 // Need extra level of indirection to quote a macro value, due to a special rule around argument prescan.
 #define QUOT(v) #v
 #define QUOTE(v) QUOT(v)
@@ -220,7 +230,7 @@ static void __attribute__((interrupt)) irq8_rtc(struct interrupt_frame *) {
 }
 
 void tick() {
-    seconds_since_boot = picCount * 65536 / 1193182;
+    seconds_since_boot = picCount * PIT_COUNT / PIT_FREQ;
     updateClock();
     updateMemUse();
 }
@@ -255,6 +265,12 @@ static void set_handler(uint64_t vec, void* handler, uint8_t type) {
     *(idt_entry+1) = CODE_SEG;
 }
 
+static void init_pit() {
+    outb(PIT_CMD, PIT_CHAN_0 | PIT_WORD_RW | PIT_PERIODIC);
+    outb(PIT_CH0_DATA, PIT_COUNT & 0xff);
+    outb(PIT_CH0_DATA, PIT_COUNT >> 8);
+}
+
 void init_idt() {
     workQueue = newList();
 
@@ -286,6 +302,7 @@ void init_idt() {
     set_handler(0, divide_by_zero_handler, TYPE_TRAP);
 
     init_pic();
+    init_pit();
 
     com1_print("initializing rtc\n");
     init_rtc();
