@@ -3,6 +3,7 @@
 #include "io.h"
 #include "rtc.h"
 
+#define NMI_DISABLED (1<<7)
 #define RTC_SEC 0
 #define RTC_MIN 0x02
 #define RTC_HR 0x04
@@ -12,21 +13,27 @@
 #define RTC_YR 0x09
 #define RTC_CEN 0x32
 #define RTC_SRA_UPDATING (1<<7)
+#define RTC_SRB_PERIODIC_INT (1<<6)
 
 #define PM_BIT (1<<7)
 
 #define HRS24 (1<<1)
 #define BCD_OFF (1<<2)
 
-#define READ(r) outb(CMOS_REG_SEL, r); \
+#define READ(r) outb(CMOS_REG_SEL, r | NMI_DISABLED); \
     *q++ = inb(CMOS_IO)
+
+static void reenable_nmi() {
+    outb(CMOS_REG_SEL, RTC_SRB); // Doesn't matter what register we select, just that NMI_DISABLED isn't set.
+    inb(CMOS_IO);                // And doesn't matter what's we read, just *that* we read after selecting.
+}
 
 static uint8_t* read(uint8_t* p) {
     uint8_t* q = p;
 
     __asm__ __volatile__("cli");
 
-    outb(CMOS_REG_SEL, RTC_SRA);
+    outb(CMOS_REG_SEL, RTC_SRA | NMI_DISABLED);
     while (inb(CMOS_IO) & RTC_SRA_UPDATING)
         ;
 
@@ -40,6 +47,7 @@ static uint8_t* read(uint8_t* p) {
     READ(RTC_CEN);
     READ(RTC_SRB);
 
+    reenable_nmi();
     __asm__ __volatile__("sti");
 
     return p;
@@ -80,4 +88,46 @@ void read_rtc(struct rtc_time* t) {
         t->hours += 12;
     if (t->hours == 24) // Midnight
         t->hours = 0;
+}
+
+uint8_t read_rtc_reg(uint8_t reg) {
+    //__asm__ __volatile__("cli");
+
+    outb(CMOS_REG_SEL, reg | NMI_DISABLED);
+    uint8_t ret = inb(CMOS_IO);
+
+    reenable_nmi();
+    //__asm__ __volatile__("sti");
+
+    return ret;
+}
+
+void enable_rtc_timer() {
+    __asm__ __volatile__("cli");
+
+    outb(CMOS_REG_SEL, RTC_SRB | NMI_DISABLED);
+    uint8_t regb = inb(CMOS_IO);
+    com1_printf("regb: 0x%h\n", regb);
+    outb(CMOS_REG_SEL, RTC_SRB | NMI_DISABLED);
+    outb(CMOS_IO, regb | RTC_SRB_PERIODIC_INT);
+
+    outb(CMOS_REG_SEL, RTC_SRB | NMI_DISABLED);
+    regb = inb(CMOS_IO);
+    com1_printf("regb now: 0x%h\n", regb);
+
+    outb(CMOS_REG_SEL, RTC_SRA | NMI_DISABLED);
+    uint8_t rega = inb(CMOS_IO);
+    com1_printf("rega: 0x%h\n", rega);
+
+    outb(CMOS_REG_SEL, RTC_SRC | NMI_DISABLED);
+    uint8_t regc = inb(CMOS_IO);
+    com1_printf("regc: 0x%h\n", regc);
+
+    outb(CMOS_REG_SEL, RTC_SRB | NMI_DISABLED);
+    regb = inb(CMOS_IO);
+    com1_printf("regb now: 0x%h\n", regb);
+
+    reenable_nmi();
+    __asm__ __volatile__("sti");
+    com1_print("Huh, RTC timer should be enabled now...\n");
 }

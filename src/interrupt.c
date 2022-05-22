@@ -5,6 +5,17 @@
 #include "keyboard.h"
 #include "rtc.h"
 
+
+/*
+
+  Okay, I think I'm finally setting up and using the PICs correctly.
+
+  If IRQ was initiated by the secondary, that means both are involved, and both need an ack.
+  If it was initiated by the primary, just ack to that one.
+
+ */
+
+
 #define IDT 0
 #define CODE_SEG 8 // 1 quadword past null descriptor; next segment would be 16, etc.
 #define TYPE_TRAP 0b1111
@@ -102,29 +113,44 @@ TRAPS(TRAP_N, 0)
 TRAPS(TRAP_N, 1)
 
 static void init_pic() {
+    // ICW1
     outb(PIC_PRIMARY_CMD, ICW1 | ICW1_ICW4_NEEDED);
     outb(PIC_SECONDARY_CMD, ICW1 | ICW1_ICW4_NEEDED);
 
+    // ICW2
     outb(PIC_PRIMARY_DATA, 0x20);   // Map  primary  PIC to 0x20 - 0x27
     outb(PIC_SECONDARY_DATA, 0x28); // Map secondary PIC to 0x28 - 0x2f
 
-    outb(PIC_PRIMARY_DATA, 4);
-    outb(PIC_SECONDARY_DATA, 2);
+    // ICW3
+    outb(PIC_PRIMARY_DATA, 1<<2);   // Secondary is at IRQ 2
+    outb(PIC_SECONDARY_DATA, 2);    // Secondary is at IRQ 2
 
-    outb(PIC_PRIMARY_DATA, 1);
-    outb(PIC_SECONDARY_DATA, 1);
+    // ICW4
+    outb(PIC_PRIMARY_DATA, 1);      // 8086/8088 mode
+    outb(PIC_SECONDARY_DATA, 1);    // 8086/8088 mode
 
-    outb(PIC_PRIMARY_DATA, 0);
+    // Mask interrupts as you see fit
+    outb(PIC_PRIMARY_DATA, 1);      // PIT is firing by default (maybe no matter what?); ignore it, at least for now.
     outb(PIC_SECONDARY_DATA, 0);
-
-    outb(PIC_PRIMARY_DATA, 0xfd);
-    outb(PIC_SECONDARY_DATA, 0xff);
 }
 
 static void __attribute__((interrupt)) default_interrupt_handler(struct interrupt_frame *frame) {
+    log("Default interrupt handler\n");
+    dumpFrame(frame);
+}
+
+static void __attribute__((interrupt)) default_PIC_P_handler(struct interrupt_frame *frame) {
     outb(PIC_PRIMARY_CMD, PIC_ACK);
 
-    log("Default interrupt handler\n");
+    log("Default primary PIC interrupt handler\n");
+    dumpFrame(frame);
+}
+
+static void __attribute__((interrupt)) default_PIC_S_handler(struct interrupt_frame *frame) {
+    outb(PIC_SECONDARY_CMD, PIC_ACK);
+    outb(PIC_PRIMARY_CMD, PIC_ACK);
+
+    log("Default secondary PIC interrupt handler\n");
     dumpFrame(frame);
 }
 
@@ -160,16 +186,22 @@ static void __attribute__((interrupt)) irq1_kbd(struct interrupt_frame *frame) {
     keyScanned(code);
 }
 
-static void __attribute__((interrupt)) irq8_rtc(struct interrupt_frame *frame) {
-    __asm__ __volatile__("cli");
-    outb(CMOS_REG_SEL, RTC_SRC);
-    inb(CMOS_IO); // Discard; just need to read from status register C
-    __asm__ __volatile__("sti");
+static uint64_t rtcCount = 0;
 
+static void __attribute__((interrupt)) irq8_rtc(struct interrupt_frame *frame) {
+    read_rtc_reg(RTC_SRC);
+    outb(PIC_SECONDARY_CMD, PIC_ACK);
     outb(PIC_PRIMARY_CMD, PIC_ACK);
 
-    log("Default interrupt handler\n");
-    dumpFrame(frame);
+    rtcCount += 1;
+    if (rtcCount % 1024 == 0)
+        printf("rtcCount: %u\n", rtcCount);
+}
+
+static void __attribute__((interrupt)) irq0_pit(struct interrupt_frame *frame) {
+    outb(PIC_PRIMARY_CMD, PIC_ACK);
+
+    log("irq0 (PIT!) interrupt handler\n");
 }
 
 static void set_handler(uint64_t vec, void* handler, uint8_t type) {
@@ -188,11 +220,16 @@ static void set_handler(uint64_t vec, void* handler, uint8_t type) {
 void init_idt() {
     for (int i = 0; i < 32; i++)
         set_handler(i, default_trap_handler, TYPE_TRAP);
-    for (int i = 32; i < 256; i++)
+    for (int i = 32; i < 40; i++)
+        set_handler(i, default_PIC_P_handler, TYPE_INT);
+    for (int i = 40; i < 48; i++)
+        set_handler(i, default_PIC_S_handler, TYPE_INT);
+    for (int i = 48; i < 256; i++)
         set_handler(i, default_interrupt_handler, TYPE_INT);
 
+    set_handler(0x20, irq0_pit, TYPE_INT);
     set_handler(0x21, irq1_kbd, TYPE_INT);
-    set_handler(0x25, irq8_rtc, TYPE_INT);
+    set_handler(0x28, irq8_rtc, TYPE_INT);
 
     // These are the traps with errors on stack according to https://wiki.osdev.org/Exceptions, 
     set_handler(8, double_fault_handler, TYPE_TRAP);
@@ -209,5 +246,4 @@ void init_idt() {
     set_handler(0, divide_by_zero_handler, TYPE_TRAP);
 
     init_pic();
-    //init_rtc_irq();
 }
