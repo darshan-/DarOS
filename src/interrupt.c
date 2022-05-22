@@ -194,9 +194,9 @@ static void __attribute__((interrupt)) irq8_rtc(struct interrupt_frame *frame) {
     outb(PIC_PRIMARY_CMD, PIC_ACK);
 
     if (type == RTC_INT_PERIODIC) {
-        rtcCount += 1;
         if (rtcCount % 1024 == 0)
             printf("rtcCount: %u\n", rtcCount);
+        rtcCount += 1;
     }
 }
 

@@ -36,7 +36,7 @@
 
 static void reenable_nmi() {
     outb(REG_SEL, SRB); // Doesn't matter what register we select, just that NMI_DISABLED isn't set.
-    inb(IO);                // And doesn't matter what's we read, just *that* we read after selecting.
+    inb(IO);            // And doesn't matter what we read, just *that* we read after selecting.
 }
 
 static uint8_t* read(uint8_t* p) {
@@ -126,27 +126,12 @@ void enable_rtc_timer() {
 
     outb(REG_SEL, SRB | NMI_DISABLED);
     uint8_t regb = inb(IO);
-    com1_printf("regb: 0x%h\n", regb);
     outb(REG_SEL, SRB | NMI_DISABLED);
     outb(IO, regb | INT_PERIODIC);
 
-    outb(REG_SEL, SRB | NMI_DISABLED);
-    regb = inb(IO);
-    com1_printf("regb now: 0x%h\n", regb);
-
-    outb(REG_SEL, SRA | NMI_DISABLED);
-    uint8_t rega = inb(IO);
-    com1_printf("rega: 0x%h\n", rega);
-
     outb(REG_SEL, SRC | NMI_DISABLED);
-    uint8_t regc = inb(IO);
-    com1_printf("regc: 0x%h\n", regc);
-
-    outb(REG_SEL, SRB | NMI_DISABLED);
-    regb = inb(IO);
-    com1_printf("regb now: 0x%h\n", regb);
+    inb(IO);
 
     reenable_nmi();
     __asm__ __volatile__("sti");
-    com1_print("Huh, RTC timer should be enabled now...\n");
 }
