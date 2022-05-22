@@ -3,8 +3,8 @@
 #include "serial.h"
 #include "io.h"
 #include "keyboard.h"
-#include "rtc.h"
-
+#include "list.h"
+#include "rtc_int.h"
 
 /*
 
@@ -14,7 +14,6 @@
   If it was initiated by the primary, just ack to that one.
 
  */
-
 
 #define IDT 0
 #define CODE_SEG 8 // 1 quadword past null descriptor; next segment would be 16, etc.
@@ -44,6 +43,8 @@ struct interrupt_frame {
     uint64_t ss;
 };
 
+static struct list* workQueue = (struct list*) 0;
+
 
 #define log com1_printf
 
@@ -51,16 +52,22 @@ struct interrupt_frame {
 //     fmt = fmt;
 // }
 
-void __attribute__((naked)) waitloop() {
-    __asm__ __volatile__(
-        "mov $"
-        QUOTE(KERNEL_STACK_TOP)
-        ", %esp\n" // We'll never return anywhere or use anything currently on the stack, so reset it
-        "loop:\n"
-        "sti\n"
-        "hlt\n"
-        "jmp loop\n"
-    );
+void waitloop() {
+    for (;;) {
+        void (*f)();
+        while (f = (void (*)()) atomicPop(workQueue)) {
+            printf("Found a workQueue work item (0x%h); doing it!\n", f);
+            f();
+        }
+
+        __asm__ __volatile__(
+            "mov $"
+            QUOTE(KERNEL_STACK_TOP)
+            ", %esp\n" // We'll never return anywhere or use anything currently on the stack, so reset it
+            "sti\n"
+            "hlt\n"
+        );
+    }
 }
 
 static void dumpFrame(struct interrupt_frame *frame) {
@@ -186,6 +193,10 @@ static void __attribute__((interrupt)) irq1_kbd(struct interrupt_frame *frame) {
     keyScanned(code);
 }
 
+void secTick() {
+    printf("secTick()\n");
+}
+
 static uint64_t rtcCount = 0;
 
 static void __attribute__((interrupt)) irq8_rtc(struct interrupt_frame *frame) {
@@ -194,8 +205,11 @@ static void __attribute__((interrupt)) irq8_rtc(struct interrupt_frame *frame) {
     outb(PIC_PRIMARY_CMD, PIC_ACK);
 
     if (type == RTC_INT_PERIODIC) {
-        if (rtcCount % 1024 == 0)
-            printf("rtcCount: %u\n", rtcCount);
+        if (rtcCount % 1024 == 0) {
+            rtc_seconds++;
+            addToList(workQueue, secTick);
+        }
+
         rtcCount += 1;
     }
 }
@@ -220,6 +234,8 @@ static void set_handler(uint64_t vec, void* handler, uint8_t type) {
 }
 
 void init_idt() {
+    workQueue = newList();
+
     for (int i = 0; i < 32; i++)
         set_handler(i, default_trap_handler, TYPE_TRAP);
     for (int i = 32; i < 40; i++)

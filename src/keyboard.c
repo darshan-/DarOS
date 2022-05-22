@@ -108,11 +108,11 @@ void registerKbdListener(void (*gotChar)(char)) {
     if (!inputCallbackList)
         inputCallbackList = newList();
 
-    addToList(inputCallbackList, (void*) gotChar);
+    addToList(inputCallbackList, gotChar);
 }
 
 void unregisterKbdListener(void (*gotChar)(char)) {
     if (!inputCallbackList) return;
 
-    removeFromList(inputCallbackList, (void*) gotChar);
+    removeFromList(inputCallbackList, gotChar);
 }

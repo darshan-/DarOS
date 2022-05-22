@@ -218,5 +218,4 @@ start64:
         mov gs, ax
         mov ss, ax
 
-        ;call read_rtc
         lidt [idtr]

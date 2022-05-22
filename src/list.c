@@ -35,6 +35,26 @@ void addToList(struct list* l, void* item) {
     cur->next = n;
 }
 
+// Only to be called when interrupts are enabled (or safe to reenable).
+// For code that touches data structures that interrupts handlers also touch.
+void* atomicPop(struct list* l) {
+    void* item = (void *) 0;
+
+    __asm__ __volatile__("cli");
+
+    if (!l || !l->head) goto ret;
+
+    item = l->head->item;
+
+    struct list_node* old_head = l->head;
+    l->head = l->head->next;
+    free(old_head);
+
+ ret:
+    __asm__ __volatile__("sti");
+    return item;
+}
+
 // Removes first occurance of item from list, if it exists
 void removeFromList(struct list* l, void* item) {
     if (!l || !l->head) return;

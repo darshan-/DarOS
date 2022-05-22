@@ -2,6 +2,7 @@
 #include "interrupt.h"
 #include "io.h"
 #include "rtc.h"
+#include "rtc_int.h"
 
 #define REG_SEL 0x70
 #define IO 0x71
@@ -30,6 +31,10 @@
 
 #define HRS24 (1<<1)
 #define BCD_OFF (1<<2)
+
+//static struct rtc_time
+//static uint64_t seconds; // Seconds into the day; calculated from RTC when we read it, incremented on timer tick.
+extern uint64_t rtc_seconds = 0;
 
 #define READ(r) outb(REG_SEL, r | NMI_DISABLED); \
     *q++ = inb(IO)
