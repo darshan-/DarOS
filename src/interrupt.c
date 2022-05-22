@@ -135,8 +135,10 @@ static void init_pic() {
     outb(PIC_SECONDARY_DATA, 1);    // 8086/8088 mode
 
     // Mask interrupts as you see fit
-    outb(PIC_PRIMARY_DATA, 1);      // PIT is firing by default (maybe no matter what?); ignore it, at least for now.
+    outb(PIC_PRIMARY_DATA, 0);      // PIT is firing by default (maybe no matter what?); ignore it, at least for now.
     outb(PIC_SECONDARY_DATA, 0);
+
+    outb(PIC_PRIMARY_CMD, 0b11000000 | 1); // Make IRQ 2 top priority of primary PIC?  (By making 3 lowest)
 }
 
 static void __attribute__((interrupt)) default_interrupt_handler(struct interrupt_frame *frame) {
@@ -194,7 +196,10 @@ static void __attribute__((interrupt)) irq1_kbd(struct interrupt_frame *frame) {
 void secTick() {
     // TODO: Use list of callbacks rather than hardcoding what wants to be called
     updateClock();
+    updateMemUse();
 }
+
+static uint64_t picCount = 0;
 
 static uint64_t rtcCount = 0;
 
@@ -204,19 +209,37 @@ static void __attribute__((interrupt)) irq8_rtc(struct interrupt_frame *) {
     outb(PIC_PRIMARY_CMD, PIC_ACK);
 
     if (type == RTC_INT_PERIODIC) {
-        if (rtcCount % 1024 == 0) {
-            rtc_seconds++;
-            addToList(workQueue, secTick);
-        }
+        //if (rtcCount % 1024 == 0) {
+        //    //rtc_seconds++;
+        //    //printf("picCount: %u @ rtc seconds: %u\n", picCount, rtcCount/1024);
+        //    addToList(workQueue, secTick);
+        //}
 
         rtcCount += 1;
     }
 }
 
+void tick() {
+    seconds_since_boot = picCount * 65536 / 1193182;
+    updateClock();
+    updateMemUse();
+}
+
 static void __attribute__((interrupt)) irq0_pit(struct interrupt_frame *) {
     outb(PIC_PRIMARY_CMD, PIC_ACK);
 
-    log("irq0 (PIT!) interrupt handler\n");
+    // if (picCount % 10 == 0)
+    //     printf("picCount: %u, rtcCount: %u\n", picCount, rtcCount);
+
+    // if ((picCount * 100) / 1821 == 0)
+    //     printf("rtcCount: %u @ pic seconds: %u\n", rtcCount, picCount * 100 / 1821);
+
+    if (picCount % 4 == 0)
+        addToList(workQueue, tick);
+
+    picCount++;
+
+    //log("irq0 (PIT!) interrupt handler\n");
 }
 
 static void set_handler(uint64_t vec, void* handler, uint8_t type) {

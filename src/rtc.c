@@ -32,7 +32,8 @@
 #define HRS24 (1<<1)
 #define BCD_OFF (1<<2)
 
-uint64_t rtc_seconds = 0;
+uint64_t seconds_since_boot = 0;
+static uint64_t rtc_seconds, seconds_at_boot;
 
 #define READ(r) outb(REG_SEL, r | NMI_DISABLED); \
     *q++ = inb(IO)
@@ -128,18 +129,20 @@ uint8_t irq8_type() {
 
 // To be called only when interrupts are safe to enable.
 void get_rtc_time(struct rtc_time* t) {
+
+    rtc_seconds = (seconds_at_boot + seconds_since_boot) % (60 * 60 * 24);
     static uint64_t last_sync = 0;
 
-    // Not sure why I'm having a lot of drift (and playing with qemu options didn't help), but syncing to
-    //  cmos every 10 seconds seems good enough for now...
-    // Ultimately I'll almost certainly want to use one of the more modern, higher precision timing sources, but
-    //  for now I want to keep it simple and good enough to move forward.
-    if (rtc_seconds - last_sync > 10) {
-        __asm__ __volatile__("cli");
-        sync_rtc_seconds();
-        last_sync = rtc_seconds;
-        __asm__ __volatile__("sti");
-    }
+    // // Not sure why I'm having a lot of drift (and playing with qemu options didn't help), but syncing to
+    // //  cmos every 10 seconds seems good enough for now...
+    // // Ultimately I'll almost certainly want to use one of the more modern, higher precision timing sources, but
+    // //  for now I want to keep it simple and good enough to move forward.
+    // if (rtc_seconds - last_sync > 10) {
+    //     __asm__ __volatile__("cli");
+    //     sync_rtc_seconds();
+    //     last_sync = rtc_seconds;
+    //     __asm__ __volatile__("sti");
+    // }
 
     t->seconds = rtc_seconds % 60;
     t->minutes = rtc_seconds / 60 % 60;
@@ -162,5 +165,6 @@ static void enable_rtc_timer() {
 // To be called only before interrupts are first turned on at boot.
 void init_rtc() {
     sync_rtc_seconds();
+    seconds_at_boot = rtc_seconds;
     enable_rtc_timer();
 }

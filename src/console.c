@@ -72,9 +72,6 @@ void updateClock() {
     struct rtc_time t;
     get_rtc_time(&t);
 
-    // Let's space-pad the hour, zero-pad the minutes and hours, and do the hour mod 12 and show AM or PM
-    // Bonus: we won't have to worry about clearing space after.  Real reason: I think it'll look nicer
-    //  zero-padded for single-digit hours.
     char* ampm = t.hours >= 12 ? "PM" : "AM";
     uint8_t hours = t.hours % 12;
     if (hours == 0) hours = 12;
@@ -90,7 +87,6 @@ static void setStatusBar() {
         *v = 0x3f003f003f003f00;
 
     writeStatusBar("DarOS", 38);
-    updateMemUse();
 }
 
 void clearScreen() {
