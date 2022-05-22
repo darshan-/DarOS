@@ -4,7 +4,6 @@
 #include "io.h"
 #include "keyboard.h"
 #include "list.h"
-#include "rtc.h"
 #include "rtc_int.h"
 
 /*
@@ -56,10 +55,8 @@ static struct list* workQueue = (struct list*) 0;
 void waitloop() {
     for (;;) {
         void (*f)();
-        while (f = (void (*)()) atomicPop(workQueue)) {
-            printf("Found a workQueue work item (0x%h); doing it!\n", f);
+        while (f = (void (*)()) atomicPop(workQueue))
             f();
-        }
 
         __asm__ __volatile__(
             "mov $"
@@ -195,9 +192,7 @@ static void __attribute__((interrupt)) irq1_kbd(struct interrupt_frame *frame) {
 }
 
 void secTick() {
-    struct rtc_time t;
-    get_rtc_time(&t);
-    printf("secTick: %u:%u:%u\n", t.hours, t.minutes, t.seconds);
+    updateClock();
 }
 
 static uint64_t rtcCount = 0;

@@ -3,6 +3,7 @@
 #include "console.h"
 #include "io.h"
 #include "malloc.h"
+#include "rtc.h"
 #include "strings.h"
 
 /*
@@ -65,6 +66,12 @@ void updateMemUse() {
 
     writeStatusBar(s, 80 - strlen(s));
     free(s);
+}
+
+void updateClock() {
+    struct rtc_time t;
+    get_rtc_time(&t);
+    printf("%u:%u:%u\n", t.hours, t.minutes, t.seconds);
 }
 
 static void setStatusBar() {
