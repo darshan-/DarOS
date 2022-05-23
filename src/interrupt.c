@@ -205,12 +205,15 @@ static void __attribute__((interrupt)) irq1_kbd(struct interrupt_frame *frame) {
     keyScanned(code);
 }
 
+// static uint64_t rtcCount = 0;
+
 static void __attribute__((interrupt)) irq8_rtc(struct interrupt_frame *) {
     uint8_t type = irq8_type();
     outb(PIC_SECONDARY_CMD, PIC_ACK);
     outb(PIC_PRIMARY_CMD, PIC_ACK);
 
     // if (type == RTC_INT_PERIODIC) {
+    //     rtcCount++;
     // }
 }
 
@@ -226,6 +229,10 @@ void tick() {
     #define MEMUSE_UPDATE_PERIOD 1 // How many seconds to wait between updates
     if (pitCount % (TICK_HZ * MEMUSE_UPDATE_PERIOD ) == 0)
         updateMemUse();
+
+    // if (pitCount % (TICK_HZ * 2) == 0)
+    //     printf("%u rtc/sec cumulative (%u : %u)\n", (rtcCount * PIT_FREQ) / (pitCount * PIT_COUNT),
+    //            rtcCount, pitCount);
 }
 
 static void __attribute__((interrupt)) irq0_pit(struct interrupt_frame *) {

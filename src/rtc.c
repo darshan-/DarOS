@@ -148,6 +148,11 @@ void get_rtc_time(struct rtc_time* t) {
     t->hours = rtc_seconds / 60 / 60;
 }
 
+// Hmm, well, my qemu rtc timer seems to tick at 1,000,000 / 1024 Hz -- around 976 Hz, not 1024 Hz as advertised...
+// So it's about as consistent as PIC, just slow when treated as 1024 Hz.  That's definitly *not* what all the docs
+// I find say, so I guess it's a qemu bug?  In any case, that's why I seemed to have a lot of skew.  And I'm happy to
+// be using the PIT now.
+
 // To be called only before interrupts are first turned on at boot.
 static void enable_rtc_timer() {
     outb(REG_SEL, SRB | NMI_DISABLED);
