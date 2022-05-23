@@ -16,8 +16,9 @@ static struct list* inputCallbackList = (struct list*) 0;
 static inline void gotInput(char c) {
     forEachListItem(inputCallbackList, ({
         void __fn__ (void* item) {
-            void (*cb)(char) = (void (*)(char)) item;
-            cb(c);
+            ((void (*)(char)) item)(c);
+            // void (*cb)(char) = (void (*)(char)) item;
+            // cb(c);
         }
         __fn__;
     }));
@@ -102,8 +103,6 @@ void keyScanned(uint8_t c) {
     }
 }
 
-// Have dynamic list of listeners, so more than one thing can listen, I think.
-// For now have just one, or an array of 3 potential ones or something?
 void registerKbdListener(void (*gotChar)(char)) {
     if (!inputCallbackList)
         inputCallbackList = newList();

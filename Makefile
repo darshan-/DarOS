@@ -26,6 +26,9 @@ build/%.o: src/%.c | build
 out/boot.img: $(c_objects) src/linker.ld build/bootloader.o | out
 	ld -o out/boot.img $(LD_OPTS) build/bootloader.o $(c_objects)
 
+
+# -display gtk,zoom-to-fit=on
+# -full-screen
 .PHONY: run
 run: out/boot.img
 	qemu-system-x86_64 -rtc base=localtime -enable-kvm -drive format=raw,file=out/boot.img
@@ -36,7 +39,8 @@ clean:
 
 .PHONY: crun
 crun: clean
-	make run
+	$(MAKE) run
+#	make run
 
 # TODO: I guess with C I need to have each object file list any .h files the .c file includes as prereq
 # And I want to set bootloader up to read the right number of sectors.  Oh, er, hmm... BIOS can only

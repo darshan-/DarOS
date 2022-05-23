@@ -131,7 +131,7 @@ uint8_t irq8_type() {
 void get_rtc_time(struct rtc_time* t) {
 
     rtc_seconds = (seconds_at_boot + seconds_since_boot) % (60 * 60 * 24);
-    static uint64_t last_sync = 0;
+    // static uint64_t last_sync = 0;
 
     // TODO: I think I may still want this periodically?
     //       I'll also want to check RTC for day and date and stuff after day changes, at least until such
@@ -154,17 +154,17 @@ void get_rtc_time(struct rtc_time* t) {
 // be using the PIT now.
 
 // To be called only before interrupts are first turned on at boot.
-static void enable_rtc_timer() {
-    outb(REG_SEL, SRB | NMI_DISABLED);
-    uint8_t regb = inb(IO);
-    outb(REG_SEL, SRB | NMI_DISABLED);
-    outb(IO, regb | INT_PERIODIC);
+// static void enable_rtc_timer() {
+//     outb(REG_SEL, SRB | NMI_DISABLED);
+//     uint8_t regb = inb(IO);
+//     outb(REG_SEL, SRB | NMI_DISABLED);
+//     outb(IO, regb | INT_PERIODIC);
 
-    outb(REG_SEL, SRC | NMI_DISABLED);
-    inb(IO);
+//     outb(REG_SEL, SRC | NMI_DISABLED);
+//     inb(IO);
 
-    reenable_nmi();
-}
+//     reenable_nmi();
+// }
 
 // To be called only before interrupts are first turned on at boot.
 void init_rtc() {

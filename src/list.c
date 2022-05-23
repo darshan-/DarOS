@@ -53,22 +53,62 @@ void* atomicPop(struct list* l) {
     return item;
 }
 
-// Removes first occurance of item from list, if it exists
-void removeFromList(struct list* l, void* item) {
+void removeFromListWithEquality(struct list* l, int (*equals)(void*)) {
     if (!l || !l->head) return;
 
     struct list_node* prev = (struct list_node*) 0;
     for (struct list_node* cur = l->head; cur; prev = cur, cur = cur->next) {
-        if (cur->item == item) {
+        if (equals(cur->item)) {
             if (prev)
                 prev->next = cur->next;
             else
                 l->head = cur->next;
+
             free(cur);
+
             return;
         }
     }
 }
+
+// Removes first occurance of item from list, if it exists
+void removeFromList(struct list* l, void* item) {
+    removeFromListWithEquality(l, ({
+        int __fn__ (void* other) {
+            return other == item;
+        }
+
+        __fn__;
+    }));
+}
+
+// void removeFromList(struct list* l, void* item) {
+//     removeFromListWithEquality(l, item, ({
+//         uint64_t __fn__ (void* l, void* r) {
+//             return l == r;
+//         }
+
+//         __fn__;
+//     }));
+// }
+
+// void removeFromListWithEquality(struct list* l, void* item, uint64_t (*equals)(void*, void*)) {
+//     if (!l || !l->head) return;
+
+//     struct list_node* prev = (struct list_node*) 0;
+//     for (struct list_node* cur = l->head; cur; prev = cur, cur = cur->next) {
+//         if (equals(cur->item, item)) {
+//             if (prev)
+//                 prev->next = cur->next;
+//             else
+//                 l->head = cur->next;
+
+//             free(cur);
+
+//             return;
+//         }
+//     }
+// }
 
 void forEachListItem(struct list* l, void (*f)(void*)) {
     if (!l || !l->head) return;

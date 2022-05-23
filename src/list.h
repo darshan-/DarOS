@@ -5,6 +5,7 @@ struct list;
 struct list* newList();
 void addToList(struct list* l, void* item);
 void removeFromList(struct list* l, void* item);
+void removeFromListWithEquality(struct list* l, int (*equals)(void*));
 void forEachListItem(struct list* l, void (*f)(void*));
 
 // Only to be called when interrupts are enabled (or safe to reenable).

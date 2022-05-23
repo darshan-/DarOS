@@ -4,6 +4,7 @@
 #include "io.h"
 #include "keyboard.h"
 #include "list.h"
+#include "periodic_callback.h"
 #include "rtc_int.h"
 
 /*
@@ -64,8 +65,40 @@ static struct list* workQueue = (struct list*) 0;
 //     fmt = fmt;
 // }
 
+static uint64_t pitCount = 0;
+
+void tick() {
+    uint64_t c = pitCount;
+    seconds_since_boot = c * PIT_COUNT / PIT_FREQ;
+
+    forEachListItem(periodicCallbackList, ({
+        void __fn__ (void* item) {
+            struct periodic_callback *pc = (struct periodic_callback*) item;
+
+            if (c % (TICK_HZ * pc->period / pc->count) == 0)
+                pc->f();
+            // if (pitCount % ((uint64_t) (TICK_HZ / ((struct periodic_callback*) item)->Hz)) == 0)
+            //     ((struct periodic_callback*) item)->f();
+        }
+        __fn__;
+    }));
+
+    // #define CLOCK_UPDATE_HZ 5
+    // if (pitCount % (TICK_HZ / CLOCK_UPDATE_HZ ) == 0)
+    //     updateClock();
+
+    // #define MEMUSE_UPDATE_PERIOD 1 // How many seconds to wait between updates
+    // //if (pitCount % (TICK_HZ * MEMUSE_UPDATE_PERIOD ) == 0)
+    // if (pitCount % ((uint64_t) (TICK_HZ / 0.5)) == 0)
+    //     updateMemUse();
+}
+
 void waitloop() {
     for (;;) {
+        // Lighter-weight to just tick every time we're here, rather than adding to workQueue on timer interrupt,
+        //   and making sure we don't have a backlog of ticks (I'm still thinking about if we want to process every
+        //   tick, or if it's okay to miss some...)
+        tick();
         void (*f)();
         while ( (f = (void (*)()) atomicPop(workQueue)) )
             f();
@@ -199,47 +232,26 @@ static void __attribute__((interrupt)) irq1_kbd(struct interrupt_frame *frame) {
     uint8_t code = inb(0x60);
     outb(PIC_PRIMARY_CMD, PIC_ACK);
 
-    log("C keyboard interrupt handler: %p02h\n", code);
+    log("Keyboard interrupt handler with scan code: %p02h\n", code);
     dumpFrame(frame);
 
     keyScanned(code);
 }
 
-// static uint64_t rtcCount = 0;
-
 static void __attribute__((interrupt)) irq8_rtc(struct interrupt_frame *) {
-    uint8_t type = irq8_type();
     outb(PIC_SECONDARY_CMD, PIC_ACK);
     outb(PIC_PRIMARY_CMD, PIC_ACK);
 
+    // uint8_t type = irq8_type();
     // if (type == RTC_INT_PERIODIC) {
-    //     rtcCount++;
     // }
-}
-
-static uint64_t pitCount = 0;
-
-void tick() {
-    seconds_since_boot = pitCount * PIT_COUNT / PIT_FREQ;
-
-    #define CLOCK_UPDATE_HZ 5
-    if (pitCount % (TICK_HZ / CLOCK_UPDATE_HZ ) == 0)
-        updateClock();
-
-    #define MEMUSE_UPDATE_PERIOD 1 // How many seconds to wait between updates
-    if (pitCount % (TICK_HZ * MEMUSE_UPDATE_PERIOD ) == 0)
-        updateMemUse();
-
-    // if (pitCount % (TICK_HZ * 2) == 0)
-    //     printf("%u rtc/sec cumulative (%u : %u)\n", (rtcCount * PIT_FREQ) / (pitCount * PIT_COUNT),
-    //            rtcCount, pitCount);
 }
 
 static void __attribute__((interrupt)) irq0_pit(struct interrupt_frame *) {
     outb(PIC_PRIMARY_CMD, PIC_ACK);
 
     pitCount++;
-    addToList(workQueue, tick);
+    //addToList(workQueue, tick); // Hmm, I think workQueue need to be of struct with pitCount and function...
 }
 
 static void set_handler(uint64_t vec, void* handler, uint8_t type) {
@@ -261,7 +273,7 @@ static void init_pit() {
     outb(PIT_CH0_DATA, PIT_COUNT >> 8);
 }
 
-void init_idt() {
+void init_interrupts() {
     workQueue = newList();
 
     for (int i = 0; i < 32; i++)
@@ -291,6 +303,9 @@ void init_idt() {
 
     set_handler(0, divide_by_zero_handler, TYPE_TRAP);
 
+    init_rtc();
     init_pit();
     init_pic();
+
+    __asm__ __volatile__("sti");
 }

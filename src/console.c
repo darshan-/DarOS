@@ -3,6 +3,7 @@
 #include "console.h"
 #include "io.h"
 #include "malloc.h"
+#include "periodic_callback.h"
 #include "rtc.h"
 #include "strings.h"
 
@@ -49,6 +50,7 @@ static void writeStatusBar(char* s, uint8_t loc) {
 
 #define MAX_MEMLEN 24
 void updateMemUse() {
+    print("updateMemUse\n");
     char* s;
     uint64_t m = memUsed();
     
@@ -77,6 +79,7 @@ void updateMemUse() {
 }
 
 void updateClock() {
+    print("updateClock\n");
     struct rtc_time t;
     get_rtc_time(&t);
 
@@ -94,15 +97,26 @@ static void setStatusBar() {
     for (uint64_t* v = (uint64_t*) STATUS_LINE; v < (uint64_t*) VRAM_END; v++)
         *v = 0x3f003f003f003f00;
 
-    writeStatusBar("DarOS", 38);
+    writeStatusBar("Dar OS", 37);
+    // STATUS_LINE[35*2] = (char*) 3;
+    // STATUS_LINE[35*2+1] = 0x35;
+    // STATUS_LINE[44*2] = (char*) 3;
+    // STATUS_LINE[44*2+1] = 0x35;
+
+    registerPeriodicCallback((struct periodic_callback) {10, 1, updateClock});
+    registerPeriodicCallback((struct periodic_callback) {1, 2, updateMemUse});
+    // registerPeriodicCallback(struct periodic_callback {10, updateClock});
+    // registerPeriodicCallback(struct periodic_callback {0.5, updateMemUse});
 }
 
 void clearScreen() {
+    __asm__ __volatile__("cli");
     for (uint64_t* v = (uint64_t*) VRAM; v < (uint64_t*) STATUS_LINE; v++)
         *v = 0x0700070007000700;
     cur = VRAM;
     updateCursorPosition();
     setStatusBar();
+    __asm__ __volatile__("sti");
 }
 
 static inline void advanceLine() {
@@ -144,10 +158,14 @@ static inline void printChar(uint8_t c) {
 }
 
 void printColor(char* s, uint8_t c) {
+    __asm__ __volatile__("cli");
+
     while (*s != 0)
         printCharColor(*s++, c);
 
     updateCursorPosition();
+
+    __asm__ __volatile__("sti");
 }
 
 void print(char* s) {
@@ -155,8 +173,12 @@ void print(char* s) {
 }
 
 void printc(char c) {
+    __asm__ __volatile__("cli");
+
     printCharColor(c, 0x07);
     updateCursorPosition();
+
+    __asm__ __volatile__("sti");
 }
 
 void printf(char* fmt, ...) {
