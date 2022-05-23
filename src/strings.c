@@ -123,6 +123,10 @@ char* M_vsprintf(char* fmt, va_list ap) {
             continue;
 
             break;
+        case '%':
+            s[i++] = c;
+            continue;
+            break;
         default:
             s[i++] = '%';
             s[i++] = c;

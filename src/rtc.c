@@ -133,10 +133,9 @@ void get_rtc_time(struct rtc_time* t) {
     rtc_seconds = (seconds_at_boot + seconds_since_boot) % (60 * 60 * 24);
     static uint64_t last_sync = 0;
 
-    // // Not sure why I'm having a lot of drift (and playing with qemu options didn't help), but syncing to
-    // //  cmos every 10 seconds seems good enough for now...
-    // // Ultimately I'll almost certainly want to use one of the more modern, higher precision timing sources, but
-    // //  for now I want to keep it simple and good enough to move forward.
+    // TODO: I think I may still want this periodically?
+    //       I'll also want to check RTC for day and date and stuff after day changes, at least until such
+    //       a time as I do my own handling of months and leap things and whatnot.
     // if (rtc_seconds - last_sync > 10) {
     //     __asm__ __volatile__("cli");
     //     sync_rtc_seconds();

@@ -30,6 +30,8 @@
 #define PIC_SECONDARY_CMD 0xa0
 #define PIC_SECONDARY_DATA 0xa1
 
+#define TICK_HZ 250
+
 #define PIT_CMD 0x43
 #define PIT_CH0_DATA 0x40
 #define PIT_CHAN_0 0
@@ -37,7 +39,7 @@
 #define PIT_PERIODIC (0b10<<1)
 //#define PIT_COUNT 65536
 #define PIT_FREQ 1193182
-#define PIT_COUNT (PIT_FREQ / 100)
+#define PIT_COUNT (PIT_FREQ / TICK_HZ)
 
 #define KERNEL_STACK_TOP 0xeffff
 
@@ -203,53 +205,34 @@ static void __attribute__((interrupt)) irq1_kbd(struct interrupt_frame *frame) {
     keyScanned(code);
 }
 
-void secTick() {
-    // TODO: Use list of callbacks rather than hardcoding what wants to be called
-    updateClock();
-    updateMemUse();
-}
-
-static uint64_t picCount = 0;
-
-static uint64_t rtcCount = 0;
-
 static void __attribute__((interrupt)) irq8_rtc(struct interrupt_frame *) {
     uint8_t type = irq8_type();
     outb(PIC_SECONDARY_CMD, PIC_ACK);
     outb(PIC_PRIMARY_CMD, PIC_ACK);
 
-    if (type == RTC_INT_PERIODIC) {
-        //if (rtcCount % 1024 == 0) {
-        //    //rtc_seconds++;
-        //    //printf("picCount: %u @ rtc seconds: %u\n", picCount, rtcCount/1024);
-        //    addToList(workQueue, secTick);
-        //}
-
-        rtcCount += 1;
-    }
+    // if (type == RTC_INT_PERIODIC) {
+    // }
 }
 
+static uint64_t pitCount = 0;
+
 void tick() {
-    seconds_since_boot = picCount * PIT_COUNT / PIT_FREQ;
-    updateClock();
-    updateMemUse();
+    seconds_since_boot = pitCount * PIT_COUNT / PIT_FREQ;
+
+    #define CLOCK_UPDATE_HZ 5
+    if (pitCount % (TICK_HZ / CLOCK_UPDATE_HZ ) == 0)
+        updateClock();
+
+    #define MEMUSE_UPDATE_PERIOD 1 // How many seconds to wait between updates
+    if (pitCount % (TICK_HZ * MEMUSE_UPDATE_PERIOD ) == 0)
+        updateMemUse();
 }
 
 static void __attribute__((interrupt)) irq0_pit(struct interrupt_frame *) {
     outb(PIC_PRIMARY_CMD, PIC_ACK);
 
-    // if (picCount % 10 == 0)
-    //     printf("picCount: %u, rtcCount: %u\n", picCount, rtcCount);
-
-    // if ((picCount * 100) / 1821 == 0)
-    //     printf("rtcCount: %u @ pic seconds: %u\n", rtcCount, picCount * 100 / 1821);
-
-    if (picCount % 4 == 0)
-        addToList(workQueue, tick);
-
-    picCount++;
-
-    //log("irq0 (PIT!) interrupt handler\n");
+    pitCount++;
+    addToList(workQueue, tick);
 }
 
 static void set_handler(uint64_t vec, void* handler, uint8_t type) {
@@ -301,9 +284,6 @@ void init_idt() {
 
     set_handler(0, divide_by_zero_handler, TYPE_TRAP);
 
-    init_pic();
     init_pit();
-
-    com1_print("initializing rtc\n");
-    init_rtc();
+    init_pic();
 }

@@ -49,10 +49,6 @@ static void writeStatusBar(char* s, uint8_t loc) {
 
 #define MAX_MEMLEN 24
 void updateMemUse() {
-    // Lazy way to just clear area in case new string is shorter than last
-    for (uint8_t l = 80 - MAX_MEMLEN; l < 160; l++)
-        STATUS_LINE[l*2] = ' ';
-
     char* s;
     uint64_t m = memUsed();
     
@@ -63,6 +59,18 @@ void updateMemUse() {
 
     if (strlen(s) > MAX_MEMLEN)
         s[MAX_MEMLEN] = 0;
+
+    // Now let's zero-pad so things don't look bad if an interrupt happens after clearing but before writing.
+    // In reality, I plan to next slow down the updates of this to something more reasonable (clock updating 10
+    //   times a second seems great, so so catch second tick quickly, but for mem use, you can't read such frequent
+    //   updates), but this was a good test of my understanding (success!), and fun to try!
+    if (strlen(s) < MAX_MEMLEN) {
+        char* f = M_sprintf("%%p %us", MAX_MEMLEN);
+        char* t = M_sprintf(f, s);
+        free(f);
+        free(s);
+        s = t;
+    }
 
     writeStatusBar(s, 80 - strlen(s));
     free(s);
