@@ -17,7 +17,8 @@ void registerPeriodicCallback(struct periodic_callback c) {
         cap = INIT_CAP;
         periodicCallbacks.pcs = malloc(INIT_CAP * sizeof(void*));
     } else if (periodicCallbacks.len + 1 >= cap) {
-        periodicCallbacks.pcs = realloc(periodicCallbacks.pcs, cap * 2);
+        cap *= 2;
+        periodicCallbacks.pcs = realloc(periodicCallbacks.pcs, cap);
     }
 
     struct periodic_callback* cp = (struct periodic_callback*) malloc(sizeof(struct periodic_callback));
@@ -49,17 +50,4 @@ void unregisterPeriodicCallback(struct periodic_callback c) {
     periodicCallbacks.len--;
 
     __asm__ __volatile__("sti");
-
-    // Remove callback that matches c from callbacks
-    // removeFromListWithEquality(periodicCallbackList, ({
-    //     int __fn__ (void* other) {
-    //         return
-    //             //((struct periodic_callback) other)->Hz == c.Hz &&
-    //             ((struct periodic_callback*) other)->count == c.count &&
-    //             ((struct periodic_callback*) other)->period == c.period &&
-    //             ((struct periodic_callback*) other)->f == c.f;
-    //     }
-
-    //     __fn__;
-    // }));
 }

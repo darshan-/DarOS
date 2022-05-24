@@ -59,7 +59,7 @@ struct interrupt_frame {
 
 //static struct list* workQueue = (struct list*) 0;
 
-#define INIT_WQ_CAP 100
+#define INIT_WQ_CAP 20
 
 static void **wq_start, **wq_head, **wq_tail;
 static uint64_t wq_cap = 0;
@@ -86,10 +86,6 @@ static inline void* wq_pop() {
     __asm__ __volatile__("sti");
 
     return f;
-
-    // void (*f)() = wq_head++;
-    // if (wq_head == WQ_START + wq_cap)
-    //     wq_head = WQ_START;
 }
 
 // To be called only when interrupts are off
@@ -98,13 +94,15 @@ static inline void wq_push(void* f) {
     // I can have a work queue item that runs periodically (say, every 10 seconds?) that checks capcity
     //   and usage, and doubles capacity if usage is greater than half of capacity.  So we'll make it extremely
     //   unlikely we'll have to increase capacity here.
-    if (wq_tail + 1 == wq_head) {
+    if (wq_tail + 1 == wq_head || (wq_tail + 1 == wq_start + wq_cap && wq_head == wq_start)) {
+        wq_cap *= 2;
         uint64_t head_off = wq_head - wq_start;
         uint64_t tail_off = wq_tail - wq_start;
-        wq_start = realloc(wq_start, wq_cap * 2);
+        wq_start = realloc(wq_start, wq_cap);
 
         wq_head = wq_start + head_off;
         wq_tail = wq_start + tail_off;
+        //com1_printf("Work queue now has capacity: %u\n", wq_cap);
     }
 
     *wq_tail = f;
@@ -114,14 +112,9 @@ static inline void wq_push(void* f) {
 void waitloop() {
     for (;;) {
         void (*f)();
-        int didwork = 0;
-        while ((f = (void (*)()) wq_pop())) {
-            didwork++;
-            printf("Found a work queue item\n");
+
+        while ((f = (void (*)()) wq_pop()))
             f();
-        }
-        if (didwork)
-        printf("Cleared queue!  Done with work for now!\n");
 
         __asm__ __volatile__(
             "mov $"
@@ -279,10 +272,6 @@ static void __attribute__((interrupt)) irq0_pit(struct interrupt_frame *) {
     for (uint64_t i = 0; i < periodicCallbacks.len; i++)
         if (pitCount % (TICK_HZ * periodicCallbacks.pcs[i]->period / periodicCallbacks.pcs[i]->count) == 0)
             wq_push(periodicCallbacks.pcs[i]->f);
-
-    // for (struct periodic_callback* pc = *periodicCallbacks; pc; pc++)
-    //     if (pitCount % (TICK_HZ * pc->period / pc->count) == 0)
-    //         wq_push(pc->f);
 }
 
 static void set_handler(uint64_t vec, void* handler, uint8_t type) {
