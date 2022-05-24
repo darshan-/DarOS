@@ -2,23 +2,22 @@
 #include "list.h"
 #include "malloc.h"
 #include "periodic_callback.h"
+#include "periodic_callback_int.h"
 
-// Zero-terminated array of pointers to callback structs
-struct periodic_callback *periodicCallbacks = 0;
+#define INIT_CAP 10
 
-static uint64_t cap = 0, len = 0;
+struct periodic_callbacks periodicCallbacks = {0, 0};
 
-
-// If we're at capacity, realloc
+static uint64_t cap = 0;
 
 void registerPeriodicCallback(struct periodic_callback c) {
     __asm__ __volatile__("cli");
 
-    if (!periodicCallbacks) {
+    if (!periodicCallbacks.pcs) {
         cap = INIT_CAP;
-        periodicCallbacks = malloc(INIT_CAP * sizeof(void*));
-    } else if (len + 1 >= cap) {
-        periodicCallbacks = realloc(periodicCallbacks, cap * 2);
+        periodicCallbacks.pcs = malloc(INIT_CAP * sizeof(void*));
+    } else if (periodicCallbacks.len + 1 >= cap) {
+        periodicCallbacks.pcs = realloc(periodicCallbacks.pcs, cap * 2);
     }
 
     struct periodic_callback* cp = (struct periodic_callback*) malloc(sizeof(struct periodic_callback));
@@ -26,15 +25,28 @@ void registerPeriodicCallback(struct periodic_callback c) {
     cp->period = c.period;
     cp->f = c.f;
 
-    // Add cp to callbacks
+    periodicCallbacks.pcs[periodicCallbacks.len++] = cp;
 
     __asm__ __volatile__("sti");
 }
 
 void unregisterPeriodicCallback(struct periodic_callback c) {
-    if (!periodicCallbacks) return;
+    if (!periodicCallbacks.pcs) return;
 
     __asm__ __volatile__("cli");
+
+    int found = 0;
+    for (uint64_t i = 0; i < periodicCallbacks.len - 1; i++) {
+        if (found) {
+            periodicCallbacks.pcs[i] = periodicCallbacks.pcs[i+1];
+        } else if (periodicCallbacks.pcs[i]->count == c.count &&
+                   periodicCallbacks.pcs[i]->period == c.period &&
+                   periodicCallbacks.pcs[i]->f == c.f) {
+            found = 1;
+        }
+    }
+
+    periodicCallbacks.len--;
 
     __asm__ __volatile__("sti");
 

@@ -4,6 +4,7 @@
 #include "io.h"
 #include "keyboard.h"
 #include "list.h"
+#include "malloc.h"
 #include "periodic_callback.h"
 #include "periodic_callback_int.h"
 #include "rtc_int.h"
@@ -60,7 +61,7 @@ struct interrupt_frame {
 
 #define INIT_WQ_CAP 100
 
-static void **start, **head, **tail;
+static void **wq_start, **wq_head, **wq_tail;
 static uint64_t wq_cap = 0;
 
 
@@ -72,11 +73,55 @@ static uint64_t wq_cap = 0;
 
 static uint64_t pitCount = 0;
 
+#define INC_WQ_PT(p) (p)++; if ((p) == wq_start + wq_cap) (p) = wq_start;
+
+static inline void* wq_pop() {
+    __asm__ __volatile__("cli");
+
+    if (wq_head == wq_tail) return 0;
+
+    void* f = *wq_head;
+    INC_WQ_PT(wq_head);
+
+    __asm__ __volatile__("sti");
+
+    return f;
+
+    // void (*f)() = wq_head++;
+    // if (wq_head == WQ_START + wq_cap)
+    //     wq_head = WQ_START;
+}
+
+// To be called only when interrupts are off
+static inline void wq_push(void* f) {
+    // TODO:
+    // I can have a work queue item that runs periodically (say, every 10 seconds?) that checks capcity
+    //   and usage, and doubles capacity if usage is greater than half of capacity.  So we'll make it extremely
+    //   unlikely we'll have to increase capacity here.
+    if (wq_tail + 1 == wq_head) {
+        uint64_t head_off = wq_head - wq_start;
+        uint64_t tail_off = wq_tail - wq_start;
+        wq_start = realloc(wq_start, wq_cap * 2);
+
+        wq_head = wq_start + head_off;
+        wq_tail = wq_start + tail_off;
+    }
+
+    *wq_tail = f;
+    INC_WQ_PT(wq_tail);
+}
+
 void waitloop() {
     for (;;) {
         void (*f)();
-        while ((f = (void (*)()) wq_pop(workQueue)))
+        int didwork = 0;
+        while ((f = (void (*)()) wq_pop())) {
+            didwork++;
+            printf("Found a work queue item\n");
             f();
+        }
+        if (didwork)
+        printf("Cleared queue!  Done with work for now!\n");
 
         __asm__ __volatile__(
             "mov $"
@@ -222,42 +267,6 @@ static void __attribute__((interrupt)) irq8_rtc(struct interrupt_frame *) {
     // }
 }
 
-#define INC_WQ_PT(p) (p)++; if ((p) == wq_start + wq_cap) (p) = wq_start;
-
-
-static inline void* wq_pop() {
-    __asm__ __volatile__("cli");
-
-    if (wq_head == wq_tail) return 0;
-
-    void* f = wq_head;
-    INC_WQ_PT(wq_head);
-
-    __asm__ __volatile__("sti");
-
-    return f;
-
-    // void (*f)() = wq_head++;
-    // if (wq_head == WQ_START + wq_cap)
-    //     wq_head = WQ_START;
-}
-
-// To be called only when interrupts are off
-static inline void wq_push(void* f) {
-    // TODO: 
-    // I can have a work queue item that runs periodically (say, every 10 seconds?) that checks capcity
-    //   and usage, and doubles capacity if usage is greater than half of capacity.  So we'll make it extremely
-    //   unlikely we'll have to increase capacity here.
-    if (wq_tail + 1 == wq_head) {
-        uint64_t head_off = wq_head - wq_start;
-        uint64_t tail_off = wq_tail - wq_start;
-        wq_start = realloc(wq_start, wq_cap * 2);
-    }
-
-    wq_tail = f;
-    INQ_WQ_PT(wq_tail);
-}
-
 static void __attribute__((interrupt)) irq0_pit(struct interrupt_frame *) {
     outb(PIC_PRIMARY_CMD, PIC_ACK);
 
@@ -265,9 +274,15 @@ static void __attribute__((interrupt)) irq0_pit(struct interrupt_frame *) {
 
     seconds_since_boot = pitCount * PIT_COUNT / PIT_FREQ;
 
-    for (struct periodic_callback* pc = periodicCallbacks; pc; pc++)
-        if (picCount % (TICK_HZ * pc->period / pc->count) == 0)
-            wq_push(f);
+    if (!periodicCallbacks.pcs) return;
+
+    for (uint64_t i = 0; i < periodicCallbacks.len; i++)
+        if (pitCount % (TICK_HZ * periodicCallbacks.pcs[i]->period / periodicCallbacks.pcs[i]->count) == 0)
+            wq_push(periodicCallbacks.pcs[i]->f);
+
+    // for (struct periodic_callback* pc = *periodicCallbacks; pc; pc++)
+    //     if (pitCount % (TICK_HZ * pc->period / pc->count) == 0)
+    //         wq_push(pc->f);
 }
 
 static void set_handler(uint64_t vec, void* handler, uint8_t type) {
@@ -290,8 +305,6 @@ static void init_pit() {
 }
 
 void init_interrupts() {
-    workQueue = newList();
-
     for (int i = 0; i < 32; i++)
         set_handler(i, default_trap_handler, TYPE_TRAP);
     for (int i = 32; i < 40; i++)
