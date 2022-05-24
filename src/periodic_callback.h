@@ -2,8 +2,6 @@
 
 #include "list.h"
 
-extern struct list* periodicCallbackList;
-
 struct periodic_callback {
     //double Hz; // Ah, I was right to be wary of floating point in kernel... SSE registers, etc.
     uint64_t count;

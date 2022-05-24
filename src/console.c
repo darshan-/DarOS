@@ -50,7 +50,7 @@ static void writeStatusBar(char* s, uint8_t loc) {
 
 #define MAX_MEMLEN 24
 void updateMemUse() {
-    print("updateMemUse\n");
+    //print("updateMemUse\n");
     char* s;
     uint64_t m = memUsed();
     
@@ -79,7 +79,7 @@ void updateMemUse() {
 }
 
 void updateClock() {
-    print("updateClock\n");
+    //print("updateClock\n");
     struct rtc_time t;
     get_rtc_time(&t);
 

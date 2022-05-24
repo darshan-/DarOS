@@ -5,14 +5,13 @@
 #include "keyboard.h"
 #include "list.h"
 #include "periodic_callback.h"
+#include "periodic_callback_int.h"
 #include "rtc_int.h"
 
 /*
 
-  Okay, I think I'm finally setting up and using the PICs correctly.
-
-  If IRQ was initiated by the secondary, that means both are involved, and both need an ack.
-  If it was initiated by the primary, just ack to that one.
+  If IRQ was initiated by the secondary PIC, that means both are involved, and both need an ack.
+  If it was initiated by the primary, just send ack to that one.
 
  */
 
@@ -31,7 +30,7 @@
 #define PIC_SECONDARY_CMD 0xa0
 #define PIC_SECONDARY_DATA 0xa1
 
-#define TICK_HZ 250
+#define TICK_HZ 1000
 
 #define PIT_CMD 0x43
 #define PIT_CH0_DATA 0x40
@@ -56,7 +55,13 @@ struct interrupt_frame {
     uint64_t ss;
 };
 
-static struct list* workQueue = (struct list*) 0;
+
+//static struct list* workQueue = (struct list*) 0;
+
+#define INIT_WQ_CAP 100
+
+static void **start, **head, **tail;
+static uint64_t wq_cap = 0;
 
 
 #define log com1_printf
@@ -67,40 +72,10 @@ static struct list* workQueue = (struct list*) 0;
 
 static uint64_t pitCount = 0;
 
-void tick() {
-    uint64_t c = pitCount;
-    seconds_since_boot = c * PIT_COUNT / PIT_FREQ;
-
-    forEachListItem(periodicCallbackList, ({
-        void __fn__ (void* item) {
-            struct periodic_callback *pc = (struct periodic_callback*) item;
-
-            if (c % (TICK_HZ * pc->period / pc->count) == 0)
-                pc->f();
-            // if (pitCount % ((uint64_t) (TICK_HZ / ((struct periodic_callback*) item)->Hz)) == 0)
-            //     ((struct periodic_callback*) item)->f();
-        }
-        __fn__;
-    }));
-
-    // #define CLOCK_UPDATE_HZ 5
-    // if (pitCount % (TICK_HZ / CLOCK_UPDATE_HZ ) == 0)
-    //     updateClock();
-
-    // #define MEMUSE_UPDATE_PERIOD 1 // How many seconds to wait between updates
-    // //if (pitCount % (TICK_HZ * MEMUSE_UPDATE_PERIOD ) == 0)
-    // if (pitCount % ((uint64_t) (TICK_HZ / 0.5)) == 0)
-    //     updateMemUse();
-}
-
 void waitloop() {
     for (;;) {
-        // Lighter-weight to just tick every time we're here, rather than adding to workQueue on timer interrupt,
-        //   and making sure we don't have a backlog of ticks (I'm still thinking about if we want to process every
-        //   tick, or if it's okay to miss some...)
-        tick();
         void (*f)();
-        while ( (f = (void (*)()) atomicPop(workQueue)) )
+        while ((f = (void (*)()) wq_pop(workQueue)))
             f();
 
         __asm__ __volatile__(
@@ -247,11 +222,52 @@ static void __attribute__((interrupt)) irq8_rtc(struct interrupt_frame *) {
     // }
 }
 
+#define INC_WQ_PT(p) (p)++; if ((p) == wq_start + wq_cap) (p) = wq_start;
+
+
+static inline void* wq_pop() {
+    __asm__ __volatile__("cli");
+
+    if (wq_head == wq_tail) return 0;
+
+    void* f = wq_head;
+    INC_WQ_PT(wq_head);
+
+    __asm__ __volatile__("sti");
+
+    return f;
+
+    // void (*f)() = wq_head++;
+    // if (wq_head == WQ_START + wq_cap)
+    //     wq_head = WQ_START;
+}
+
+// To be called only when interrupts are off
+static inline void wq_push(void* f) {
+    // TODO: 
+    // I can have a work queue item that runs periodically (say, every 10 seconds?) that checks capcity
+    //   and usage, and doubles capacity if usage is greater than half of capacity.  So we'll make it extremely
+    //   unlikely we'll have to increase capacity here.
+    if (wq_tail + 1 == wq_head) {
+        uint64_t head_off = wq_head - wq_start;
+        uint64_t tail_off = wq_tail - wq_start;
+        wq_start = realloc(wq_start, wq_cap * 2);
+    }
+
+    wq_tail = f;
+    INQ_WQ_PT(wq_tail);
+}
+
 static void __attribute__((interrupt)) irq0_pit(struct interrupt_frame *) {
     outb(PIC_PRIMARY_CMD, PIC_ACK);
 
     pitCount++;
-    //addToList(workQueue, tick); // Hmm, I think workQueue need to be of struct with pitCount and function...
+
+    seconds_since_boot = pitCount * PIT_COUNT / PIT_FREQ;
+
+    for (struct periodic_callback* pc = periodicCallbacks; pc; pc++)
+        if (picCount % (TICK_HZ * pc->period / pc->count) == 0)
+            wq_push(f);
 }
 
 static void set_handler(uint64_t vec, void* handler, uint8_t type) {
@@ -306,6 +322,9 @@ void init_interrupts() {
     init_rtc();
     init_pit();
     init_pic();
+
+    wq_start = wq_head = wq_tail = malloc(INIT_WQ_CAP * sizeof(void*));
+    wq_cap = INIT_WQ_CAP;
 
     __asm__ __volatile__("sti");
 }
