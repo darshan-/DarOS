@@ -53,7 +53,7 @@ uint64_t memUsed() {
 }
 
 void* malloc(uint64_t nBytes) {
-    com1_print("malloc");plumpPCs();
+    //com1_print("malloc");plumpPCs();
     if (heap == map) return 0;
     if (nBytes > 64 / MAP_ENTRY_SZ * BLK_SZ) return 0;  // For now; later will support more than one qword per alloc
 
@@ -81,7 +81,7 @@ void* malloc(uint64_t nBytes) {
 }
 
 void free(void *p) {
-    com1_print("free");plumpPCs();
+    //com1_print("free");plumpPCs();
     if (p < (void*) heap || p > (void*) heap + (map_size * (64 / MAP_ENTRY_SZ) - 1) * BLK_SZ)
         return;
 
@@ -123,11 +123,11 @@ void free(void *p) {
     }
 
     map[b] &= free_mask;
-    com1_print("free END");plumpPCs();
+    //com1_print("free END");plumpPCs();
 }
 
 void* realloc(void* p, int newSize) {
-    com1_print("realloc");plumpPCs();
+    //com1_print("realloc");plumpPCs();
     if (heap == map) return 0;
 
     uint64_t* q1 = (uint64_t*) p;

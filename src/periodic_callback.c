@@ -19,7 +19,7 @@ void registerPeriodicCallback(struct periodic_callback c) {
         periodicCallbacks.pcs = malloc(INIT_CAP * sizeof(void*));
     } else if (periodicCallbacks.len + 1 >= cap) {
         cap *= 2;
-        periodicCallbacks.pcs = realloc(periodicCallbacks.pcs, cap);
+        periodicCallbacks.pcs = realloc(periodicCallbacks.pcs, cap * sizeof(void*));
     }
 
     struct periodic_callback* cp = (struct periodic_callback*) malloc(sizeof(struct periodic_callback));
@@ -33,8 +33,9 @@ void registerPeriodicCallback(struct periodic_callback c) {
 }
 
 void dumpPCs() {
+    com1_printf("[[[%h]]]\n", periodicCallbacks.pcs);
     for (int i = 0; i < periodicCallbacks.len; i++) {
-        com1_printf("{{{{i: %u, (%u, %u)\n", i, periodicCallbacks.pcs[i]->period, periodicCallbacks.pcs[i]->count);
+        com1_printf("{{{{i: %u (@%h) (%u, %u)\n", i, periodicCallbacks.pcs[i], periodicCallbacks.pcs[i]->period, periodicCallbacks.pcs[i]->count);
         // com1_printf("@ 0x%h;", periodicCallbacks.pcs[i]);
     }
 }
