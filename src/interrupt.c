@@ -92,10 +92,7 @@ struct interrupt_frame {
 //static struct list* workQueue = (struct list*) 0;
 
 #define INIT_WQ_CAP 20
-
-static void **wq_start, **wq_head, **wq_tail;
-static uint64_t wq_cap = 0;
-
+#define INIT_KB_CAP 20
 
 #define log com1_printf
 
@@ -103,48 +100,77 @@ static uint64_t wq_cap = 0;
 //     fmt = fmt;
 // }
 
+uint64_t read_tsc() {
+    uint64_t tsc;
+
+    // edx gets high-order doubleword, eax gets low-order doubleword
+
+    __asm__ __volatile__(
+        "cpuid\n"
+        "rdtsc\n"
+        "shl $32, %%rdx\n"
+        "add %%rdx, %%rax\n"
+        "mov %%rax, %0\n"
+        :"=m"(tsc)
+    );
+
+    return tsc;
+}
+
 static uint64_t pitCount = 0;
 
-#define INC_WQ_PT(p) (p)++; if ((p) == wq_start + wq_cap) (p) = wq_start;
+struct queue {
+    void** start;
+    void** head;
+    void** tail;
+    uint64_t cap;
+};
 
-static inline void* wq_pop() {
+static struct queue wq = {};
+// It's quite space inefficient to have 8-byte wide slots for key codes, but I don't expect the buffer to
+//   ever get very full, and it's simplest to just have one queue type, I think?
+static struct queue kbd_buf = {};
+
+
+#define INITQ(q, c) q.start = q.head = q.tail = malloc(c * sizeof(void*)); \
+    q.cap = c
+
+#define INC_Q_PT(q, p) (q->p)++; if ((q->p) == q->start + q->cap) (q->p) = q->start;
+
+static inline void* pop(struct queue* q) {
     __asm__ __volatile__("cli");
 
-    if (wq_head == wq_tail) return 0;
+    if (q->head == q->tail) return 0;
 
-    void* f = *wq_head;
-    INC_WQ_PT(wq_head);
+    void* p = *(q->head);
+    INC_Q_PT(q, head);
 
     __asm__ __volatile__("sti");
 
-    return f;
+    return p;
 }
 
-// To be called only when interrupts are off
-static inline void wq_push(void* f) {
-    // TODO:
-    // I can have a work queue item that runs periodically (say, every 10 seconds?) that checks capcity
-    //   and usage, and doubles capacity if usage is greater than half of capacity.  So we'll make it extremely
-    //   unlikely we'll have to increase capacity here.
-    if (wq_tail + 1 == wq_head || (wq_tail + 1 == wq_start + wq_cap && wq_head == wq_start)) {
-        wq_cap *= 2;
-        uint64_t head_off = wq_head - wq_start;
-        uint64_t tail_off = wq_tail - wq_start;
-        wq_start = realloc(wq_start, wq_cap*sizeof(void*));
+// To be called only when interrupts are off (From handler or during initialization);
+static inline void push(struct queue* q, void* p) {
+    if (q->tail + 1 == q->head || (q->tail + 1 == q->start + q->cap && q->head == q->start)) {
+        q->cap *= 2;
+        uint64_t head_off = q->head - q->start;
+        uint64_t tail_off = q->tail - q->start;
+        q->start = realloc(q->start, q->cap * sizeof(void*));
 
-        wq_head = wq_start + head_off;
-        wq_tail = wq_start + tail_off;
+        q->head = q->start + head_off;
+        q->tail = q->start + tail_off;
     }
 
-    *wq_tail = f;
-    INC_WQ_PT(wq_tail);
+    *(q->tail) = p;
+    INC_Q_PT(q, tail);
 }
 
 void waitloop() {
     for (;;) {
         void (*f)();
 
-        while ((f = (void (*)()) wq_pop()))
+        while ((f = (void (*)()) pop(&wq)))
             f();
 
         __asm__ __volatile__(
@@ -155,6 +181,11 @@ void waitloop() {
             "hlt\n"
         );
     }
+}
+
+void process_keys() {
+    uint8_t code = (uint8_t) (uint64_t) pop(&kbd_buf);
+    keyScanned(code);
 }
 
 static void dumpFrame(struct interrupt_frame *frame) {
@@ -290,12 +321,21 @@ static void __attribute__((interrupt)) double_fault_handler(struct interrupt_fra
     dumpFrame(frame);
 }
 
+static uint64_t time_in_kbd = 0;
+static uint64_t times_in_kbd = 0;
+
 static void __attribute__((interrupt)) irq1_kbd(struct interrupt_frame *) {
+    times_in_kbd++;
+    uint64_t start = read_tsc();
+
     uint8_t code = inb(0x60);
     outb(PIC_PRIMARY_CMD, PIC_ACK);
-    for (int i = 1; i < 1000*1000*20; i++)
-        ;
-    keyScanned(code);
+    push(&kbd_buf, (void*) (uint64_t) code);
+    push(&wq, process_keys);
+    //keyScanned(code);
+
+    time_in_kbd += (read_tsc() - start) / 3692;
+    com1_printf("avg kbd irq takes: %u microseconds\n", time_in_kbd / times_in_kbd);
 }
 
 static void __attribute__((interrupt)) irq8_rtc(struct interrupt_frame *) {
@@ -307,12 +347,20 @@ static void __attribute__((interrupt)) irq8_rtc(struct interrupt_frame *) {
     // }
 }
 
+static uint64_t cpuCountOffset = 0;
+
 static void __attribute__((interrupt)) irq0_pit(struct interrupt_frame *) {
     outb(PIC_PRIMARY_CMD, PIC_ACK);
+
+    // if (cpuCountOffset == 0)
+    //     cpuCountOffset = read_tsc();
 
     pitCount++;
 
     ms_since_boot = pitCount * PIT_COUNT * 1000 / PIT_FREQ;
+
+    // if (pitCount % TICK_HZ == 0)
+    //     com1_printf("Average CPU ticks per PIT tick: %u\n", (read_tsc() - cpuCountOffset) / pitCount);
 
     if (!periodicCallbacks.pcs) return;
 
@@ -323,7 +371,7 @@ static void __attribute__((interrupt)) irq0_pit(struct interrupt_frame *) {
         }
 
         if (pitCount % (TICK_HZ * periodicCallbacks.pcs[i]->period / periodicCallbacks.pcs[i]->count) == 0)
-            wq_push(periodicCallbacks.pcs[i]->f);
+            push(&wq, periodicCallbacks.pcs[i]->f);
     }
 }
 
@@ -346,11 +394,17 @@ static void init_pit() {
     outb(PIT_CH0_DATA, PIT_COUNT >> 8);
 }
 
-static void print_wq_status() {
-    com1_printf("Work queue now has capacity: %u\n", wq_cap);
+// TODO: Grow queue capacities if appropriate
+    // TODO:
+    // I can have a work queue item that runs periodically (say, every 10 seconds?) that checks capacity
+    //   and usage, and doubles capacity if usage is greater than half of capacity.
+
+static void check_queue_caps() {
+    //com1_printf("kbd_buf now has capacity: %u\n", kbd_buf.cap);
 }
 
 void init_interrupts() {
+    cpuCountOffset = read_tsc();
     // for (int i = 0; i < 32; i++)
     //     set_handler(i, default_trap_handler, TYPE_INT);
     for (int i = 32; i < 40; i++)
@@ -386,10 +440,10 @@ void init_interrupts() {
     init_pit();
     init_pic();
 
-    wq_start = wq_head = wq_tail = malloc(INIT_WQ_CAP * sizeof(void*));
-    wq_cap = INIT_WQ_CAP;
+    INITQ(wq, INIT_WQ_CAP);
+    INITQ(kbd_buf, INIT_KB_CAP);
 
-    registerPeriodicCallback((struct periodic_callback) {1, 2, print_wq_status});
+    registerPeriodicCallback((struct periodic_callback) {1, 2, check_queue_caps});
 
     __asm__ __volatile__("sti");
 }
