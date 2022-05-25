@@ -27,12 +27,17 @@ void registerPeriodicCallback(struct periodic_callback c) {
     cp->f = c.f;
 
     periodicCallbacks.pcs[periodicCallbacks.len++] = cp;
+    for (int i = 0; i < periodicCallbacks.len; i++) {
+        com1_printf("pc0c: %u;", periodicCallbacks.pcs[i]->count);
+        com1_printf("@ 0x%h;", periodicCallbacks.pcs[i]);
+    }
 
     __asm__ __volatile__("sti");
 }
 
 void unregisterPeriodicCallback(struct periodic_callback c) {
     if (!periodicCallbacks.pcs) return;
+    com1_print("unregistering");
 
     __asm__ __volatile__("cli");
 

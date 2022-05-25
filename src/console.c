@@ -84,7 +84,7 @@ void updateClock() {
     char* ampm = t.hours >= 12 ? "PM" : "AM";
     uint8_t hours = t.hours % 12;
     if (hours == 0) hours = 12;
-    char *s = M_sprintf("%p 2u:%p02u:%p02u %s", hours, t.minutes, t.seconds, ampm);
+    char *s = M_sprintf("%p 2u:%p02u:%p02u.%p03u %s", hours, t.minutes, t.seconds, t.ms, ampm);
 
     writeStatusBar(s, 0);
 
@@ -101,7 +101,7 @@ static void setStatusBar() {
     // STATUS_LINE[44*2] = (char*) 3;
     // STATUS_LINE[44*2+1] = 0x35;
 
-    registerPeriodicCallback((struct periodic_callback) {10, 1, updateClock});
+    registerPeriodicCallback((struct periodic_callback) {1000, 1, updateClock});
     registerPeriodicCallback((struct periodic_callback) {1, 2, updateMemUse});
 }
 
@@ -174,7 +174,7 @@ void printc(char c) {
     printCharColor(c, 0x07);
     updateCursorPosition();
 
-    __asm__ __volatile__("sti");
+    //__asm__ __volatile__("sti");
 }
 
 void printf(char* fmt, ...) {

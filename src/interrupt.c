@@ -16,6 +16,15 @@
 
  */
 
+/*
+
+  According to section 8.9.3 "Interrupt Stack Frame" of teh AMD manual vol 2,
+
+        If the gate descriptor is an interrupt gate, RFLAGS.IF is cleared to 0.
+        If the gate descriptor is a trapgate, RFLAGS.IF is not modified.
+
+ */
+
 #define IDT 0
 #define CODE_SEG 8 // 1 quadword past null descriptor; next segment would be 16, etc.
 #define TYPE_TRAP 0b1111
@@ -31,18 +40,20 @@
 #define PIC_SECONDARY_CMD 0xa0
 #define PIC_SECONDARY_DATA 0xa1
 
-#define TICK_HZ 1000
+#define TICK_HZ 3000
 
 #define PIT_CMD 0x43
 #define PIT_CH0_DATA 0x40
+#define PIT_CH2_DATA 0x42
 #define PIT_CHAN_0 0
+#define PIT_CHAN_2 (1<<7)
 #define PIT_WORD_RW (0b11<<4) // Read or write low byte then high byte, rather than just one byte
 #define PIT_PERIODIC (0b10<<1)
 //#define PIT_COUNT 65536
 #define PIT_FREQ 1193182
 #define PIT_COUNT (PIT_FREQ / TICK_HZ)
 
-#define KERNEL_STACK_TOP 0xeffff
+#define KERNEL_STACK_TOP 0xfffff
 
 // Need extra level of indirection to quote a macro value, due to a special rule around argument prescan.
 #define QUOT(v) #v
@@ -119,7 +130,7 @@ void waitloop() {
         __asm__ __volatile__(
             "mov $"
             QUOTE(KERNEL_STACK_TOP)
-            ", %esp\n" // We'll never return anywhere or use anything currently on the stack, so reset it
+            ", %rsp\n" // We'll never return anywhere or use anything currently on the stack, so reset it
             "sti\n"
             "hlt\n"
         );
@@ -143,13 +154,27 @@ static inline void generic_trap_n(struct interrupt_frame *frame, int n) {
     frame->ip = (uint64_t) waitloop;
 }
 
+static inline void generic_etrap_n(struct interrupt_frame *frame, uint64_t error_code, int n) {
+    log("Generic trap handler used for trap vector 0x%h, with error on stack; error: 0x%p016h\n", n, error_code);
+    dumpFrame(frame);
+    frame->ip = (uint64_t) waitloop;
+    log("waitloop?");
+}
+
+
 // Is there an easier/cleaner/more efficient way to do this?  Macros are weird, clunky, too powerful and too
 //   limited at the same time...
 
-#define SET_GTRAP_N(nn) set_handler(0x##nn, trap_handler_0x##nn, TYPE_TRAP);
+#define SET_GTRAP_N(nn) set_handler(0x##nn, trap_handler_0x##nn, TYPE_INT);
 
 #define TRAP_N(nn) static void __attribute__((interrupt)) trap_handler_0x##nn(struct interrupt_frame *frame) {\
     generic_trap_n(frame, 0x##nn);\
+}
+
+#define SET_GETRAP_N(nn) set_handler(0x##nn, etrap_handler_0x##nn, TYPE_INT);
+
+#define ETRAP_N(nn) static void __attribute__((interrupt)) etrap_handler_0x##nn(struct interrupt_frame *frame, uint64_t ec) { \
+    generic_etrap_n(frame, ec, 0x##nn);\
 }
 
 #define TRAP_HL(macro, h, l) macro(h##l)
@@ -175,6 +200,18 @@ TRAP_HL(macro, h, f)
 TRAPS(TRAP_N, 0)
 TRAPS(TRAP_N, 1)
 
+ETRAP_N(08)
+ETRAP_N(0a)
+ETRAP_N(0b)
+ETRAP_N(0c)
+ETRAP_N(0d)
+ETRAP_N(0e)
+ETRAP_N(11)
+ETRAP_N(15)
+ETRAP_N(1d)
+ETRAP_N(1e)
+
+
 static void init_pic() {
     // ICW1
     outb(PIC_PRIMARY_CMD, ICW1 | ICW1_ICW4_NEEDED);
@@ -193,10 +230,13 @@ static void init_pic() {
     outb(PIC_SECONDARY_DATA, 1);    // 8086/8088 mode
 
     // Mask interrupts as you see fit
-    outb(PIC_PRIMARY_DATA, 0);      // PIT is firing by default (maybe no matter what?); ignore it, at least for now.
-    outb(PIC_SECONDARY_DATA, 0);
+    outb(PIC_PRIMARY_DATA, 0xff);
+    outb(PIC_SECONDARY_DATA, 0xff);
+}
 
-    outb(PIC_PRIMARY_CMD, 0b11000000 | 1); // Make IRQ 2 top priority of primary PIC?  (By making 3 lowest)
+void unmask_pics() {
+    outb(PIC_PRIMARY_DATA, 0);
+    outb(PIC_SECONDARY_DATA, 0);
 }
 
 static void __attribute__((interrupt)) default_interrupt_handler(struct interrupt_frame *frame) {
@@ -242,16 +282,20 @@ static void __attribute__((interrupt)) double_fault_handler(struct interrupt_fra
 }
 
 static void __attribute__((interrupt)) irq1_kbd(struct interrupt_frame *frame) {
+    com1_print("{{KBD");
     uint8_t code = inb(0x60);
+    com1_print(" 1");
     outb(PIC_PRIMARY_CMD, PIC_ACK);
-
-    log("Keyboard interrupt handler with scan code: %p02h\n", code);
-    dumpFrame(frame);
-
+    com1_print(" 2 ");
+    for (int i = 1; i < 1000*1000*20; i++)
+        ;
+    com1_print("3 ");
     keyScanned(code);
+    com1_print("KBD}}");
 }
 
 static void __attribute__((interrupt)) irq8_rtc(struct interrupt_frame *) {
+    com1_print("---------------------- IRQ8");
     outb(PIC_SECONDARY_CMD, PIC_ACK);
     outb(PIC_PRIMARY_CMD, PIC_ACK);
 
@@ -260,18 +304,41 @@ static void __attribute__((interrupt)) irq8_rtc(struct interrupt_frame *) {
     // }
 }
 
-static void __attribute__((interrupt)) irq0_pit(struct interrupt_frame *) {
+static void __attribute__((interrupt)) irq0_pit(struct interrupt_frame *frame) {
+    //com1_print("---------------------- IRQ0");
+    //com1_print("^");
     outb(PIC_PRIMARY_CMD, PIC_ACK);
 
     pitCount++;
 
-    seconds_since_boot = pitCount * PIT_COUNT / PIT_FREQ;
+    ms_since_boot = pitCount * PIT_COUNT * 1000 / PIT_FREQ;
 
     if (!periodicCallbacks.pcs) return;
 
-    for (uint64_t i = 0; i < periodicCallbacks.len; i++)
-        if (pitCount % (TICK_HZ * periodicCallbacks.pcs[i]->period / periodicCallbacks.pcs[i]->count) == 0)
+    // com1_printf("\npitCount: %u\n", pitCount);
+    // com1_printf("wq_head: %u, wq_tail: %u, wq_cap: %u\n", wq_head - wq_start, wq_tail - wq_start, wq_cap);
+    // com1_printf("{(%u)", periodicCallbacks.len);
+    for (uint64_t i = 0; i < periodicCallbacks.len; i++) {
+        /*if (i == 2) */com1_printf("%u, %u\n", periodicCallbacks.pcs[i]->period, periodicCallbacks.pcs[i]->count);
+        if (periodicCallbacks.pcs[i]->count == 0 || periodicCallbacks.pcs[i]->count >= TICK_HZ) {
+            com1_printf("halting!\n");
+            __asm__ __volatile__ ("hlt");
+        }
+
+        //com1_printf("%u, %h, %u, %u;", i, periodicCallbacks.pcs[i], periodicCallbacks.pcs[i]->period, periodicCallbacks.pcs[i]->count);
+        // com1_printf("AAA%u;", periodicCallbacks.pcs[i]->period / periodicCallbacks.pcs[i]->count);
+        // com1_printf("BBB%u;", TICK_HZ * periodicCallbacks.pcs[i]->period / periodicCallbacks.pcs[i]->count);
+        // com1_printf("CCC%u;", pitCount % (TICK_HZ * periodicCallbacks.pcs[i]->period/ periodicCallbacks.pcs[i]->count));
+        // com1_printf("DDD%u;", pitCount % (TICK_HZ * periodicCallbacks.pcs[i]->period / periodicCallbacks.pcs[i]->count) == 0);
+        if (periodicCallbacks.pcs[i]->count > 0 &&
+            periodicCallbacks.pcs[i]->count < TICK_HZ &&
+            pitCount % (TICK_HZ * periodicCallbacks.pcs[i]->period / periodicCallbacks.pcs[i]->count) == 0) {
             wq_push(periodicCallbacks.pcs[i]->f);
+        }
+    }
+    //com1_print("}");
+    //com1_printf("0x%p016h", frame->sp);
+    //com1_print("&");
 }
 
 static void set_handler(uint64_t vec, void* handler, uint8_t type) {
@@ -293,9 +360,13 @@ static void init_pit() {
     outb(PIT_CH0_DATA, PIT_COUNT >> 8);
 }
 
+static void print_wq_status() {
+    com1_printf("Work queue now has capacity: %u\n", wq_cap);
+}
+
 void init_interrupts() {
-    for (int i = 0; i < 32; i++)
-        set_handler(i, default_trap_handler, TYPE_TRAP);
+    // for (int i = 0; i < 32; i++)
+    //     set_handler(i, default_trap_handler, TYPE_INT);
     for (int i = 32; i < 40; i++)
         set_handler(i, default_PIC_P_handler, TYPE_INT);
     for (int i = 40; i < 48; i++)
@@ -307,19 +378,23 @@ void init_interrupts() {
     set_handler(0x21, irq1_kbd, TYPE_INT);
     set_handler(0x28, irq8_rtc, TYPE_INT);
 
-    // These are the traps with errors on stack according to https://wiki.osdev.org/Exceptions, 
-    set_handler(8, double_fault_handler, TYPE_TRAP);
-    for (int i = 10; i <= 14; i++)
-        set_handler(i, default_trap_with_error_handler, TYPE_TRAP);
-    set_handler(17, default_trap_with_error_handler, TYPE_TRAP);
-    set_handler(21, default_trap_with_error_handler, TYPE_TRAP);
-    set_handler(29, default_trap_with_error_handler, TYPE_TRAP);
-    set_handler(30, default_trap_with_error_handler, TYPE_TRAP);
-
     TRAPS(SET_GTRAP_N, 0);
     TRAPS(SET_GTRAP_N, 1);
 
-    set_handler(0, divide_by_zero_handler, TYPE_TRAP);
+    set_handler(0, divide_by_zero_handler, TYPE_INT);
+
+    // These are the traps with errors on stack according to https://wiki.osdev.org/Exceptions, 
+    set_handler(8, double_fault_handler, TYPE_INT);
+    //SET_GETRAP_N(08);
+    SET_GETRAP_N(0a);
+    SET_GETRAP_N(0b);
+    SET_GETRAP_N(0c);
+    SET_GETRAP_N(0d);
+    SET_GETRAP_N(0e);
+    SET_GETRAP_N(11);
+    SET_GETRAP_N(15);
+    SET_GETRAP_N(1d);
+    SET_GETRAP_N(1e);
 
     init_rtc();
     init_pit();
@@ -327,6 +402,8 @@ void init_interrupts() {
 
     wq_start = wq_head = wq_tail = malloc(INIT_WQ_CAP * sizeof(void*));
     wq_cap = INIT_WQ_CAP;
+
+    registerPeriodicCallback((struct periodic_callback) {1, 2, print_wq_status});
 
     __asm__ __volatile__("sti");
 }

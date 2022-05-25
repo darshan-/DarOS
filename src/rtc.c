@@ -32,7 +32,7 @@
 #define HRS24 (1<<1)
 #define BCD_OFF (1<<2)
 
-uint64_t seconds_since_boot = 0;
+uint64_t ms_since_boot = 0;
 static uint64_t rtc_seconds, seconds_at_boot;
 
 #define READ(r) outb(REG_SEL, r | NMI_DISABLED); \
@@ -129,8 +129,8 @@ uint8_t irq8_type() {
 
 // To be called only when interrupts are safe to enable.
 void get_rtc_time(struct rtc_time* t) {
-
-    rtc_seconds = (seconds_at_boot + seconds_since_boot) % (60 * 60 * 24);
+    // Rather than essentially flooring cmos time, let's estimate that we're in the middle of a second (so add 500 ms)
+    rtc_seconds = (seconds_at_boot + (ms_since_boot + 500) / 1000) % (60 * 60 * 24);
     // static uint64_t last_sync = 0;
 
     // TODO: I think I may still want this periodically?
@@ -143,6 +143,7 @@ void get_rtc_time(struct rtc_time* t) {
     //     __asm__ __volatile__("sti");
     // }
 
+    t->ms = ms_since_boot % 1000;
     t->seconds = rtc_seconds % 60;
     t->minutes = rtc_seconds / 60 % 60;
     t->hours = rtc_seconds / 60 / 60;

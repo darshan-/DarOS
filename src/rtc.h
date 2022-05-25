@@ -11,6 +11,7 @@ struct rtc_time {
     uint8_t month : 8;
     uint8_t year : 8;
     uint8_t century : 8;
+    uint16_t ms;
 };
 
 void get_rtc_time(struct rtc_time* t);
