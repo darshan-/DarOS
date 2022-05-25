@@ -105,7 +105,9 @@ static inline void wq_push(void* f) {
     // I can have a work queue item that runs periodically (say, every 10 seconds?) that checks capcity
     //   and usage, and doubles capacity if usage is greater than half of capacity.  So we'll make it extremely
     //   unlikely we'll have to increase capacity here.
+    com1_print("*****  WQ_PUSH TOP *****");dumpPCs();
     if (wq_tail + 1 == wq_head || (wq_tail + 1 == wq_start + wq_cap && wq_head == wq_start)) {
+        com1_print("-------------------------------------- INCREASING CAPACITY\n");
         wq_cap *= 2;
         uint64_t head_off = wq_head - wq_start;
         uint64_t tail_off = wq_tail - wq_start;
@@ -115,18 +117,28 @@ static inline void wq_push(void* f) {
         wq_tail = wq_start + tail_off;
         //com1_printf("Work queue now has capacity: %u\n", wq_cap);
     }
+    com1_print("-------------------------------------- done maybe increasing capacity\n");dumpPCs();
 
+    com1_print("About to set the location pointed to by tail to f");dumpPCs();
+    com1_printf(">>>>>>>>>>>>>>>>>>>>>>>>>>>wq_head: %u, wq_tail: %u, wq_cap: %u\n", wq_head - wq_start, wq_tail - wq_start, wq_cap);
+    com1_printf("What *was* at tail: %h", *wq_tail);
     *wq_tail = f;
+    com1_printf("What's *now* at tail: %h", *wq_tail);
+    com1_printf(">>>>>>>>>>>>>>>>>>>>>>>>>>>wq_head: %u, wq_tail: %u, wq_cap: %u\n", wq_head - wq_start, wq_tail - wq_start, wq_cap);
+    com1_print("Now about to try to increment tail...");dumpPCs();
     INC_WQ_PT(wq_tail);
+    com1_print("*****  WQ_PUSH BOTTOM *****");dumpPCs();
 }
 
 void waitloop() {
     for (;;) {
         void (*f)();
 
+        com1_print("wl00000");dumpPCs();
         while ((f = (void (*)()) wq_pop()))
             f();
 
+        com1_print("wl11111");dumpPCs();
         __asm__ __volatile__(
             "mov $"
             QUOTE(KERNEL_STACK_TOP)
@@ -305,21 +317,28 @@ static void __attribute__((interrupt)) irq8_rtc(struct interrupt_frame *) {
 }
 
 static void __attribute__((interrupt)) irq0_pit(struct interrupt_frame *frame) {
+    if (!periodicCallbacks.pcs) return;
     //com1_print("---------------------- IRQ0");
     //com1_print("^");
+    com1_print("irq0 --- 1");dumpPCs();
     outb(PIC_PRIMARY_CMD, PIC_ACK);
+    com1_print("irq0 --- 2");dumpPCs();
 
     pitCount++;
 
     ms_since_boot = pitCount * PIT_COUNT * 1000 / PIT_FREQ;
 
+    com1_print("irq0 --- 3");dumpPCs();
     if (!periodicCallbacks.pcs) return;
 
     // com1_printf("\npitCount: %u\n", pitCount);
     // com1_printf("wq_head: %u, wq_tail: %u, wq_cap: %u\n", wq_head - wq_start, wq_tail - wq_start, wq_cap);
     // com1_printf("{(%u)", periodicCallbacks.len);
+    com1_print("irq0 --- 4");dumpPCs();
     for (uint64_t i = 0; i < periodicCallbacks.len; i++) {
-        /*if (i == 2) */com1_printf("%u, %u\n", periodicCallbacks.pcs[i]->period, periodicCallbacks.pcs[i]->count);
+        /*if (i == 2) */
+        com1_print("Calling com1_printf from IRQ0\n");
+        com1_printf("IRQ0: %u, %u\n", periodicCallbacks.pcs[i]->period, periodicCallbacks.pcs[i]->count);
         if (periodicCallbacks.pcs[i]->count == 0 || periodicCallbacks.pcs[i]->count >= TICK_HZ) {
             com1_printf("halting!\n");
             __asm__ __volatile__ ("hlt");
@@ -330,15 +349,18 @@ static void __attribute__((interrupt)) irq0_pit(struct interrupt_frame *frame) {
         // com1_printf("BBB%u;", TICK_HZ * periodicCallbacks.pcs[i]->period / periodicCallbacks.pcs[i]->count);
         // com1_printf("CCC%u;", pitCount % (TICK_HZ * periodicCallbacks.pcs[i]->period/ periodicCallbacks.pcs[i]->count));
         // com1_printf("DDD%u;", pitCount % (TICK_HZ * periodicCallbacks.pcs[i]->period / periodicCallbacks.pcs[i]->count) == 0);
-        if (periodicCallbacks.pcs[i]->count > 0 &&
-            periodicCallbacks.pcs[i]->count < TICK_HZ &&
-            pitCount % (TICK_HZ * periodicCallbacks.pcs[i]->period / periodicCallbacks.pcs[i]->count) == 0) {
+        com1_print("irq0 --- 5");dumpPCs();
+        if (pitCount % (TICK_HZ * periodicCallbacks.pcs[i]->period / periodicCallbacks.pcs[i]->count) == 0) {
+            com1_print("*****  BEFORE WQ_PUSH *****");dumpPCs();
             wq_push(periodicCallbacks.pcs[i]->f);
+            com1_print("*****  AFTER WQ_PUSH *****");dumpPCs();
         }
+        com1_print("irq0 --- 6");dumpPCs();
     }
     //com1_print("}");
     //com1_printf("0x%p016h", frame->sp);
     //com1_print("&");
+        com1_print("irq0 --- 7");dumpPCs();
 }
 
 static void set_handler(uint64_t vec, void* handler, uint8_t type) {

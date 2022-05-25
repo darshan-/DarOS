@@ -43,6 +43,8 @@ char* M_sprintf(char* fmt, ...) {
 }
 
 char* M_vsprintf(char* fmt, va_list ap) {
+    //com1_print("M_vsprintf");plumpPCs();
+
     int scap = 128;
     char* s = malloc(scap);
     char c, *t, padc;

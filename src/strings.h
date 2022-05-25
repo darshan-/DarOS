@@ -46,4 +46,5 @@ uint64_t dstoui(char* s);
     char* s = M_vsprintf(fmt, ap); \
     va_end(ap); \
     p(s); \
+    com1_print("calling free from VARIADIC_PRINT\n"); \
     free(s)
