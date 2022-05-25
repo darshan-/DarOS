@@ -129,7 +129,6 @@ uint8_t irq8_type() {
 
 // To be called only when interrupts are safe to enable.
 void get_rtc_time(struct rtc_time* t) {
-    com1_print("get_rtc_time");dumpPCs();
     // Rather than essentially flooring cmos time, let's estimate that we're in the middle of a second (so add 500 ms)
     rtc_seconds = (seconds_at_boot + (ms_since_boot + 500) / 1000) % (60 * 60 * 24);
     // static uint64_t last_sync = 0;

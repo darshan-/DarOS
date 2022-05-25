@@ -50,7 +50,6 @@ static void writeStatusBar(char* s, uint8_t loc) {
 
 #define MAX_MEMLEN 24
 void updateMemUse() {
-    com1_print("updateMemUse\n");
     char* s;
     uint64_t m = memUsed();
     
@@ -79,7 +78,6 @@ void updateMemUse() {
 }
 
 void updateClock() {
-    com1_print("updateClock\n");
     struct rtc_time t;
     get_rtc_time(&t);
 
@@ -103,7 +101,7 @@ static void setStatusBar() {
     // STATUS_LINE[44*2] = (char*) 3;
     // STATUS_LINE[44*2+1] = 0x35;
 
-    registerPeriodicCallback((struct periodic_callback) {1000, 1, updateClock});
+    registerPeriodicCallback((struct periodic_callback) {60, 1, updateClock});
     registerPeriodicCallback((struct periodic_callback) {1, 2, updateMemUse});
 }
 
