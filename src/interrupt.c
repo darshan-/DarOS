@@ -19,6 +19,15 @@
 //     have requested to disable interrupts.  If that number drops to zero and we otherwise want them
 //     on, turn them on?
 
+
+// TODO: Have keyboard buffer (another queue like work queue, probably...) so I can just add the code
+//  to the kbd buf queue and then add a processKey function to the workQueue and return from the keyboard
+//  handler ASAP.
+
+// TODO: Do I really want everything set up as INT rather than TRAP?  I like interrupts being turned off
+//  for me automatically, but do I understand the implications of this change?  Am I really free to just
+//  choose as a I please, whether a given interrupt vector is tagged as interrupt or trap?
+
 /*
 
   If IRQ was initiated by the secondary PIC, that means both are involved, and both need an ack.
