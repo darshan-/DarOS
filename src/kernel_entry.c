@@ -32,6 +32,9 @@ void __attribute__((section(".kernel_entry"))) kernel_entry() {
 
     updateMemUse();
 
+
+    //printf("find_rsdp() returns: 0x%h\n", find_rsdp());
+    read_rsdp();
     //unmask_pics();
     com1_print("going to waitloop\n");
     waitloop();

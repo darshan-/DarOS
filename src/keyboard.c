@@ -25,7 +25,7 @@ static inline void gotInput(char c) {
 }
 
 void keyScanned(uint8_t c) {
-    uint8_t hob = c & 0x80;
+    uint8_t hob = c & 0x80;  // Break / release
     switch (c) {
     case 0x9d: // LCtrl (Or RCtrl if e0 was before this)
     case 0xaa: // LShift
