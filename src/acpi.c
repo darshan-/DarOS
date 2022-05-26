@@ -2,6 +2,7 @@
 
 static uint64_t* rsdp = 0;
 static uint64_t* rsdt = 0;
+static uint64_t* hpet = 0;
 
 static uint64_t* find_rsdp() {
     // uint16_t* x040e = (uint16_t*) 0x040e;
@@ -62,5 +63,13 @@ void read_rsdp() {
         for (int i = 0; i < 4; i++)
             printc(p[i]);
         print("\n");
+
+        if (p[0] == 'H' && p[1] == 'P' && p[2] == 'E' && p[3] == 'T')
+            hpet = table;
     }
+
+    printf("hpet is at: %h\n", hpet);
+
+    uint32_t hpet_len = *((uint32_t*) hpet + 1);
+    printf("hpet has length: %u\n", hpet_len);
 }
