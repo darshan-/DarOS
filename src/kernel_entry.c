@@ -30,24 +30,6 @@ void __attribute__((section(".kernel_entry"))) kernel_entry() {
     //     demo[i] = (char) i+1;
     // print(demo);
 
-    struct cpuid_ret r = cpuid(0);
-    char manufId[13];
-    manufId[12] = 0;
-    uint32_t* p = (uint32_t*) manufId;
-    *p++ = r.ebx;
-    *p++ = r.edx;
-    *p = r.ecx;
-    printf("cpuid with eax 0x00000000 returns %p08h in eax and man. ID: %s\n", r.eax, manufId);
-
-    r = cpuid(0x80000000ul);
-    printf("cpuid with eax 0x80000000 returns %p08h in eax\n", r.eax);
-
-    r = cpuid(0x80000001ul);
-    printf("cpuid with eax 0x80000001 returns %p08h in edx and %p08h in ecx\n", r.edx, r.ecx);
-
-    r = cpuid(0x80000007ul);
-    printf("cpuid with eax 0x80000007 returns %p08h in edx\n", r.edx);
-
     updateMemUse();
 
     //unmask_pics();

@@ -99,7 +99,7 @@ static void setStatusBar() {
     for (uint64_t* v = (uint64_t*) STATUS_LINE; v < (uint64_t*) VRAM_END; v++)
         *v = 0x3f003f003f003f00;
 
-    writeStatusBar("Dar OS", 37);
+    writeStatusBar("PurpOS", 37);
     // STATUS_LINE[35*2] = (char*) 3;
     // STATUS_LINE[35*2+1] = 0x35;
     // STATUS_LINE[44*2] = (char*) 3;
