@@ -29,6 +29,7 @@ out/boot.img: $(c_objects) src/linker.ld build/bootloader.o | out
 
 # -display gtk,zoom-to-fit=on
 # -full-screen
+# -cpu host 
 .PHONY: run
 run: out/boot.img
 	qemu-system-x86_64 -rtc base=localtime -enable-kvm -drive format=raw,file=out/boot.img
