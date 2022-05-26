@@ -1,4 +1,6 @@
 #include <stdint.h>
+
+#include "interrupt.h"
 #include "list.h"
 #include "malloc.h"
 #include "periodic_callback.h"
@@ -20,7 +22,7 @@ void registerPeriodicCallback(struct periodic_callback c) {
         return;
     }
 
-    __asm__ __volatile__("cli");
+    no_ints();
 
     if (!periodicCallbacks.pcs) {
         cap = INIT_CAP;
@@ -37,13 +39,13 @@ void registerPeriodicCallback(struct periodic_callback c) {
 
     periodicCallbacks.pcs[periodicCallbacks.len++] = cp;
 
-    __asm__ __volatile__("sti");
+    ints_okay();
 }
 
 void unregisterPeriodicCallback(struct periodic_callback c) {
     if (!periodicCallbacks.pcs) return;
 
-    __asm__ __volatile__("cli");
+    no_ints();
 
     int found = 0;
     for (uint64_t i = 0; i < periodicCallbacks.len - 1; i++) {
@@ -58,5 +60,5 @@ void unregisterPeriodicCallback(struct periodic_callback c) {
 
     periodicCallbacks.len--;
 
-    __asm__ __volatile__("sti");
+    ints_okay();
 }

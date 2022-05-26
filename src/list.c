@@ -1,3 +1,4 @@
+#include "interrupt.h"
 #include "list.h"
 #include "malloc.h"
 
@@ -38,7 +39,7 @@ void addToList(struct list* l, void* item) {
 void* atomicPop(struct list* l) {
     void* item = (void *) 0;
 
-    __asm__ __volatile__("cli");
+    no_ints();
 
     if (!l || !l->head) goto ret;
 
@@ -49,7 +50,7 @@ void* atomicPop(struct list* l) {
     free(old_head);
 
  ret:
-    __asm__ __volatile__("sti");
+    ints_okay();
     return item;
 }
 

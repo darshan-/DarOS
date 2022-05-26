@@ -100,6 +100,8 @@ struct interrupt_frame {
 //     fmt = fmt;
 // }
 
+uint64_t int_blocks = 0;
+
 uint64_t read_tsc() {
     uint64_t tsc;
 
@@ -138,7 +140,7 @@ static struct queue kbd_buf = {};
 #define INC_Q_PT(q, p) (q->p)++; if ((q->p) == q->start + q->cap) (q->p) = q->start;
 
 static inline void* pop(struct queue* q) {
-    __asm__ __volatile__("cli");
+    __asm__ __volatile__("cli"); // I think I want to special case this and not use no_ints() and ints_okay()?
 
     if (q->head == q->tail) return 0;
 
@@ -321,21 +323,11 @@ static void __attribute__((interrupt)) double_fault_handler(struct interrupt_fra
     dumpFrame(frame);
 }
 
-static uint64_t time_in_kbd = 0;
-static uint64_t times_in_kbd = 0;
-
 static void __attribute__((interrupt)) irq1_kbd(struct interrupt_frame *) {
-    times_in_kbd++;
-    uint64_t start = read_tsc();
-
     uint8_t code = inb(0x60);
     outb(PIC_PRIMARY_CMD, PIC_ACK);
     push(&kbd_buf, (void*) (uint64_t) code);
     push(&wq, process_keys);
-    //keyScanned(code);
-
-    time_in_kbd += (read_tsc() - start) / 3692;
-    com1_printf("avg kbd irq takes: %u microseconds\n", time_in_kbd / times_in_kbd);
 }
 
 static void __attribute__((interrupt)) irq8_rtc(struct interrupt_frame *) {

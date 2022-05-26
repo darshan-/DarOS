@@ -1,10 +1,12 @@
 #include <stdarg.h>
 #include <stdint.h>
 #include "console.h"
+#include "interrupt.h"
 #include "io.h"
 #include "malloc.h"
 #include "periodic_callback.h"
 #include "rtc.h"
+#include "serial.h"
 #include "strings.h"
 
 /*
@@ -44,8 +46,10 @@ static inline void updateCursorPosition() {
 static void writeStatusBar(char* s, uint8_t loc) {
     if (loc >= 80) return;
 
+    no_ints();
     for (uint8_t l = loc; *s && l < 160; s++, l++)
         STATUS_LINE[l*2] = *s;
+    ints_okay();
 }
 
 #define MAX_MEMLEN 24
@@ -106,13 +110,16 @@ static void setStatusBar() {
 }
 
 void clearScreen() {
-    __asm__ __volatile__("cli");
+    no_ints();
+
     for (uint64_t* v = (uint64_t*) VRAM; v < (uint64_t*) STATUS_LINE; v++)
         *v = 0x0700070007000700;
+
     cur = VRAM;
     updateCursorPosition();
     setStatusBar();
-    __asm__ __volatile__("sti");
+
+    ints_okay();
 }
 
 static inline void advanceLine() {
@@ -154,14 +161,14 @@ static inline void printChar(uint8_t c) {
 }
 
 void printColor(char* s, uint8_t c) {
-    __asm__ __volatile__("cli");
+    no_ints();
 
     while (*s != 0)
         printCharColor(*s++, c);
 
     updateCursorPosition();
 
-    __asm__ __volatile__("sti");
+    ints_okay();
 }
 
 void print(char* s) {
@@ -169,12 +176,12 @@ void print(char* s) {
 }
 
 void printc(char c) {
-    __asm__ __volatile__("cli");
+    no_ints();
 
     printCharColor(c, 0x07);
     updateCursorPosition();
 
-    //__asm__ __volatile__("sti");
+    ints_okay();
 }
 
 void printf(char* fmt, ...) {
