@@ -31,7 +31,13 @@ void __attribute__((section(".kernel_entry"))) kernel_entry() {
     // print(demo);
 
     struct cpuid_ret r = cpuid(0);
-    printf("cpuid with eax 0x00000000 returns %p08h in eax\n", r.eax);
+    char manufId[13];
+    manufId[12] = 0;
+    uint32_t* p = (uint32_t*) manufId;
+    *p++ = r.ebx;
+    *p++ = r.edx;
+    *p = r.ecx;
+    printf("cpuid with eax 0x00000000 returns %p08h in eax and man. ID: %s\n", r.eax, manufId);
 
     r = cpuid(0x80000000ul);
     printf("cpuid with eax 0x80000000 returns %p08h in eax\n", r.eax);
