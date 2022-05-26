@@ -1,5 +1,6 @@
 #include <stdint.h>
 
+#include "acpi.h"
 #include "serial.h"
 
 static uint8_t* rsdp = 0;
@@ -7,6 +8,8 @@ static uint8_t* rsdt = 0;
 static uint8_t* hpet = 0;
 static uint8_t* apic = 0;
 static uint8_t* facp = 0;
+
+uint8_t* hpet_block = 0;
 
 static uint8_t* find_rsdp() {
     uint64_t rsdp_sig = *((uint64_t*) "RSD PTR ");
@@ -19,6 +22,10 @@ static uint8_t* find_rsdp() {
 
     return 0;
 }
+
+// uint8_t* get_hpet_block() {
+//     return hpet_block;
+// }
 
 void read_rsdp() {
     if (!(rsdp = find_rsdp())) {
@@ -45,7 +52,7 @@ void read_rsdp() {
 
     uint32_t rsdt_len = *(uint32_t*)(rsdt + 4);
     sum = 0;
-    for (int i = 0; i < rsdt_len; i++)
+    for (uint32_t i = 0; i < rsdt_len; i++)
         sum += rsdt[i];
 
     if (sum != 0) {
@@ -73,16 +80,18 @@ void read_rsdp() {
             facp = table;
     }
 
-    printf("hpet: %h, apic: %h, facp: %h\n", hpet, apic, facp);
+    // printf("hpet: %h, apic: %h, facp: %h\n", hpet, apic, facp);
 
-    printf("hpet is at: %h\n", hpet);
+    // printf("hpet is at: %h\n", hpet);
 
-    uint32_t hpet_len = *(uint32_t*)(hpet + 4);
-    printf("hpet has length: %u\n", hpet_len);
+    // uint32_t hpet_len = *(uint32_t*)(hpet + 4);
+    // printf("hpet has length: %u\n", hpet_len);
 
-    uint32_t hpet_addr32 = *(uint32_t*)(hpet + 40);
-    printf("hpet_addr32: %p08h\n", hpet_addr32);
+    // uint32_t hpet_addr32 = *(uint32_t*)(hpet + 40);
+    // printf("hpet_addr32: %p08h\n", hpet_addr32);
 
-    uint64_t hpet_addr64 = *(uint64_t*)(hpet + 44);
-    printf("hpet_addr64: %h\n", hpet_addr64);
+    // uint64_t hpet_addr64 = *(uint64_t*)(hpet + 44);
+    // printf("hpet_addr64: %h\n", hpet_addr64);
+
+    hpet_block = (uint8_t*)*(uint64_t*)(hpet + 44);
 }

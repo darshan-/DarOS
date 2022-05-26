@@ -1,6 +1,9 @@
 #include <stdint.h>
+
+#include "acpi.h"
 #include "console.h"
 #include "cpuid.h"
+#include "hpet.h"
 #include "interrupt.h"
 #include "keyboard.h"
 #include "malloc.h"
@@ -33,9 +36,10 @@ void __attribute__((section(".kernel_entry"))) kernel_entry() {
     updateMemUse();
 
 
-    //printf("find_rsdp() returns: 0x%h\n", find_rsdp());
     read_rsdp();
-    //unmask_pics();
+    //init_hpet(get_hpet_block());
+    init_hpet();
+
     com1_print("going to waitloop\n");
     waitloop();
 }
