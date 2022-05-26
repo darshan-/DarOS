@@ -97,7 +97,7 @@ void updateClock() {
 
 static void setStatusBar() {
     for (uint64_t* v = (uint64_t*) STATUS_LINE; v < (uint64_t*) VRAM_END; v++)
-        *v = 0x3f003f003f003f00;
+        *v = 0x5f005f005f005f00;
 
     writeStatusBar("PurpOS", 37);
     // STATUS_LINE[35*2] = (char*) 3;
