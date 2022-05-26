@@ -9,7 +9,7 @@ static uint8_t* hpet = 0;
 static uint8_t* apic = 0;
 static uint8_t* facp = 0;
 
-uint8_t* hpet_block = 0;
+uint64_t* hpet_block = 0;
 
 static uint8_t* find_rsdp() {
     uint64_t rsdp_sig = *((uint64_t*) "RSD PTR ");
@@ -93,5 +93,5 @@ void read_rsdp() {
     // uint64_t hpet_addr64 = *(uint64_t*)(hpet + 44);
     // printf("hpet_addr64: %h\n", hpet_addr64);
 
-    hpet_block = (uint8_t*)*(uint64_t*)(hpet + 44);
+    hpet_block = *(uint64_t**)(hpet + 44);
 }
