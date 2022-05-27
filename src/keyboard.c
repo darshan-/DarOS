@@ -24,6 +24,11 @@ static inline void gotInput(char c) {
     }));
 }
 
+// TODO:  I can keep a history of 4 items, and if the past 4 were first
+//   a control down a and an alt down (in either order) and the next two
+//   were a control up and an alt up (in either order) and this is '1',
+//   then do nothing.  (QEMU switching back to VGA.)
+
 void keyScanned(uint8_t c) {
     uint8_t hob = c & 0x80;  // Break / release
     switch (c) {

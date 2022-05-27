@@ -4,6 +4,10 @@
 #include "hpet.h"
 #include "serial.h"
 
+
+#include "console.h"
+#define com1_printf printf
+
 /*
   000-007h RO General Capabilities and ID Register
   010-017h RW General Configuration Register
@@ -26,7 +30,28 @@ void init_hpet() {
         return;
     }
 
-    //uint64_t gcir = *hpet_block;
     uint64_t gcir = hpet_block[0];
     com1_printf("General Capabilities and ID Register: 0x%p016h\n", gcir);
+
+    //uint32_t counter_clk_period = (uint32_t) (gcir>>32);
+    uint32_t counter_clk_period = gcir >> 32;
+    com1_printf("HPET counter increments every %u femptoseconds.\n", counter_clk_period);
+
+    uint8_t leg_rt_cap = !!(gcir & (1<<15));
+    com1_printf("leg_rt_cap: %u\n", leg_rt_cap);
+
+    uint8_t num_tim_cap = (gcir & (0b1111<<8)) >> 8; // Index of last timer, so e.g. 2 means there are 3 timers.
+    com1_printf("num_tim_cap: %u\n", num_tim_cap);
+
+
+    uint64_t gcr = hpet_block[2];
+    com1_printf("General Configuration Register: 0x%p016h\n", gcr);
+
+
+    uint64_t gisr = hpet_block[4];
+    com1_printf("General Interrupt Status Register: 0x%p016h\n", gisr);
+
+
+    uint64_t mcvr = hpet_block[30];
+    com1_printf("Main Counter Value Register: 0x%p016h\n", mcvr);
 }
