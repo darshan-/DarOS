@@ -93,5 +93,22 @@ void read_rsdp() {
     // uint64_t hpet_addr64 = *(uint64_t*)(hpet + 44);
     // printf("hpet_addr64: %h\n", hpet_addr64);
 
+    // uint32_t hpet_addr32 = *(uint32_t*)(hpet + 40);
+    // printf("hpet_addr32: %p08h\n", hpet_addr32);
+    // hpet_addr32 = *(uint32_t*)(hpet + 44);
+    // printf("hpet_addr32: %p08h\n", hpet_addr32);
+    // hpet_addr32 = *(uint32_t*)(hpet + 48);
+    // printf("hpet_addr32: %p08h\n", hpet_addr32);
+
+    for (int i = 0; i < 15; i++) {
+        uint32_t hpet_addr32 = *(uint32_t*)(hpet + (4*i));
+        printf("%p02u: %p08h\n", i, hpet_addr32);
+    }
+
     hpet_block = *(uint64_t**)(hpet + 44);
+    // printf("hpet_block: %p016h\n", hpet_block);
+    // hpet_block = (uint64_t*)(((uint64_t) hpet_block) << 32);
+    // printf("hpet_block: %p016h\n", hpet_block);
+
+    //hpet_block = (uint64_t*)(uint64_t)(*((uint32_t*)(hpet + 44)));
 }

@@ -22,4 +22,7 @@
 
 void init_hpet() {
     com1_printf("Using hpet_block: %h\n", hpet_block);
+    //uint64_t gcir = *hpet_block;
+    uint64_t gcir = hpet_block[0];
+    com1_printf("General Capabilities and ID Register: 0x%p016h\n", gcir);
 }

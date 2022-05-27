@@ -1,4 +1,4 @@
-        SZ_2MB equ 0x200000
+        SZ_1GB equ 0x40000000
         SZ_QW equ 8
 
         ; Segment Descriptor constants
@@ -112,17 +112,13 @@ lba_success:
 	mov eax, page_table_l3 | PT_PRESENT | PT_WRITABLE
 	mov [page_table_l4], eax
 
-        ; l3 page has just the one entry for l2
-	mov eax, page_table_l2 | PT_PRESENT | PT_WRITABLE
-	mov [page_table_l3], eax
-
-        ; l2 identity maps first 1 GB of memory with huge pages (512*2MB)
+        ; l3 identity maps 512 1GB huge pages
         mov eax, PT_PRESENT | PT_WRITABLE | PT_HUGE
-        mov ebx, page_table_l2
+        mov ebx, page_table_l3
 	mov ecx, 512
 l2_loop:
         mov [ebx], eax
-	add eax, SZ_2MB       ; Huge page bit makes for 2MB pages, so each page is this far apart
+	add eax, SZ_1GB       ; Huge page bit on l3 makes for 1GB pages, so each page is this far apart
         add ebx, SZ_QW
         loop l2_loop
 
