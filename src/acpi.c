@@ -23,11 +23,7 @@ static uint8_t* find_rsdp() {
     return 0;
 }
 
-// uint8_t* get_hpet_block() {
-//     return hpet_block;
-// }
-
-void read_rsdp() {
+void parse_acpi_tables() {
     if (!(rsdp = find_rsdp())) {
         com1_printf("RSDP signature not found!\n", rsdp);
         return;
@@ -80,35 +76,5 @@ void read_rsdp() {
             facp = table;
     }
 
-    // printf("hpet: %h, apic: %h, facp: %h\n", hpet, apic, facp);
-
-    // printf("hpet is at: %h\n", hpet);
-
-    // uint32_t hpet_len = *(uint32_t*)(hpet + 4);
-    // printf("hpet has length: %u\n", hpet_len);
-
-    // uint32_t hpet_addr32 = *(uint32_t*)(hpet + 40);
-    // printf("hpet_addr32: %p08h\n", hpet_addr32);
-
-    // uint64_t hpet_addr64 = *(uint64_t*)(hpet + 44);
-    // printf("hpet_addr64: %h\n", hpet_addr64);
-
-    // uint32_t hpet_addr32 = *(uint32_t*)(hpet + 40);
-    // printf("hpet_addr32: %p08h\n", hpet_addr32);
-    // hpet_addr32 = *(uint32_t*)(hpet + 44);
-    // printf("hpet_addr32: %p08h\n", hpet_addr32);
-    // hpet_addr32 = *(uint32_t*)(hpet + 48);
-    // printf("hpet_addr32: %p08h\n", hpet_addr32);
-
-    for (int i = 0; i < 15; i++) {
-        uint32_t hpet_addr32 = *(uint32_t*)(hpet + (4*i));
-        printf("%p02u: %p08h\n", i, hpet_addr32);
-    }
-
     hpet_block = *(uint64_t**)(hpet + 44);
-    // printf("hpet_block: %p016h\n", hpet_block);
-    // hpet_block = (uint64_t*)(((uint64_t) hpet_block) << 32);
-    // printf("hpet_block: %p016h\n", hpet_block);
-
-    //hpet_block = (uint64_t*)(uint64_t)(*((uint32_t*)(hpet + 44)));
 }
