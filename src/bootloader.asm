@@ -48,7 +48,7 @@
         page_table_l3 equ 0x2000
         page_table_l2 equ 0x3000
         ;stack_bottom equ 0x4000
-        ;stack_top equ 0x7bff
+        stack_top equ 0x7bff
         idt equ 0               ; 0-0x1000 available in long mode
         idt32 equ 0x3000        ; Since not using page table l2 right now
 
@@ -292,64 +292,32 @@ sect2code:
 
         mov esp, stack_top
 
-        call check_long_mode
-        call set_up_page_tables
-        call enable_paging
-
-        lgdt [gdt64.pointer]
-        jmp gdt64.code:start64
-
-        ; print `OK` to screen
-        mov dword [0xb8000], 0x2f4b2f4f
-        hlt
-
-check_long_mode:
-        ; test if extended processor info in available
-        mov eax, 0x80000000    ; implicit argument for cpuid
-        cpuid                  ; get highest supported argument
-        cmp eax, 0x80000001    ; it needs to be at least 0x80000001
-        jb .no_long_mode       ; if it's less, the CPU is too old for long mode
-
-        ; use extended info to test if long mode is available
-        mov eax, 0x80000001    ; argument for extended processor info
-        cpuid                  ; returns various feature bits in ecx and edx
-        test edx, 1 << 29      ; test if the LM-bit is set in the D-register
-        jz .no_long_mode       ; If it's not set, there is no long mode
-        ret
-.no_long_mode:
-        mov al, "2"
-        jmp error
-
-set_up_page_tables:
         ; map first P4 entry to P3 table
-        mov eax, p3_table
+        mov eax, page_table_l3
         or eax, 0b11 ; present + writable
-        mov [p4_table], eax
+        mov [page_table_l4], eax
 
         ; map first P3 entry to P2 table
-        mov eax, p2_table
+        mov eax, page_table_l2
         or eax, 0b11 ; present + writable
-        mov [p3_table], eax
+        mov [page_table_l3], eax
 
         ; map each P2 entry to a huge 2MiB page
         mov ecx, 0         ; counter variable
 
-.map_p2_table:
+.map_page_table_l2:
         ; map ecx-th P2 entry to a huge page that starts at address 2MiB*ecx
         mov eax, 0x200000  ; 2MiB
         mul ecx            ; start address of ecx-th page
         or eax, 0b10000011 ; present + writable + huge
-        mov [p2_table + ecx * 8], eax ; map ecx-th entry
+        mov [page_table_l2 + ecx * 8], eax ; map ecx-th entry
 
         inc ecx            ; increase counter
         cmp ecx, 512       ; if counter == 512, the whole P2 table is mapped
-        jne .map_p2_table  ; else map the next entry
+        jne .map_page_table_l2  ; else map the next entry
 
-        ret
-
-enable_paging:
         ; load P4 to cr3 register (cpu uses this to access the P4 table)
-        mov eax, p4_table
+        mov eax, page_table_l4
         mov cr3, eax
 
         ; enable PAE-flag in cr4 (Physical Address Extension)
@@ -368,7 +336,9 @@ enable_paging:
         or eax, 1 << 31
         mov cr0, eax
 
-        ret
+        lgdt [gdt64.pointer]
+        jmp gdt64.code:start64
+
 
         ; Prints `ERR: ` and the given error code to screen and hangs.
         ; parameter: error code (in ascii) in al
@@ -379,11 +349,6 @@ error:
         mov byte  [0xb800a], al
         hlt
 
-        p4_table equ 0x1000
-        p3_table equ 0x2000
-        p2_table equ 0x3000
-        stack_bottom equ 0x4000
-        stack_top equ 0x5000
 
 
 

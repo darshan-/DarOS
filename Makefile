@@ -39,7 +39,8 @@ run: out/boot.img
 
 .PHONY: run-bochs
 run-bochs: out/bochs.img
-	bochs -qf bochs.cfg
+	rm -f out/bochs.img.lock
+	bochs -qf bochs.cfg -rc bochs.command
 
 .PHONY: clean
 clean:
