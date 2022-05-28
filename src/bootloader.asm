@@ -37,9 +37,9 @@
         ; Flags nibble is bits 52-55, so bit shift from 52 to 55 for bits 0-3 of access byte
         SD_GRAN4K equ 1<<55
         SD_GRANBYTE equ 0
-        SD_MODE16 equ 0
-        SD_MODE32 equ 1<<54
-        SD_MODE64 equ 1<<53
+        SD_DFLT_SZ_16 equ 0
+        SD_DFLT_SZ_32 equ 1<<54
+        SD_LONGMODECODE equ 1<<53
 
         ; 0x500-0x7bff available and a good place for stack and page tables
         ; Page tables need to be 0x1000 aligned.  Wasting 0x500 from 0x500 to 0x1000 is better
@@ -188,9 +188,9 @@ start32:
 gdt:
 	dq 0
 .code64:
-        dq 0xf<<48|0xffff| SD_PRESENT | SD_NONTSS | SD_CODESEG | SD_READABLE | SD_GRAN4K | SD_MODE64
+        dq 0xf<<48|0xffff| SD_PRESENT | SD_NONTSS | SD_CODESEG | SD_READABLE | SD_GRAN4K | SD_LONGMODECODE
 .data64:
-        dq 0xf<<48|0xffff|SD_PRESENT | SD_NONTSS | SD_DATASEG | SD_WRITABLE | SD_GRAN4K | SD_MODE64
+        dq 0xf<<48|0xffff| SD_PRESENT | SD_NONTSS | SD_DATASEG | SD_WRITABLE | SD_GRAN4K
 .tss:
         dd 0x00000068
         dd 0x00CF8900
@@ -309,6 +309,17 @@ loop_idt232:
 
         lidt [idtr32]
 
+        mov eax, cr0
+        and eax, ~CR0_PAGING
+        mov cr0, eax
+
+        mov edi, 0x1000    ; Set the destination index to 0x1000.
+        mov cr3, edi       ; Set control register 3 to the destination index.
+        xor eax, eax       ; Nullify the A-register.
+        mov ecx, 4096      ; Set the C-register to 4096.
+        rep stosd          ; Clear the memory.
+        mov edi, cr3       ; Set the destination index to control register 3.
+
 	; Enable PAE
 	mov eax, cr4
 	or eax, CR4_PAE
@@ -341,7 +352,8 @@ l2_loop:
 	; Enable paging and enter protected mode
 	mov eax, cr0
 	;or eax, CR0_PAGING | CR0_PROTECTION
-        bts eax, 31
+	or eax, CR0_PAGING
+        ;bts eax, 31
 	mov cr0, eax
 
         jmp CODE_SEG64:start64
@@ -385,6 +397,11 @@ start64:
 
         mov ax, DATA_SEG64
         mov ds, ax
+        mov ss, ax
+        mov ds, ax
+        mov es, ax
+        mov fs, ax
+        mov gs, ax
 
         ; mov ax, TSS_SEG
         ; ltr ax
