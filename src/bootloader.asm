@@ -50,7 +50,6 @@
         ;stack_bottom equ 0x4000
         stack_top equ 0x7bff
         idt equ 0               ; 0-0x1000 available in long mode
-        idt32 equ 0x3000        ; Since not using page table l2 right now
 
         ; Page Table constants
         PT_PRESENT equ 1
@@ -154,24 +153,6 @@ lba_success:
         jmp CODE_SEG32:start32
 
 bits 32
-trap_gate32:
-        mov eax, trap_gate_s
-        mov ebx, [trap_gate_s+9]
-        inc ebx
-        mov [eax+9], ebx
-        mov eax, 0xb8000+960
-        mov ebx, trap_gate_s
-        mov ch, 0x07
-        call print
-        iret
-
-interrupt_gate32:
-        mov eax, 0xb8000+1120
-        mov ebx, interrupt_gate_s
-        mov ch, 0x07
-        call print
-        iret
-
 
 start32:
 
@@ -246,10 +227,6 @@ gdtr:
 idtr:
         dw 4095                 ; Size of IDT minus 1
         dq idt                  ; Address
-
-idtr32:
-        dw 2047                 ; Size of IDT minus 1
-        dd idt32                ; Address
 
 dap:
         db 0x10                 ; Size of DAP (Disk Address Packet)
@@ -374,30 +351,6 @@ error:
         ; ** On the other hand, https://forum.osdev.org/viewtopic.php?t=11093 has plenty of people saying it's
         ;   fine on real-world hardware, including AMD processors, despite the manual.  So let's leave it.
 
-        mov ebx, idt32
-        mov ecx, 31
-loop_idt32:
-        mov eax, trap_gate32
-        mov [ebx], ax
-        shr eax, 16
-        mov [ebx+6], ax
-        mov word [ebx+2], CODE_SEG32
-        mov word [ebx+4], 1<<15 | 0b1111 << 8
-        add ebx, 8
-        loop loop_idt32
-
-        mov ecx, 225
-loop_idt232:
-        mov eax, interrupt_gate32
-        mov [ebx], ax
-        shr eax, 16
-        mov [ebx+6], ax
-        mov word [ebx+2], CODE_SEG32
-        mov word [ebx+4], 1<<15 | 0b1110 << 8
-        add ebx, 8
-        loop loop_idt232
-
-        lidt [idtr32]
 
         mov eax, cr0
         and eax, ~CR0_PAGING
