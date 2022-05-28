@@ -518,10 +518,10 @@ interrupt_gate:
         iretq
 
 start64:
-        hlt
         mov rsp, stack_top
 
-        mov ax, DATA_SEG64
+        ;mov ax, [gdt64.code]
+        xor ax, ax
         mov ds, ax
         mov ss, ax
         mov ds, ax
