@@ -48,7 +48,7 @@
         page_table_l3 equ 0x2000
         page_table_l2 equ 0x3000
         ;stack_bottom equ 0x4000
-        stack_top equ 0x7bff
+        ;stack_top equ 0x7bff
         idt equ 0               ; 0-0x1000 available in long mode
         idt32 equ 0x3000        ; Since not using page table l2 right now
 
@@ -177,7 +177,7 @@ start32:
 
         mov ax, DATA_SEG32
         mov ds, ax
-        mov ax, STACK_SEG32
+        ;mov ax, STACK_SEG32
         mov ss, ax
         mov esp, stack_top
 
@@ -278,6 +278,119 @@ trap_gate_s: db "Trap gate", 0
 interrupt_gate_s: db "Interrupt gate", 0
 
 sect2code:
+
+
+
+        mov esp, stack_top
+
+        call check_long_mode
+        call set_up_page_tables
+        call enable_paging
+
+        ; print `OK` to screen
+        mov dword [0xb8000], 0x2f4b2f4f
+        hlt
+
+check_long_mode:
+        ; test if extended processor info in available
+        mov eax, 0x80000000    ; implicit argument for cpuid
+        cpuid                  ; get highest supported argument
+        cmp eax, 0x80000001    ; it needs to be at least 0x80000001
+        jb .no_long_mode       ; if it's less, the CPU is too old for long mode
+
+        ; use extended info to test if long mode is available
+        mov eax, 0x80000001    ; argument for extended processor info
+        cpuid                  ; returns various feature bits in ecx and edx
+        test edx, 1 << 29      ; test if the LM-bit is set in the D-register
+        jz .no_long_mode       ; If it's not set, there is no long mode
+        ret
+.no_long_mode:
+        mov al, "2"
+        jmp error
+
+set_up_page_tables:
+        ; map first P4 entry to P3 table
+        mov eax, p3_table
+        or eax, 0b11 ; present + writable
+        mov [p4_table], eax
+
+        ; map first P3 entry to P2 table
+        mov eax, p2_table
+        or eax, 0b11 ; present + writable
+        mov [p3_table], eax
+
+        ; map each P2 entry to a huge 2MiB page
+        mov ecx, 0         ; counter variable
+
+.map_p2_table:
+        ; map ecx-th P2 entry to a huge page that starts at address 2MiB*ecx
+        mov eax, 0x200000  ; 2MiB
+        mul ecx            ; start address of ecx-th page
+        or eax, 0b10000011 ; present + writable + huge
+        mov [p2_table + ecx * 8], eax ; map ecx-th entry
+
+        inc ecx            ; increase counter
+        cmp ecx, 512       ; if counter == 512, the whole P2 table is mapped
+        jne .map_p2_table  ; else map the next entry
+
+        ret
+
+enable_paging:
+        ; load P4 to cr3 register (cpu uses this to access the P4 table)
+        mov eax, p4_table
+        mov cr3, eax
+
+        ; enable PAE-flag in cr4 (Physical Address Extension)
+        mov eax, cr4
+        or eax, 1 << 5
+        mov cr4, eax
+
+        ; set the long mode bit in the EFER MSR (model specific register)
+        mov ecx, 0xC0000080
+        rdmsr
+        or eax, 1 << 8
+        wrmsr
+
+        ; enable paging in the cr0 register
+        mov eax, cr0
+        or eax, 1 << 31
+        mov cr0, eax
+
+        ret
+
+        ; Prints `ERR: ` and the given error code to screen and hangs.
+        ; parameter: error code (in ascii) in al
+error:
+        mov dword [0xb8000], 0x4f524f45
+        mov dword [0xb8004], 0x4f3a4f52
+        mov dword [0xb8008], 0x4f204f20
+        mov byte  [0xb800a], al
+        hlt
+
+        p4_table equ 0x1000
+        p3_table equ 0x2000
+        p2_table equ 0x3000
+        stack_bottom equ 0x4000
+        stack_top equ 0x5000
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
         
         ; AMD manual says we have to enter protected mode before entering long mode, so it's possible that this
         ;   works in QEMU but wouldn't on real hardware...  Maybe do it the "right" way?
