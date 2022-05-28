@@ -1,3 +1,4 @@
+        SZ_2MB equ 0x200000
         SZ_1GB equ 0x40000000
         SZ_QW equ 8
 
@@ -272,16 +273,27 @@ sect2code:
 	mov eax, page_table_l3 | PT_PRESENT | PT_WRITABLE
 	mov [page_table_l4], eax
 
-        ; l3 identity maps 512 1GB huge pages
-        mov eax, PT_PRESENT | PT_WRITABLE | PT_HUGE
+        ; l3 page has 512 l2 tables
+        mov eax, page_table_l2 | PT_PRESENT | PT_WRITABLE
         mov ebx, page_table_l3
+	mov ecx, 512
+l3_loop:
+        mov [ebx], eax
+	add eax, SZ_2MB
+        add ebx, SZ_QW
+        loop l3_loop
+
+        ; Each l2 table identity maps 1 GB of memory with huge pages (512*2MB)
+        ; We'll set up just one now, and do the rest from C later
+
+        mov eax, PT_PRESENT | PT_WRITABLE | PT_HUGE
+        mov ebx, page_table_l2
 	mov ecx, 512
 l2_loop:
         mov [ebx], eax
-	add eax, SZ_1GB       ; Huge page bit on l3 makes for 1GB pages, so each page is this far apart
+	add eax, SZ_2MB       ; Huge page bit makes for 2MB pages, so each page is this far apart
         add ebx, SZ_QW
         loop l2_loop
-
 
 ;         ; map first P3 entry to P2 table
 ;         mov eax, page_table_l2
