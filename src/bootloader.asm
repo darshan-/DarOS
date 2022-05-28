@@ -158,7 +158,6 @@ start32:
 
         mov ax, DATA_SEG32
         mov ds, ax
-        ;mov ax, STACK_SEG32
         mov ss, ax
         mov esp, stack_top
 
@@ -269,38 +268,55 @@ sect2code:
 
         mov esp, stack_top
 
-        ; map first P4 entry to P3 table
-        mov eax, page_table_l3
-        or eax, 0b11 ; present + writable
-        mov [page_table_l4], eax
+        ; l4 page has just the one entry for l3
+	mov eax, page_table_l3 | PT_PRESENT | PT_WRITABLE
+	mov [page_table_l4], eax
 
-        ; map first P3 entry to P2 table
-        mov eax, page_table_l2
-        or eax, 0b11 ; present + writable
-        mov [page_table_l3], eax
+        ; l3 identity maps 512 1GB huge pages
+        mov eax, PT_PRESENT | PT_WRITABLE | PT_HUGE
+        mov ebx, page_table_l3
+	mov ecx, 512
+l2_loop:
+        mov [ebx], eax
+	add eax, SZ_1GB       ; Huge page bit on l3 makes for 1GB pages, so each page is this far apart
+        add ebx, SZ_QW
+        loop l2_loop
 
-        ; map each P2 entry to a huge 2MiB page
-        mov ecx, 0         ; counter variable
 
-.map_page_table_l2:
-        ; map ecx-th P2 entry to a huge page that starts at address 2MiB*ecx
-        mov eax, 0x200000  ; 2MiB
-        mul ecx            ; start address of ecx-th page
-        or eax, 0b10000011 ; present + writable + huge
-        mov [page_table_l2 + ecx * 8], eax ; map ecx-th entry
+;         ; map first P3 entry to P2 table
+;         mov eax, page_table_l2
+;         or eax, 0b11 ; present + writable
+;         mov [page_table_l3], eax
 
-        inc ecx            ; increase counter
-        cmp ecx, 512       ; if counter == 512, the whole P2 table is mapped
-        jne .map_page_table_l2  ; else map the next entry
+;         ; map each P2 entry to a huge 2MiB page
+;         mov ecx, 0         ; counter variable
 
-        ; load P4 to cr3 register (cpu uses this to access the P4 table)
-        mov eax, page_table_l4
-        mov cr3, eax
+; .map_page_table_l2:
+;         ; map ecx-th P2 entry to a huge page that starts at address 2MiB*ecx
+;         mov eax, 0x200000  ; 2MiB
+;         mul ecx            ; start address of ecx-th page
+;         or eax, 0b10000011 ; present + writable + huge
+;         mov [page_table_l2 + ecx * 8], eax ; map ecx-th entry
 
-        ; enable PAE-flag in cr4 (Physical Address Extension)
-        mov eax, cr4
-        or eax, 1 << 5
-        mov cr4, eax
+;         inc ecx            ; increase counter
+;         cmp ecx, 512       ; if counter == 512, the whole P2 table is mapped
+;         jne .map_page_table_l2  ; else map the next entry
+
+        ; Now we're ready to load and use tables
+	mov eax, page_table_l4
+	mov cr3, eax
+
+        ; ; load P4 to cr3 register (cpu uses this to access the P4 table)
+        ; mov eax, page_table_l4
+        ; mov cr3, eax
+
+
+
+
+	; Enable PAE
+	mov eax, cr4
+	or eax, CR4_PAE
+	mov cr4, eax
 
         ; set the long mode bit in the EFER MSR (model specific register)
         mov ecx, 0xC0000080
@@ -317,35 +333,7 @@ sect2code:
         jmp gdt64.code:start64
 
 
-        ; Prints `ERR: ` and the given error code to screen and hangs.
-        ; parameter: error code (in ascii) in al
-error:
-        mov dword [0xb8000], 0x4f524f45
-        mov dword [0xb8004], 0x4f3a4f52
-        mov dword [0xb8008], 0x4f204f20
-        mov byte  [0xb800a], al
-        hlt
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-        
         ; AMD manual says we have to enter protected mode before entering long mode, so it's possible that this
         ;   works in QEMU but wouldn't on real hardware...  Maybe do it the "right" way?
         ; ** On the other hand, https://forum.osdev.org/viewtopic.php?t=11093 has plenty of people saying it's
@@ -363,28 +351,6 @@ error:
         rep stosd          ; Clear the memory.
         mov edi, cr3       ; Set the destination index to control register 3.
 
-	; Enable PAE
-	mov eax, cr4
-	or eax, CR4_PAE
-	mov cr4, eax
-
-        ; l4 page has just the one entry for l3
-	mov eax, page_table_l3 | PT_PRESENT | PT_WRITABLE
-	mov [page_table_l4], eax
-
-        ; l3 identity maps 512 1GB huge pages
-        mov eax, PT_PRESENT | PT_WRITABLE | PT_HUGE
-        mov ebx, page_table_l3
-	mov ecx, 512
-l2_loop:
-        mov [ebx], eax
-	add eax, SZ_1GB       ; Huge page bit on l3 makes for 1GB pages, so each page is this far apart
-        add ebx, SZ_QW
-        loop l2_loop
-
-        ; Now we're ready to load and use tables
-	mov eax, page_table_l4
-	mov cr3, eax
 
 	; Enable long mode
 	mov ecx, MSR_IA32_EFER
