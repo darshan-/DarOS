@@ -26,6 +26,9 @@ build/%.o: src/%.c | build
 out/boot.img: $(c_objects) src/linker.ld build/bootloader.o | out
 	ld -o out/boot.img $(LD_OPTS) build/bootloader.o $(c_objects)
 
+out/bochs.img: out/boot.img
+	cp out/boot.img out/bochs.img
+	truncate -s 499712 out/bochs.img
 
 # -display gtk,zoom-to-fit=on
 # -full-screen
@@ -33,6 +36,10 @@ out/boot.img: $(c_objects) src/linker.ld build/bootloader.o | out
 .PHONY: run
 run: out/boot.img
 	qemu-system-x86_64 -rtc base=localtime -enable-kvm -drive format=raw,file=out/boot.img
+
+.PHONY: run-bochs
+run-bochs: out/bochs.img
+	bochs -qf bochs.cfg
 
 .PHONY: clean
 clean:
