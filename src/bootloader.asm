@@ -184,6 +184,15 @@ start32:
         jmp sect2code
 
 
+gdt64:
+        dq 0 ; zero entry
+.code: equ $ - gdt64 ; new
+        dq (1<<43) | (1<<44) | (1<<47) | (1<<53) ; code segment
+.pointer:
+        dw $ - gdt64 - 1
+        dq gdt64
+        
+
 ;        CODE_SEG equ 0+(8*1)    ; Code segment is 1st (and only, at least for now) segment
 gdt:
 	dq 0
@@ -286,6 +295,9 @@ sect2code:
         call check_long_mode
         call set_up_page_tables
         call enable_paging
+
+        lgdt [gdt64.pointer]
+        jmp gdt64.code:start64
 
         ; print `OK` to screen
         mov dword [0xb8000], 0x2f4b2f4f
@@ -506,6 +518,7 @@ interrupt_gate:
         iretq
 
 start64:
+        hlt
         mov rsp, stack_top
 
         mov ax, DATA_SEG64
