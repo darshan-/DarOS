@@ -59,7 +59,7 @@
 #define PIC_SECONDARY_CMD 0xa0
 #define PIC_SECONDARY_DATA 0xa1
 
-#define TICK_HZ 2000
+#define TICK_HZ 19
 
 uint64_t int_tick_hz = TICK_HZ;  // For periodic_callbacks.c to access.
 
@@ -181,6 +181,7 @@ void waitloop() {
             ", %rsp\n" // We'll never return anywhere or use anything currently on the stack, so reset it
             "sti\n"
             "hlt\n"
+            "xchgw %bx, %bx\n"
         );
     }
 }
@@ -258,7 +259,7 @@ ETRAP_N(0a)
 ETRAP_N(0b)
 ETRAP_N(0c)
 ETRAP_N(0d)
-ETRAP_N(0e)
+//ETRAP_N(0e)
 ETRAP_N(11)
 ETRAP_N(15)
 ETRAP_N(1d)
@@ -283,8 +284,8 @@ static void init_pic() {
     outb(PIC_SECONDARY_DATA, 1);    // 8086/8088 mode
 
     // Mask interrupts as you see fit
-    // outb(PIC_PRIMARY_DATA, 0xff);
-    // outb(PIC_SECONDARY_DATA, 0xff);
+    outb(PIC_PRIMARY_DATA, 0x7d);
+    outb(PIC_SECONDARY_DATA, 0xff);
 }
 
 // void unmask_pics() {
@@ -318,6 +319,23 @@ static void __attribute__((interrupt)) divide_by_zero_handler(struct interrupt_f
     dumpFrame(frame);
 }
 
+static void __attribute__((interrupt)) trap_0x0e_page_fault(struct interrupt_frame *frame, uint64_t error_code) {
+    log("Page fault; error: 0x%p016h\n", error_code);
+    dumpFrame(frame);
+
+    uint64_t cr2;
+
+    __asm__ __volatile__(
+        "mov %%cr2, %%rax\n"
+        "mov %%rax, %0\n"
+        :"=m"(cr2)
+    );
+
+    com1_printf("cr2: %p016h\n", cr2);
+
+    frame->ip = (uint64_t) waitloop;
+}
+
 static void __attribute__((interrupt)) double_fault_handler(struct interrupt_frame *frame, uint64_t error_code) {
     log("Double fault; error should be zero.  error: 0x%p016h\n", error_code);
     dumpFrame(frame);
@@ -342,6 +360,7 @@ static void __attribute__((interrupt)) irq8_rtc(struct interrupt_frame *) {
 static uint64_t cpuCountOffset = 0;
 
 static void __attribute__((interrupt)) irq0_pit(struct interrupt_frame *) {
+    log("0");
     outb(PIC_PRIMARY_CMD, PIC_ACK);
 
     // if (cpuCountOffset == 0)
@@ -423,7 +442,8 @@ void init_interrupts() {
     SET_GETRAP_N(0b);
     SET_GETRAP_N(0c);
     SET_GETRAP_N(0d);
-    SET_GETRAP_N(0e);
+    //SET_GETRAP_N(0e);
+    set_handler(0x0e, trap_0x0e_page_fault, TYPE_INT);
     SET_GETRAP_N(11);
     SET_GETRAP_N(15);
     SET_GETRAP_N(1d);
@@ -436,9 +456,7 @@ void init_interrupts() {
     INITQ(wq, INIT_WQ_CAP);
     INITQ(kbd_buf, INIT_KB_CAP);
 
-    registerPeriodicCallback((struct periodic_callback) {1, 2, check_queue_caps});
-    __asm__ __volatile__ ("hlt");
-
+    //registerPeriodicCallback((struct periodic_callback) {1, 2, check_queue_caps});
 
     __asm__ __volatile__("sti");
 }

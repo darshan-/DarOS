@@ -5,7 +5,7 @@
 
 #define BLK_SZ 128
 #define MAP_ENTRY_SZ 2
-#define START 0x0100000
+#define START 0x0110000
 #define BFREE 0b00
 #define BPART 0b11
 #define BEND  0b10

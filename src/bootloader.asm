@@ -47,7 +47,7 @@
         page_table_l4 equ 0x1000
         page_table_l3 equ 0x2000
         page_table_l2 equ 0x3000
-        ;stack_bottom equ 0x4000
+        page_tables_l2 equ 0x0100000
         stack_top equ 0x7bff
         idt equ 0               ; 0-0x1000 available in long mode
 
@@ -132,19 +132,12 @@ lba_success:
 	mov eax, page_table_l3 | PT_PRESENT | PT_WRITABLE
 	mov [page_table_l4], eax
 
-        ; l3 page has 512 l2 tables
+        ; Let's load l3 with just one 1GB l2 table for now; more once in long mode
         mov eax, page_table_l2 | PT_PRESENT | PT_WRITABLE
-        mov ebx, page_table_l3
-	mov ecx, 512
-l3_loop:
-        mov [ebx], eax
-	add eax, SZ_2MB
-        add ebx, SZ_QW
-        loop l3_loop
+        mov [page_table_l3], eax
 
         ; Each l2 table identity maps 1 GB of memory with huge pages (512*2MB)
-        ; We'll set up just one now, and do the rest from C later
-
+        ; We'll set up just one now, and do the rest once in long mode
         mov eax, PT_PRESENT | PT_WRITABLE | PT_HUGE
         mov ebx, page_table_l2
 	mov ecx, 512
@@ -211,12 +204,24 @@ dap:
 .toseg: dw 0                    ; segment
 .from:  dq 1                    ; LBA number (sector to start reading from)
 
-        ; I just checked, and as expected and hoped, NASM will complain if we put too much above, because
-        ;  this vaule will end up being negative, so we can't assemble.  So go ahead and put as much above
-        ;  here as feels right; we'll find out if we pass 510 bytes and need to move some stuff down.
-        times 510 - ($-$$) db 0
-        dw 0xaa55
 
+        BOOTABLE equ 1<<7
+        times 440 - ($-$$) db 0
+        db "PURP"
+        dw 0
+        db BOOTABLE
+        db 0, 2, 0              ; CHS of partition start
+        db 0x0b                 ; FAT32
+        db 0, 41, 0             ; CHS of partition end
+        dd 1                    ; LBA of partition start
+        dd 40                   ; Number of sectors in partition
+        dq 0
+        dq 0
+        dq 0
+        dq 0
+        dq 0
+        dq 0
+        dw 0xaa55
 
 sect2:
         ; AMD manual says we have to enter protected mode before entering long mode, so it's possible that this
@@ -243,4 +248,45 @@ start64:
         mov gs, ax
         mov ss, ax
 
+        mov esp, 0xfffff
+
         lidt [idtr]
+
+
+        mov eax, PT_PRESENT | PT_WRITABLE | PT_HUGE
+        mov ebx, page_tables_l2
+	mov ecx, 512*10
+l2s_loop:
+        mov [ebx], eax
+	add eax, SZ_2MB       ; Huge page bit makes for 2MB pages, so each page is this far apart
+        add ebx, SZ_QW
+        loop l2s_loop
+
+;         mov ecx, 4
+; l2s_outer:
+;         push rcx
+;         mov eax, PT_PRESENT | PT_WRITABLE | PT_HUGE
+;         mov ebx, page_tables_l2
+; 	mov ecx, 512
+; l2s_loop:
+;         mov [ebx], eax
+; 	add eax, SZ_2MB       ; Huge page bit makes for 2MB pages, so each page is this far apart
+;         add ebx, SZ_QW
+;         loop l2s_loop
+;         pop rcx
+;         loop l2s_outer
+
+
+        mov eax, page_tables_l2 | PT_PRESENT | PT_WRITABLE
+        mov ebx, page_table_l3
+	mov ecx, 10
+l3_loop2:
+        mov [ebx], eax
+	add eax, SZ_QW*512
+        add ebx, SZ_QW
+        loop l3_loop2
+
+
+        ; Do we just use the new ones as necesary?  Are they cached?  Do we need this?
+	mov rax, page_table_l4
+	mov cr3, rax
