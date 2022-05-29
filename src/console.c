@@ -6,7 +6,7 @@
 #include "malloc.h"
 #include "periodic_callback.h"
 #include "rtc.h"
-#include "serial.h"
+//#include "serial.h"
 #include "strings.h"
 
 /*

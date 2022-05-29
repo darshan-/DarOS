@@ -36,7 +36,7 @@ void __attribute__((section(".kernel_entry"))) kernel_entry() {
     updateMemUse();
 
     parse_acpi_tables();
-    init_hpet();
+    //init_hpet();
 
     com1_print("going to waitloop\n");
     waitloop();

@@ -40,6 +40,8 @@ void registerPeriodicCallback(struct periodic_callback c) {
     periodicCallbacks.pcs[periodicCallbacks.len++] = cp;
 
     ints_okay();
+    //__asm__ __volatile__ ("xchgw %bx, %bx");
+    //__asm__ __volatile__ ("hlt");
 }
 
 void unregisterPeriodicCallback(struct periodic_callback c) {

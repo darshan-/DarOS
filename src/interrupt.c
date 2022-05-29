@@ -378,6 +378,7 @@ static void set_handler(uint64_t vec, void* handler, uint8_t type) {
 
     *(idt_entry+2) = (uint16_t) 1<<15 | type << 8;
     *(idt_entry+1) = CODE_SEG;
+    *((uint32_t*) (idt_entry+6)) = 0;
 }
 
 static void init_pit() {
@@ -436,6 +437,8 @@ void init_interrupts() {
     INITQ(kbd_buf, INIT_KB_CAP);
 
     registerPeriodicCallback((struct periodic_callback) {1, 2, check_queue_caps});
+    __asm__ __volatile__ ("hlt");
+
 
     __asm__ __volatile__("sti");
 }
