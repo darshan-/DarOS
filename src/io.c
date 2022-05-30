@@ -1,4 +1,5 @@
 #include <stdint.h>
+
 #include "io.h"
 
 void outb(uint32_t dest, uint8_t val) {

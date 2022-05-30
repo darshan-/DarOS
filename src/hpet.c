@@ -1,13 +1,10 @@
 #include <stdint.h>
 
-#include "acpi.h"
 #include "hpet.h"
+
+#include "acpi.h"
+#include "log.h"
 #include "malloc.h"
-#include "serial.h"
-
-
-#include "console.h"
-#define com1_printf printf
 
 /*
   000-007h RO General Capabilities and ID Register
@@ -27,32 +24,32 @@
 
 void init_hpet() {
     if (hpet_block == 0) {
-        com1_printf("No HPET detected!\n");
+        logf("No HPET detected!\n");
         return;
     }
 
     uint64_t gcir = hpet_block[0];
-    com1_printf("General Capabilities and ID Register: 0x%p016h\n", gcir);
+    logf("General Capabilities and ID Register: 0x%p016h\n", gcir);
 
     //uint32_t counter_clk_period = (uint32_t) (gcir>>32);
     uint32_t counter_clk_period = gcir >> 32;
-    com1_printf("HPET counter increments every %u femptoseconds.\n", counter_clk_period);
+    logf("HPET counter increments every %u femptoseconds.\n", counter_clk_period);
 
     uint8_t leg_rt_cap = !!(gcir & (1<<15));
-    com1_printf("leg_rt_cap: %u\n", leg_rt_cap);
+    logf("leg_rt_cap: %u\n", leg_rt_cap);
 
     uint8_t num_tim_cap = (gcir & (0b1111<<8)) >> 8; // Index of last timer, so e.g. 2 means there are 3 timers.
-    com1_printf("num_tim_cap: %u\n", num_tim_cap);
+    logf("num_tim_cap: %u\n", num_tim_cap);
 
 
     uint64_t gcr = hpet_block[2];
-    com1_printf("General Configuration Register: 0x%p016h\n", gcr);
+    logf("General Configuration Register: 0x%p016h\n", gcr);
 
 
     uint64_t gisr = hpet_block[4];
-    com1_printf("General Interrupt Status Register: 0x%p016h\n", gisr);
+    logf("General Interrupt Status Register: 0x%p016h\n", gisr);
 
 
     uint64_t mcvr = hpet_block[30];
-    com1_printf("Main Counter Value Register: 0x%p016h\n", mcvr);
+    logf("Main Counter Value Register: 0x%p016h\n", mcvr);
 }

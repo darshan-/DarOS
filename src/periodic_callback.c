@@ -1,11 +1,11 @@
 #include <stdint.h>
 
+#include "periodic_callback.h"
+#include "periodic_callback_int.h"
+
 #include "interrupt.h"
 #include "list.h"
 #include "malloc.h"
-#include "periodic_callback.h"
-#include "periodic_callback_int.h"
-#include "serial.h"
 #include "strings.h"
 
 #define INIT_CAP 10
@@ -18,7 +18,7 @@ extern uint64_t int_tick_hz;
 
 void registerPeriodicCallback(struct periodic_callback c) {
     if (c.count < 1 || c.count > int_tick_hz) {
-        com1_printf("WARNING: Skipping adding periodic callback with count: %u\n", c.count);
+        logf("WARNING: Skipping adding periodic callback with count: %u\n", c.count);
         return;
     }
 
@@ -40,8 +40,6 @@ void registerPeriodicCallback(struct periodic_callback c) {
     periodicCallbacks.pcs[periodicCallbacks.len++] = cp;
 
     ints_okay();
-    //__asm__ __volatile__ ("xchgw %bx, %bx");
-    //__asm__ __volatile__ ("hlt");
 }
 
 void unregisterPeriodicCallback(struct periodic_callback c) {

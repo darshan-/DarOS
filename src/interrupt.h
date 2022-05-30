@@ -2,7 +2,7 @@
 
 #include <stdint.h>
 
-#include "serial.h"
+#include "log.h"
 
 void init_interrupts();
 void waitloop();
@@ -16,7 +16,7 @@ static inline void no_ints() {
 
 static inline void ints_okay() {
     if (int_blocks <= 0) {
-        com1_printf("WARNING: ok_ints() called when int_blocks was %u... You have a bug.\n", int_blocks);
+        logf("WARNING: ok_ints() called when int_blocks was %u... You have a bug.\n", int_blocks);
         return;
     }
 

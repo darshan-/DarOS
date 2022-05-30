@@ -1,7 +1,9 @@
 #pragma once
 
 #include <stdarg.h>
-#include "strings.h"
+#include <stdint.h>
+
+#include "malloc.h"
 
 #define nibbleToHex(n) (n > '9' ? n + 'A' - '9' - 1 : n)
 
@@ -36,7 +38,8 @@ static inline void qwordToHex(uint64_t q, char* s) {
 char* M_sprintf(char* fmt, ...);
 char* M_vsprintf(char* fmt, va_list ap);
 uint64_t strlen(char* s);
-char* M_append(char* s, char* t);
+char* M_sappend(char* s, char* t);
+char* M_scopy(char* s);
 // Decimal string to unsigned int
 uint64_t dstoui(char* s);
 

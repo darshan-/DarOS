@@ -1,5 +1,6 @@
-#include "interrupt.h"
 #include "list.h"
+
+#include "interrupt.h"
 #include "malloc.h"
 
 struct list_node {

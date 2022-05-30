@@ -1,9 +1,12 @@
 #include <stdarg.h>
 #include <stdint.h>
-#include "serial.h"
+
+#include "interrupt.h"
+
 #include "io.h"
 #include "keyboard.h"
 #include "list.h"
+#include "log.h"
 #include "malloc.h"
 #include "periodic_callback.h"
 #include "periodic_callback_int.h"
@@ -20,10 +23,6 @@
 //     on, turn them on?
 
 
-// TODO: Have keyboard buffer (another queue like work queue, probably...) so I can just add the code
-//  to the kbd buf queue and then add a processKey function to the workQueue and return from the keyboard
-//  handler ASAP.
-
 // TODO: Do I really want everything set up as INT rather than TRAP?  I like interrupts being turned off
 //  for me automatically, but do I understand the implications of this change?  Am I really free to just
 //  choose as a I please, whether a given interrupt vector is tagged as interrupt or trap?
@@ -35,17 +34,8 @@
 
  */
 
-/*
-
-  According to section 8.9.3 "Interrupt Stack Frame" of teh AMD manual vol 2,
-
-        If the gate descriptor is an interrupt gate, RFLAGS.IF is cleared to 0.
-        If the gate descriptor is a trapgate, RFLAGS.IF is not modified.
-
- */
-
 #define IDT 0
-#define CODE_SEG 8 // 1 quadword past null descriptor; next segment would be 16, etc.
+#define CODE_SEG 8 // 1 quadword past null descriptor; next segment would be 16, etc. TODO: Grab from CS?
 #define TYPE_TRAP 0b1111
 #define TYPE_INT 0b1110
 
@@ -89,16 +79,8 @@ struct interrupt_frame {
 };
 
 
-//static struct list* workQueue = (struct list*) 0;
-
 #define INIT_WQ_CAP 20
 #define INIT_KB_CAP 20
-
-#define log com1_printf
-
-// void log(char* fmt, ...) {
-//     fmt = fmt;
-// }
 
 uint64_t int_blocks = 0;
 
@@ -191,12 +173,12 @@ void process_keys() {
 }
 
 static void dumpFrame(struct interrupt_frame *frame) {
-    log("ip: 0x%p016h    cs: 0x%p016h flags: 0x%p016h\n", frame->ip, frame->cs, frame->flags);
-    log("sp: 0x%p016h    ss: 0x%p016h\n", frame->sp, frame->ss);
+    logf("ip: 0x%p016h    cs: 0x%p016h flags: 0x%p016h\n", frame->ip, frame->cs, frame->flags);
+    logf("sp: 0x%p016h    ss: 0x%p016h\n", frame->sp, frame->ss);
 }
 
 static inline void generic_trap_n(struct interrupt_frame *frame, int n) {
-    log("Generic trap handler used for trap vector 0x%h\n", n);
+    logf("Generic trap handler used for trap vector 0x%h\n", n);
     dumpFrame(frame);
 
     // In generic case, it's not safe to do anything but go to waitloop (well, that may well not be safe either;
@@ -208,10 +190,10 @@ static inline void generic_trap_n(struct interrupt_frame *frame, int n) {
 }
 
 static inline void generic_etrap_n(struct interrupt_frame *frame, uint64_t error_code, int n) {
-    log("Generic trap handler used for trap vector 0x%h, with error on stack; error: 0x%p016h\n", n, error_code);
+    logf("Generic trap handler used for trap vector 0x%h, with error on stack; error: 0x%p016h\n", n, error_code);
     dumpFrame(frame);
     frame->ip = (uint64_t) waitloop;
-    log("waitloop?");
+    logf("waitloop?");
 }
 
 
@@ -293,14 +275,14 @@ static void init_pic() {
 // }
 
 static void __attribute__((interrupt)) default_interrupt_handler(struct interrupt_frame *frame) {
-    log("Default interrupt handler\n");
+    logf("Default interrupt handler\n");
     dumpFrame(frame);
 }
 
 static void __attribute__((interrupt)) default_PIC_P_handler(struct interrupt_frame *frame) {
     outb(PIC_PRIMARY_CMD, PIC_ACK);
 
-    log("Default primary PIC interrupt handler\n");
+    logf("Default primary PIC interrupt handler\n");
     dumpFrame(frame);
 }
 
@@ -308,18 +290,18 @@ static void __attribute__((interrupt)) default_PIC_S_handler(struct interrupt_fr
     outb(PIC_SECONDARY_CMD, PIC_ACK);
     outb(PIC_PRIMARY_CMD, PIC_ACK);
 
-    log("Default secondary PIC interrupt handler\n");
+    logf("Default secondary PIC interrupt handler\n");
     dumpFrame(frame);
 }
 
 static void __attribute__((interrupt)) divide_by_zero_handler(struct interrupt_frame *frame) {
-    log("Divide by zero handler\n");
+    logf("Divide by zero handler\n");
     frame->ip = (uint64_t) waitloop;
     dumpFrame(frame);
 }
 
 static void __attribute__((interrupt)) trap_0x0e_page_fault(struct interrupt_frame *frame, uint64_t error_code) {
-    log("Page fault; error: 0x%p016h\n", error_code);
+    logf("Page fault; error: 0x%p016h\n", error_code);
     dumpFrame(frame);
 
     uint64_t cr2;
@@ -330,13 +312,13 @@ static void __attribute__((interrupt)) trap_0x0e_page_fault(struct interrupt_fra
         :"=m"(cr2)
     );
 
-    com1_printf("cr2: %p016h\n", cr2);
+    logf("cr2: %p016h\n", cr2);
 
     frame->ip = (uint64_t) waitloop;
 }
 
 static void __attribute__((interrupt)) double_fault_handler(struct interrupt_frame *frame, uint64_t error_code) {
-    log("Double fault; error should be zero.  error: 0x%p016h\n", error_code);
+    logf("Double fault; error should be zero.  error: 0x%p016h\n", error_code);
     dumpFrame(frame);
 }
 
@@ -359,7 +341,7 @@ static void __attribute__((interrupt)) irq8_rtc(struct interrupt_frame *) {
 static uint64_t cpuCountOffset = 0;
 
 static void __attribute__((interrupt)) irq0_pit(struct interrupt_frame *) {
-    //log("0");
+    //logf("0");
     outb(PIC_PRIMARY_CMD, PIC_ACK);
 
     // if (cpuCountOffset == 0)
@@ -370,13 +352,13 @@ static void __attribute__((interrupt)) irq0_pit(struct interrupt_frame *) {
     ms_since_boot = pitCount * PIT_COUNT * 1000 / PIT_FREQ;
 
     // if (pitCount % TICK_HZ == 0)
-    //     com1_printf("Average CPU ticks per PIT tick: %u\n", (read_tsc() - cpuCountOffset) / pitCount);
+    //     logf("Average CPU ticks per PIT tick: %u\n", (read_tsc() - cpuCountOffset) / pitCount);
 
     if (!periodicCallbacks.pcs) return;
 
     for (uint64_t i = 0; i < periodicCallbacks.len; i++) {
         if (periodicCallbacks.pcs[i]->count == 0 || periodicCallbacks.pcs[i]->count > TICK_HZ) {
-            com1_printf("halting!\n");
+            logf("halting!\n");
             __asm__ __volatile__ ("hlt");
         }
 
@@ -411,7 +393,7 @@ static void init_pit() {
     //   and usage, and doubles capacity if usage is greater than half of capacity.
 
 static void check_queue_caps() {
-    //com1_printf("kbd_buf now has capacity: %u\n", kbd_buf.cap);
+    //logf("kbd_buf now has capacity: %u\n", kbd_buf.cap);
 }
 
 void init_interrupts() {
@@ -455,7 +437,7 @@ void init_interrupts() {
     INITQ(wq, INIT_WQ_CAP);
     INITQ(kbd_buf, INIT_KB_CAP);
 
-    //registerPeriodicCallback((struct periodic_callback) {1, 2, check_queue_caps});
+    registerPeriodicCallback((struct periodic_callback) {1, 2, check_queue_caps});
 
     __asm__ __volatile__("sti");
 }

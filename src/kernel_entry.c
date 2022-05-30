@@ -6,6 +6,7 @@
 #include "hpet.h"
 #include "interrupt.h"
 #include "keyboard.h"
+#include "log.h"
 #include "malloc.h"
 #include "serial.h"
 #include "strings.h"
@@ -24,20 +25,15 @@ void __attribute__((section(".kernel_entry"))) kernel_entry() {
 
     clearScreen();
 
-    com1_print("starting tty\n");
+    log("starting tty\n");
     startTty();
-
-    // char demo[255];
-    // for (uint8_t i = 0; i < 254; i++)
-    //     demo[i] = (char) i+1;
-    // print(demo);
 
     updateMemUse();
 
     parse_acpi_tables();
     init_hpet();
 
-    com1_print("going to waitloop\n");
+    log("going to waitloop\n");
     printColor("Ready!\n", 0x0d);
     waitloop();
 }

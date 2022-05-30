@@ -1,5 +1,7 @@
 #include <stdint.h>
+
 #include "keyboard.h"
+
 #include "list.h"
 
 // https://www.win.tue.nl/~aeb/linux/kbd/scancodes-1.html

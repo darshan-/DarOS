@@ -1,14 +1,14 @@
 #include <stdarg.h>
+
+#include "serial.h"
+
 #include "io.h"
 #include "malloc.h"
-#include "serial.h"
 #include "strings.h"
 
 #define COM1 0x3f8
 
 void com1_write(char c) {
-    printc(c);
-    return;
     while ((inb(COM1 + 5) & 0x20) == 0) // Wait until transmitter holding register is empty and ready for data
         ;
 

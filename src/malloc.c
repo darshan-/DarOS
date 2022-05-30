@@ -1,6 +1,8 @@
 #include <stdint.h>
+
 #include "malloc.h"
-#include "serial.h"
+
+#include "log.h"
 #include "strings.h"
 
 #define BLK_SZ 128
@@ -13,20 +15,6 @@
 static uint64_t map_size; // Size in quadwords
 static uint64_t* map = (uint64_t*) START;
 static uint64_t* heap = (uint64_t*) START;
-
-static inline void binQword(uint64_t q) {
-    for (uint64_t i = 0; i < 64; i++) {
-        if (i != 0 && !(i % 4))
-            com1_write(' ');
-        com1_write(((q & (1ull << i)) >> i) + '0');
-    }
-    com1_write('\n');
-}
-
-void dumpEntries(int n) {
-    for (int i = 0; i < n; i++)
-        binQword(map[i]);
-}
 
 // `size' is the number of bytes available to us for (map + heap)
 void init_heap(uint64_t size) {
@@ -104,7 +92,7 @@ void free(void *p) {
     //  be easy to do do...  So maybe?
 
     if (code == BFREE) {
-        com1_print("------------------------------Ooooooooooooooooooops!  Page is already free...\n");
+        log("------------------------------Ooooooooooooooooooops!  Page is already free...\n");
         return;
     }
 
@@ -116,7 +104,7 @@ void free(void *p) {
     }
 
     if (code != BEND) {
-        com1_print("------------------------------Ooooooooooooooooooops!  Contiguous region didn't end with BEND, and we don't yet support multi-entry regions, so this shouldn't happen...\n");
+        log("------------------------------Ooooooooooooooooooops!  Contiguous region didn't end with BEND, and we don't yet support multi-entry regions, so this shouldn't happen...\n");
         return;
     }
 

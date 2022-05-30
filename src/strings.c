@@ -1,35 +1,14 @@
 #include <stdarg.h>
 #include <stdint.h>
-#include "malloc.h"
+
 #include "strings.h"
+
+#include "malloc.h"
 
 #define ONE_E_19 10000000000000000000ull
 
-
-/*
-
-  %16h : print 8 bytes (16 characters)  (I guess we can just zero-pad for anything over 16)?
-  %7h  : print 3 1/2 bytes (7 characters)
-  %1h  : print 1 nibble (1 character)
-  etc.
-
-  I guess I can just call QwordToHex for all, and if width specifier is greater than 16, add zeros before
-    appending string.  And appending can look the same for everything:
-      M_append(s, qs+16-width)
-      (So if width is 16, we append qs exactly as we curently do.
-       If width is 1, we append qs+15, meaning the last character before the '\0'.
-       And it even works for %0h, which in this system means to take up zero characters -- we'll append the
-         string starting at '\0', leaving just s, so we're appending nothing.  We'll have copied s for no
-         reason, but the default behavior would be correct, so this seems right.
-
-  So, at least for hex, the number between '%' and '%' is how many characters wide to make the hex.
-
-  At some point I'll likely want to space-pad decimal numbers or strings, but this seems good for now.
-
- */
-
 static inline char* append(char* s, char* t) {
-    char* u = M_append(s, t);
+    char* u = M_sappend(s, t);
     free(s);
     return u;
 }
@@ -43,8 +22,6 @@ char* M_sprintf(char* fmt, ...) {
 }
 
 char* M_vsprintf(char* fmt, va_list ap) {
-    //com1_print("M_vsprintf");plumpPCs();
-
     int scap = 128;
     char* s = malloc(scap);
     char c, *t, padc;
@@ -100,11 +77,6 @@ char* M_vsprintf(char* fmt, va_list ap) {
 
             break;
         case 'p':
-            // Needs at least two more characters: the very next character is what to pad with, and
-            //   then at least one digit.  The digits are then interpretted as decimal and say how
-            //   wide to pad.  So "%p02u" means pad an unsigned integer with zeros to be 2 characters
-            //   wide, and "%p 10s" means pad a string with spaces to be 10 characters wide.
-
             padc = *++p;
 
             c = *++p;
@@ -115,8 +87,7 @@ char* M_vsprintf(char* fmt, va_list ap) {
                     p++;
 
                 p--;
-            } else {
-                // Bad format
+            } else { // Bad format; let's bail on interpreting it
                 s[i++] = '%';
                 s[i++] = 'p';
                 s[i++] = c;
@@ -179,7 +150,7 @@ uint64_t strlen(char* s) {
     return i;
 }
 
-char* M_append(char* s, char* t) {
+char* M_sappend(char* s, char* t) {
     char* u = malloc(strlen(s) + strlen(t) + 1);
 
     char* up = u;
@@ -190,6 +161,17 @@ char* M_append(char* s, char* t) {
 
     *up = 0;
     return u;
+}
+
+char* M_scopy(char* s) {
+    char* t = malloc(strlen(s) + 1);
+
+    char* tp = t;
+    while(*s)
+        *tp++ = *s++;
+
+    *tp = 0;
+    return t;
 }
 
 // Decimal string to unsigned int

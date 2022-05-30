@@ -1,12 +1,13 @@
 #include <stdarg.h>
 #include <stdint.h>
+
 #include "console.h"
+
 #include "interrupt.h"
 #include "io.h"
 #include "malloc.h"
 #include "periodic_callback.h"
 #include "rtc.h"
-//#include "serial.h"
 #include "strings.h"
 
 /*

@@ -1,7 +1,8 @@
 #include <stdint.h>
 
 #include "acpi.h"
-#include "serial.h"
+
+#include "log.h"
 
 static uint8_t* rsdp = 0;
 static uint8_t* rsdt = 0;
@@ -25,7 +26,7 @@ static uint8_t* find_rsdp() {
 
 void parse_acpi_tables() {
     if (!(rsdp = find_rsdp())) {
-        com1_printf("RSDP signature not found!\n", rsdp);
+        logf("RSDP signature not found!\n", rsdp);
         return;
     }
         
@@ -34,7 +35,7 @@ void parse_acpi_tables() {
         sum += rsdp[i];
 
     if (sum != 0) {
-        com1_print("RSDP checksum failure!\n");
+        log("RSDP checksum failure!\n");
         return;
     }
 
@@ -42,7 +43,7 @@ void parse_acpi_tables() {
 
     uint32_t rsdt_sig = *((uint32_t*) "RSDT");
     if (*((uint32_t*) rsdt) != rsdt_sig) {
-        com1_print("RSDT signature failure!\n");
+        log("RSDT signature failure!\n");
         return;
     }
 
@@ -52,7 +53,7 @@ void parse_acpi_tables() {
         sum += rsdt[i];
 
     if (sum != 0) {
-        com1_print("RSDT checksum failure!\n");
+        log("RSDT checksum failure!\n");
         return;
     }
 
@@ -69,7 +70,7 @@ void parse_acpi_tables() {
         uint8_t* table = (uint8_t*)(uint64_t)(tables[i]);
         for (int j = 0; j < 4; j++)
             name[j] = table[j];
-        com1_printf("Found ACPI table: %s\n", name);
+        logf("Found ACPI table: %s\n", name);
 
         if (*((uint32_t*) table) == hpet_sig)
             hpet = table;

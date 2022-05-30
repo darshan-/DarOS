@@ -1,8 +1,10 @@
 #include <stdint.h>
-#include "interrupt.h"
-#include "io.h"
+
 #include "rtc.h"
 #include "rtc_int.h"
+
+#include "interrupt.h"
+#include "io.h"
 
 #define REG_SEL 0x70
 #define IO 0x71
