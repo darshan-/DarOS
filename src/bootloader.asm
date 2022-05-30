@@ -85,11 +85,11 @@ start16:
         int 10h
 
         mov cx, LOAD_COUNT
-	mov si, dap
+        mov si, dap
         ; dl is set by BIOS to drive number we're loaded from, so just leave it as is
 lba_read:
-	mov ah, INT_0x13_LBA_READ      ; Must set on every loop, as ah gets return code
-	int 0x13
+        mov ah, INT_0x13_LBA_READ      ; Must set on every loop, as ah gets return code
+        int 0x13
 
         mov ax, [dap.toseg]
         add ax, (SECT_PER_LOAD*512)>>4 ; Increment segment rather than offset (segment is address shifted 4)
@@ -116,7 +116,7 @@ lba_success:
         ; Apparently I'll want to ask BIOS about memory (https://wiki.osdev.org/Detecting_Memory_(x86))
         ;   while I'm still in real mode, probably somewhere around here, at some point.
 
-        ; enable A20 bit
+        ; Enable A20 bit
         mov ax, 0x2401
         int 0x15
 
@@ -128,44 +128,15 @@ lba_success:
         mov dx, 0x71
         in al, dx
 
-        ; l4 page has just the one entry for l3
-	mov eax, page_table_l3 | PT_PRESENT | PT_WRITABLE
-	mov [page_table_l4], eax
+        lgdt [gdtr]
 
-        ; Let's load l3 with just one 1GB l2 table for now; more once in long mode
-        mov eax, page_table_l2 | PT_PRESENT | PT_WRITABLE
-        mov [page_table_l3], eax
+        mov eax, cr0
+        or eax, CR0_PROTECTION
+        mov cr0, eax
 
-        ; Each l2 table identity maps 1 GB of memory with huge pages (512*2MB)
-        ; We'll set up just one now, and do the rest once in long mode
-        mov eax, PT_PRESENT | PT_WRITABLE | PT_HUGE
-        mov ebx, page_table_l2
-	mov ecx, 512
-l2_loop:
-        mov [ebx], eax
-	add eax, SZ_2MB       ; Huge page bit makes for 2MB pages, so each page is this far apart
-        add ebx, SZ_QW
-        loop l2_loop
-
-        ; Now we're ready to load and use tables
-	mov eax, page_table_l4
-	mov cr3, eax
-
-	; Enable PAE
-	mov eax, cr4
-	or eax, CR4_PAE
-	mov cr4, eax
-
-	; Enable long mode
-	mov ecx, MSR_IA32_EFER
-	rdmsr
-	or eax, EFER_LONG_MODE_ENABLE
-	wrmsr
-
-        jmp sect2
+        jmp CODE_SEG32:start32
 
 loaded: db "Sectors loaded!", 0x0d, 0x0a, 0
-sect2running: db "Running from second sector code!", 0x0d, 0x0a, 0
 lba_error_s: db "LBA returned an error; please check AH for return code", 0x0d, 0x0a, 0
 
 teleprint:
@@ -174,8 +145,6 @@ teleprint:
         mov al, [bx]
         test al, al
         jz done
-        ;cmp al, 0
-        ;je done
 
         int 0x10
         inc bx
@@ -184,13 +153,30 @@ done:
         ret
 
 
-        CODE_SEG equ 0+(8*1)    ; Code segment is 1st (and only, at least for now) segment
+        CODE_SEG equ gdt.code - gdt
+        CODE_SEG32 equ gdt.code32 - gdt
+        DATA_SEG32 equ gdt.data32 - gdt
 gdt:
-	dq 0
+        dq 0
+.code:
         dq SD_PRESENT | SD_NONTSS | SD_CODESEG | SD_READABLE | SD_GRAN4K | SD_MODE64 ; Code segment
+.code32:
+        dw 0xFFFF
+        dw 0x0
+        db 0x0
+        db 10011010b
+        db 11001111b
+        db 0x0
+.data32:
+        dw 0xFFFF
+        dw 0x0
+        db 0x0
+        db 10010010b
+        db 11001111b
+        db 0x0
 gdtr:
-	dw $ - gdt - 1          ; Length in bytes minus 1
-	dq gdt                  ; Address
+        dw $ - gdt - 1          ; Length in bytes minus 1
+        dq gdt                  ; Address
 
 idtr:
         dw 4095                 ; Size of IDT minus 1
@@ -224,17 +210,55 @@ dap:
         dw 0xaa55
 
 sect2:
-        ; AMD manual says we have to enter protected mode before entering long mode, so it's possible that this
-        ;   works in QEMU but wouldn't on real hardware...  Maybe do it the "right" way?
-        ; ** On the other hand, https://forum.osdev.org/viewtopic.php?t=11093 has plenty of people saying it's
-        ;   fine on real-world hardware, including AMD processors, despite the manual.  So let's leave it.
+
+bits 32
+start32:
+
+        mov ax, DATA_SEG32
+        mov ds, ax
+        mov ss, ax
+        mov esp, stack_top
+
+        ; l4 page has just the one entry for l3
+        mov eax, page_table_l3 | PT_PRESENT | PT_WRITABLE
+        mov [page_table_l4], eax
+
+        ; Let's load l3 with just one 1GB l2 table for now; more once in long mode
+        mov eax, page_table_l2 | PT_PRESENT | PT_WRITABLE
+        mov [page_table_l3], eax
+
+        ; Each l2 table identity maps 1 GB of memory with huge pages (512*2MB)
+        ; We'll set up just one now, and do the rest once in long mode
+        mov eax, PT_PRESENT | PT_WRITABLE | PT_HUGE
+        mov ebx, page_table_l2
+        mov ecx, 512
+l2_loop:
+        mov [ebx], eax
+        add eax, SZ_2MB       ; Huge page bit makes for 2MB pages, so each page is this far apart
+        add ebx, SZ_QW
+        loop l2_loop
+
+        ; Now we're ready to load and use tables
+        mov eax, page_table_l4
+        mov cr3, eax
+
+        ; Enable PAE
+        mov eax, cr4
+        or eax, CR4_PAE
+        mov cr4, eax
+
+        ; Enable long mode (activate it momentarily)
+        mov ecx, MSR_IA32_EFER
+        rdmsr
+        or eax, EFER_LONG_MODE_ENABLE
+        wrmsr
 
         lgdt [gdtr]
 
-	; Enable paging and enter protected mode
-	mov eax, cr0
-	or eax, CR0_PAGING | CR0_PROTECTION
-	mov cr0, eax
+        ; Enable paging to activate long mode
+        mov eax, cr0
+        or eax, CR0_PAGING | CR0_PROTECTION
+        mov cr0, eax
 
         jmp CODE_SEG:start64
 
@@ -255,23 +279,18 @@ start64:
 
         mov eax, PT_PRESENT | PT_WRITABLE | PT_HUGE
         mov ebx, page_tables_l2
-	mov ecx, 512*256
+        mov ecx, 512*256
 l2s_loop:
         mov [ebx], eax
-	add eax, SZ_2MB       ; Huge page bit makes for 2MB pages, so each page is this far apart
+        add eax, SZ_2MB       ; Huge page bit makes for 2MB pages, so each page is this far apart
         add ebx, SZ_QW
         loop l2s_loop
 
         mov eax, page_tables_l2 | PT_PRESENT | PT_WRITABLE
         mov ebx, page_table_l3
-	mov ecx, 256
+        mov ecx, 256
 l3_loop2:
         mov [ebx], eax
-	add eax, SZ_QW*512
+        add eax, SZ_QW*512
         add ebx, SZ_QW
         loop l3_loop2
-
-
-        ; Do we just use the new ones as necesary?  Are they cached?  Do we need this?
-	; mov rax, page_table_l4
-	; mov cr3, rax
