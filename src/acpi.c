@@ -63,8 +63,13 @@ void parse_acpi_tables() {
     uint32_t apic_sig = *((uint32_t*) "APIC");
     uint32_t facp_sig = *((uint32_t*) "FACP");
 
+    char name[5];
+    name[4] = 0;
     for (uint64_t i = 0; i < table_count; i++) {
         uint8_t* table = (uint8_t*)(uint64_t)(tables[i]);
+        for (int j = 0; j < 4; j++)
+            name[j] = table[j];
+        com1_printf("Found ACPI table: %s\n", name);
 
         if (*((uint32_t*) table) == hpet_sig)
             hpet = table;
@@ -76,5 +81,6 @@ void parse_acpi_tables() {
             facp = table;
     }
 
-    hpet_block = *(uint64_t**)(hpet + 44);
+    if (hpet != 0)
+        hpet_block = *(uint64_t**)(hpet + 44);
 }

@@ -47,7 +47,7 @@
         page_table_l4 equ 0x1000
         page_table_l3 equ 0x2000
         page_table_l2 equ 0x3000
-        page_tables_l2 equ 0x0100000
+        page_tables_l2 equ 0x100000
         stack_top equ 0x7bff
         idt equ 0               ; 0-0x1000 available in long mode
 
@@ -248,38 +248,26 @@ start64:
         mov gs, ax
         mov ss, ax
 
-        mov esp, 0xfffff
+        ;mov rsp, 0x100000
+        ;mov rsp, stack_top
+        ;mov rsp, 0x10fff0
+        mov rsp, 0x30fff0
 
         lidt [idtr]
 
 
         mov eax, PT_PRESENT | PT_WRITABLE | PT_HUGE
         mov ebx, page_tables_l2
-	mov ecx, 512*10
+	mov ecx, 512*256
 l2s_loop:
         mov [ebx], eax
 	add eax, SZ_2MB       ; Huge page bit makes for 2MB pages, so each page is this far apart
         add ebx, SZ_QW
         loop l2s_loop
 
-;         mov ecx, 4
-; l2s_outer:
-;         push rcx
-;         mov eax, PT_PRESENT | PT_WRITABLE | PT_HUGE
-;         mov ebx, page_tables_l2
-; 	mov ecx, 512
-; l2s_loop:
-;         mov [ebx], eax
-; 	add eax, SZ_2MB       ; Huge page bit makes for 2MB pages, so each page is this far apart
-;         add ebx, SZ_QW
-;         loop l2s_loop
-;         pop rcx
-;         loop l2s_outer
-
-
         mov eax, page_tables_l2 | PT_PRESENT | PT_WRITABLE
         mov ebx, page_table_l3
-	mov ecx, 10
+	mov ecx, 256
 l3_loop2:
         mov [ebx], eax
 	add eax, SZ_QW*512
@@ -288,5 +276,5 @@ l3_loop2:
 
 
         ; Do we just use the new ones as necesary?  Are they cached?  Do we need this?
-	mov rax, page_table_l4
-	mov cr3, rax
+	; mov rax, page_table_l4
+	; mov cr3, rax

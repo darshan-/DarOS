@@ -56,11 +56,14 @@ static void writeStatusBar(char* s, uint8_t loc) {
 void updateMemUse() {
     char* s;
     uint64_t m = memUsed();
-    
-    if (m < 1024)
-        s = M_sprintf("Mem used: %u bytes", m);
-    else
-        s = M_sprintf("Mem used: %u K", m / 1024);  // TODO: Round rather than floor and/or decimal point, etc.?
+    char* unit = "bytes";
+
+    if (m >= 1024) {
+        unit = "K";
+        m /= 1024;
+    }
+
+    s = M_sprintf("Heap used: %u %s", m, unit);  // TODO: Round rather than floor and/or decimal point, etc.?
 
     if (strlen(s) > MAX_MEMLEN)
         s[MAX_MEMLEN] = 0;
