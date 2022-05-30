@@ -73,3 +73,8 @@ So when they say "Bits 63:48 are a sign extension of bit 47 as required for cano
   and below), or 0xffff (for address 0x800000000000 and above).  So 0x800000000000 isn't a valid address.
   (Well, it's not in canonical form...)
 
+Oh, but it's not just a funny way of writing 0x800000000000!  0x800000000000 *doesn't exist*!  So it's not so
+bad.  It's fine, actually.  I thought you had to take a real address, and then flip a bunch of bits if it was
+above a certain amount.  It's just that the address space is only 48-bit (currently, with I think 57-bit
+possible and coming soon-ish?), and rathe than have that address space just be the lowest 2**48 addresses,
+it's actually the lowset 2**24 and the highest 2**24.

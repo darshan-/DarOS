@@ -40,7 +40,8 @@ run: out/boot.img
 .PHONY: run-bochs
 run-bochs: out/bochs.img
 	rm -f out/bochs.img.lock
-	bochs -qf bochs.cfg -rc bochs.command
+	echo c >out/bochs.command
+	bochs -qf /dev/null -rc out/bochs.command 'memory: host=256, guest=256' 'boot: disk' 'ata0-master: type=disk, path="out/bochs.img", mode=flat, cylinders=4, heads=4, spt=61, sect_size=512, model="Generic 1234", biosdetect=auto, translation=auto' 'magic_break: enabled=1'
 
 .PHONY: clean
 clean:

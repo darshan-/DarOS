@@ -130,6 +130,11 @@ lba_success:
 
         lgdt [gdtr]
 
+        ; TODO: Intel manual specifically says we need to be in protected mode *with paging enabled* before
+        ;   entering long mode, and then turn it off.  So I guess that might be worth a try too?  AMD says
+        ;   paging doesn't have to be on, only to turn it off if it is on.  And I've seen lots of examples
+        ;   that don't, but presumably work on Intel hardware?
+
         mov eax, cr0
         or eax, CR0_PROTECTION
         mov cr0, eax
@@ -196,11 +201,13 @@ dap:
         db "PURP"
         dw 0
         db BOOTABLE
-        db 0, 2, 0              ; CHS of partition start
+        ;db 0, 2, 0             ; CHS of partition start
+        db 0, 0x28, 0x31        ; CHS of partition start
         db 0x0b                 ; FAT32
-        db 0, 41, 0             ; CHS of partition end
-        dd 1                    ; LBA of partition start
-        dd 40                   ; Number of sectors in partition
+        ;db 0, 41, 0            ; CHS of partition end
+        db 0, 0xe9, 0xff        ; CHS of partition end
+        dd 0x800                ; LBA of partition start
+        dd 0x7af000             ; Number of sectors in partition
         dq 0
         dq 0
         dq 0
@@ -219,16 +226,12 @@ start32:
         mov ss, ax
         mov esp, stack_top
 
-        ; l4 page has just the one entry for l3
         mov eax, page_table_l3 | PT_PRESENT | PT_WRITABLE
         mov [page_table_l4], eax
 
-        ; Let's load l3 with just one 1GB l2 table for now; more once in long mode
         mov eax, page_table_l2 | PT_PRESENT | PT_WRITABLE
         mov [page_table_l3], eax
 
-        ; Each l2 table identity maps 1 GB of memory with huge pages (512*2MB)
-        ; We'll set up just one now, and do the rest once in long mode
         mov eax, PT_PRESENT | PT_WRITABLE | PT_HUGE
         mov ebx, page_table_l2
         mov ecx, 512
@@ -238,16 +241,13 @@ l2_loop:
         add ebx, SZ_QW
         loop l2_loop
 
-        ; Now we're ready to load and use tables
         mov eax, page_table_l4
         mov cr3, eax
 
-        ; Enable PAE
         mov eax, cr4
         or eax, CR4_PAE
         mov cr4, eax
 
-        ; Enable long mode (activate it momentarily)
         mov ecx, MSR_IA32_EFER
         rdmsr
         or eax, EFER_LONG_MODE_ENABLE
@@ -255,7 +255,6 @@ l2_loop:
 
         lgdt [gdtr]
 
-        ; Enable paging to activate long mode
         mov eax, cr0
         or eax, CR0_PAGING | CR0_PROTECTION
         mov cr0, eax
@@ -264,7 +263,6 @@ l2_loop:
 
 bits 64
 start64:
-        ; Set up segment registers (the far jump down here set up cs)
         xor ax, ax
         mov ds, ax
         mov es, ax
