@@ -59,7 +59,7 @@
 #define PIC_SECONDARY_CMD 0xa0
 #define PIC_SECONDARY_DATA 0xa1
 
-#define TICK_HZ 19
+#define TICK_HZ 1000
 
 uint64_t int_tick_hz = TICK_HZ;  // For periodic_callbacks.c to access.
 
@@ -181,7 +181,6 @@ void waitloop() {
             ", %rsp\n" // We'll never return anywhere or use anything currently on the stack, so reset it
             "sti\n"
             "hlt\n"
-            "xchgw %bx, %bx\n"
         );
     }
 }
@@ -284,7 +283,7 @@ static void init_pic() {
     outb(PIC_SECONDARY_DATA, 1);    // 8086/8088 mode
 
     // Mask interrupts as you see fit
-    outb(PIC_PRIMARY_DATA, 0x7d);
+    outb(PIC_PRIMARY_DATA, 0x7c);
     outb(PIC_SECONDARY_DATA, 0xff);
 }
 
@@ -360,7 +359,7 @@ static void __attribute__((interrupt)) irq8_rtc(struct interrupt_frame *) {
 static uint64_t cpuCountOffset = 0;
 
 static void __attribute__((interrupt)) irq0_pit(struct interrupt_frame *) {
-    log("0");
+    //log("0");
     outb(PIC_PRIMARY_CMD, PIC_ACK);
 
     // if (cpuCountOffset == 0)

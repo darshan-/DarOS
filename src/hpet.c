@@ -26,12 +26,10 @@
 */
 
 void init_hpet() {
-    com1_print("hpet01\n");
     if (hpet_block == 0) {
-        com1_printf("hpet_block is not set!n");
+        com1_printf("No HPET detected!\n");
         return;
     }
-    com1_print("hpet02\n");
 
     // Presario: 0x0008_8E12_0000_0000
     // Presario: 0x0008_8EBA_0000_0000
@@ -58,7 +56,7 @@ void init_hpet() {
 
      */
     // Dynamically make a l2 page for that?
-    com1_printf("Using hpet block at 0x%h\n", hpet_block);
+    //com1_printf("Using hpet block at 0x%h\n", hpet_block);
 
     if ((uint64_t) hpet_block >= (512ull * 1024 * 1024 * 1024)) {
         com1_print("hpet_block is not in addressable region; let's make a new page table...\n");
@@ -108,8 +106,6 @@ void init_hpet() {
 
     uint64_t gcir = hpet_block[0];
     com1_printf("General Capabilities and ID Register: 0x%p016h\n", gcir);
-
-    com1_print("hpet03\n");
 
     //uint32_t counter_clk_period = (uint32_t) (gcir>>32);
     uint32_t counter_clk_period = gcir >> 32;

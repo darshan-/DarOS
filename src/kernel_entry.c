@@ -23,7 +23,6 @@ void __attribute__((section(".kernel_entry"))) kernel_entry() {
     init_interrupts();
 
     clearScreen();
-    printColor("Ready!\n", 0x0d);
 
     com1_print("starting tty\n");
     startTty();
@@ -39,5 +38,6 @@ void __attribute__((section(".kernel_entry"))) kernel_entry() {
     init_hpet();
 
     com1_print("going to waitloop\n");
+    printColor("Ready!\n", 0x0d);
     waitloop();
 }

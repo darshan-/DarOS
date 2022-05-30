@@ -248,9 +248,6 @@ start64:
         mov gs, ax
         mov ss, ax
 
-        ;mov rsp, 0x100000
-        ;mov rsp, stack_top
-        ;mov rsp, 0x10fff0
         mov rsp, 0x30fff0
 
         lidt [idtr]

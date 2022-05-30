@@ -108,8 +108,8 @@ static void setStatusBar() {
     // STATUS_LINE[44*2] = (char*) 3;
     // STATUS_LINE[44*2+1] = 0x35;
 
-    // registerPeriodicCallback((struct periodic_callback) {60, 1, updateClock});
-    // registerPeriodicCallback((struct periodic_callback) {1, 2, updateMemUse});
+    registerPeriodicCallback((struct periodic_callback) {60, 1, updateClock});
+    registerPeriodicCallback((struct periodic_callback) {1, 2, updateMemUse});
 }
 
 void clearScreen() {
