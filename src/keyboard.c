@@ -7,11 +7,10 @@
 // https://www.win.tue.nl/~aeb/linux/kbd/scancodes-1.html
 
 #define si(k) (struct input) {(k), alt_down, ctrl_down, shift_down}
-#define shifty(c, n, s) case c: gotInput(shift_down ? si(s) : si(n)); break
-#define capsy(c, n, s) case c: gotInput((shift_down && !caps_lock_on) || \
-                                        (!shift_down && caps_lock_on) ? si(s) : si(n)); break
+#define map(c, i) case c: gotInput(i); break
+#define shifty(c, k, s) map(c, shift_down ? si(s) : si(k))
+#define capsy(c, k, s) map(c, (shift_down && !caps_lock_on) || (!shift_down && caps_lock_on) ? si(s) : si(k))
 
-// Let's ignore caps lock for now, but keep track of shift
 static uint8_t shift_down = 0;
 static uint8_t ctrl_down = 0;
 static uint8_t alt_down = 0;
@@ -89,7 +88,7 @@ void keyScanned(uint8_t c) {
         shifty(0x1a, '[', '{');
         shifty(0x1b, ']', '}');
 
-        capsy(0x1c, '\n', '\n');
+        map(0x1c, si('\n'));
 
         capsy(0x1e, 'a', 'A');
         capsy(0x1f, 's', 'S');
@@ -102,6 +101,7 @@ void keyScanned(uint8_t c) {
         capsy(0x26, 'l', 'L');
         shifty(0x27, ';', ':');
         shifty(0x28, '\'', '"');
+        shifty(0x29, '`', '~');
 
         capsy(0x2c, 'z', 'Z');
         capsy(0x2d, 'x', 'X');
