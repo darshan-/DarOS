@@ -45,6 +45,8 @@ static inline uint8_t kbd_read_resp() {
 #define KBD_RESEND 0xfe
 
 static inline void kbd_cmd(uint8_t cmd, uint8_t arg) {
+    no_ints();
+
     for (int i = 0; i < 3; i++) {
         kbd_out(cmd);
         kbd_out(arg);
@@ -59,12 +61,12 @@ static inline void kbd_cmd(uint8_t cmd, uint8_t arg) {
 
         logf("Keyboard controller sent unexpected response: 0x%h\n", resp);
     }
+
+    ints_okay();
 }
 
 void init_keyboard() {
-    no_ints();
     kbd_cmd(0xf3, 0b0100000); // Set Typematic to 0.5 sec delay, 30.0 per second
-    ints_okay();
 }
 
 void keyScanned(uint8_t c) {
@@ -96,10 +98,7 @@ void keyScanned(uint8_t c) {
 
     case 0x3a:
         caps_lock_on = !caps_lock_on;
-        no_ints();
         kbd_cmd(0xed, caps_lock_on << 2);
-        ints_okay();
-
         break;
 
         shifty(0x02, '1', '!');
