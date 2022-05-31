@@ -34,7 +34,12 @@
 #define STATUS_LINE LINE(LINES)
 #define VRAM_END LINE(LINES + 1)
 
+#define CON_TERM 1
+#define CON_LOGS 2
+
 static uint8_t* cur = VRAM;
+static uint8_t con = CON_TERM;
+static uint8_t* term_cur;
 
 static inline void updateCursorPosition() {
     uint64_t c = (uint64_t) (cur - VRAM) / 2;
@@ -117,7 +122,6 @@ void clearScreen() {
 
     cur = VRAM;
     updateCursorPosition();
-    setStatusBar();
 
     ints_okay();
 }
@@ -199,10 +203,49 @@ void printf(char* fmt, ...) {
 //   Easy enough if this file supports it (with cur, clearScreen, and advanceLine (and printColor, if at bottom).
 
 
+// For now maybe lets have no scrolling, just have a static buffer that holds a screenful of data (including color).
+
+uint8_t term_buf[160 * LINES];
+
+static inline void showLogs() {
+    if (con == CON_LOGS)
+        return;
+
+    for (int i = 0; i < 160 * LINES; i++)
+        term_buf[i] = VRAM[i];
+
+    term_cur = cur;
+
+    con = CON_LOGS;
+    clearScreen();
+    print("Logs will go here...\n");
+}
+
+static inline void showTerminal() {
+    if (con == CON_TERM)
+        return;
+
+    for (int i = 0; i < 160 * LINES; i++)
+        VRAM[i] = term_buf[i];
+
+    cur = term_cur;
+    updateCursorPosition();
+
+    con = CON_TERM;
+}
 
 static void gotInput(struct input i) {
-    if (!i.alt && !i.ctrl)
+    if (i.key == '1' && !i.alt && i.ctrl)
+        showTerminal();
+
+    if (con == CON_TERM && !i.alt && !i.ctrl)
         printc(i.key);
+
+    if (i.key == '2' && !i.alt && i.ctrl)
+        showLogs();
+
+    if ((i.key == 'l' || i.key == 'L') && !i.alt && i.ctrl)
+        clearScreen();
 }
 
 void startTty() {
@@ -210,5 +253,6 @@ void startTty() {
     init_keyboard();
     registerKbdListener(&gotInput);
     clearScreen();
+    setStatusBar();
     printColor("Ready!\n", 0x0d);
 };
