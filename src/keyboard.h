@@ -63,3 +63,4 @@ struct input {
 void keyScanned(uint8_t c);
 void registerKbdListener(void (*)(struct input));
 void unregisterKbdListener(void (*)(struct input));
+void init_keyboard();

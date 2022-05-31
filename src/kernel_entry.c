@@ -4,6 +4,7 @@
 #include "console.h"
 #include "hpet.h"
 #include "interrupt.h"
+#include "keyboard.h"
 #include "log.h"
 #include "malloc.h"
 #include "strings.h"
@@ -15,6 +16,7 @@ void __attribute__((section(".kernel_entry"))) kernel_entry() {
     parse_acpi_tables();
     init_hpet();
 
+    init_keyboard();
     startTty();
 
     log("Kernel loaded; going to waitloop\n");

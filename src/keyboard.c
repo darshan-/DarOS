@@ -2,6 +2,8 @@
 
 #include "keyboard.h"
 
+#include "interrupt.h"
+#include "io.h"
 #include "list.h"
 
 // https://www.win.tue.nl/~aeb/linux/kbd/scancodes-1.html
@@ -25,6 +27,44 @@ static inline void gotInput(struct input c) {
         }
         __fn__;
     }));
+}
+
+static inline void kbd_out(uint8_t val) {
+    while(inb(0x64) & 0b10) // TODO: Is this safe, or should I have a counter and crap out after a bit?
+        ;
+    outb(0x60, val);
+}
+
+static inline uint8_t kbd_read_resp() {
+    while(!(inb(0x64) & 0b1)) // TODO: Is this safe, or should I have a counter and crap out after a bit?
+        ;
+    return inb(0x60);
+}
+
+#define KBD_ACK 0xfa
+#define KBD_RESEND 0xfe
+
+static inline void kbd_cmd(uint8_t cmd, uint8_t arg) {
+    for (int i = 0; i < 3; i++) {
+        kbd_out(cmd);
+        kbd_out(arg);
+
+        uint8_t resp = kbd_read_resp();
+
+        if (resp == KBD_ACK)
+            break;
+
+        if (resp == KBD_RESEND)
+            continue;
+
+        logf("Keyboard controller sent unexpected response: 0x%h\n", resp);
+    }
+}
+
+void init_keyboard() {
+    no_ints();
+    kbd_cmd(0xf3, 0b0100000); // Set Typematic to 0.5 sec delay, 30.0 per second
+    ints_okay();
 }
 
 void keyScanned(uint8_t c) {
@@ -56,10 +96,10 @@ void keyScanned(uint8_t c) {
 
     case 0x3a:
         caps_lock_on = !caps_lock_on;
-        outb(0x60, 0xed);
-        while(inb(0x64) & 0b10) // TODO: Is this safe, or should I have a counter and crap out after a bit?
-            ;
-        outb(0x60, caps_lock_on << 2);
+        no_ints();
+        kbd_cmd(0xed, caps_lock_on << 2);
+        ints_okay();
+
         break;
 
         shifty(0x02, '1', '!');
