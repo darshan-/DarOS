@@ -218,7 +218,13 @@ static inline void showLogs() {
 
     con = CON_LOGS;
     clearScreen();
-    print("Logs will go here...\n");
+
+    forEachLog(({
+        void __fn__ (char* s) {
+            print(s);
+        }
+        __fn__;
+    }));
 }
 
 static inline void showTerminal() {
@@ -238,14 +244,18 @@ static void gotInput(struct input i) {
     if (i.key == '1' && !i.alt && i.ctrl)
         showTerminal();
 
-    if (con == CON_TERM && !i.alt && !i.ctrl)
-        printc(i.key);
+    // Things that apply to both go here.
 
-    if (i.key == '2' && !i.alt && i.ctrl)
-        showLogs();
+    if (con == CON_TERM) {
+        if (!i.alt && !i.ctrl)
+            printc(i.key);
 
-    if ((i.key == 'l' || i.key == 'L') && !i.alt && i.ctrl)
-        clearScreen();
+        if (i.key == '2' && !i.alt && i.ctrl)
+            showLogs();
+
+        if ((i.key == 'l' || i.key == 'L') && !i.alt && i.ctrl)
+            clearScreen();
+    }
 }
 
 void startTty() {
