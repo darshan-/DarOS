@@ -242,6 +242,23 @@ static inline void showTerminal() {
     con = CON_TERM;
 }
 
+/*
+  I'm pretty confident that logs as terminal 2 is just a temporary hack, and the issues I have with it (starting
+  at the beginning every time seems wrong, but so is anything else; logs can be added while we're away, and keeping
+  track of which ones we've printed and which we haven't is hairy), I just think isn't worth it.  I think multiple
+  consoles/terminals sounds great, and a command to page through logs sounds great.  With multiple terminals, things
+  will only be written to them while we're there.  (Or, huh, is that a bad limitation too?  Do I really want an extra
+  level if indirection, so an app running on terminal 3 can write to terminal 3 while we're at terminal 1, and when
+  we go back to terminal 3, we see what was output while we were away?  Ultimately, yeah, I guess that's what we'd
+  want.  A buffer of some sort?  Instead of printing to the screen, it'd be printing to whatever terminal it's
+  running on, and that's copied to the terminal right away if we're there, otherwise it's copied in once we switch
+  back to it.  I guess writing to the terminal automatically scrolls us to bottom?  I think linux works that way; it
+  feels pretty intuitive.  So we can move away and come back and still be scrolled wherever, as long as nothing was
+  output, but if anything got written to the screen, we'll lose that position and be at the bottom.  I think as far
+  as incremental improvements, it's still okay and in the spirit of things to not ever-engineer this, and just keep
+  having fun and doing what makes sense and is interesting for now.)
+ */
+
 static void gotInput(struct input i) {
     if (i.key == '1' && !i.alt && i.ctrl)
         showTerminal();
