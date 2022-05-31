@@ -167,7 +167,7 @@ void registerKbdListener(void (*f)(struct input)) {
     if (!inputCallbackList)
         inputCallbackList = newList();
 
-    addToList(inputCallbackList, f);
+    pushListHead(inputCallbackList, f);
 }
 
 void unregisterKbdListener(void (*f)(struct input)) {

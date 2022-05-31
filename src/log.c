@@ -11,7 +11,7 @@ void log(char* s) {
     if (!logs)
         logs = newList();
 
-    addToList(logs, M_scopy(s));
+    pushListTail(logs, M_scopy(s));
 }
 
 void logf(char* fmt, ...) {

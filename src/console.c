@@ -126,6 +126,8 @@ void clearScreen() {
     ints_okay();
 }
 
+// Two stacks of pointers to uint8_t[160]?  LIFO for both scroll back and scroll forward...
+// So linked list, but push to head, not tail, right?
 static inline void advanceLine() {
     for (int i = 0; i < LINES - 1; i++)
         for (int j = 0; j < 160; j++)

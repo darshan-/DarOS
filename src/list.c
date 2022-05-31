@@ -19,7 +19,28 @@ struct list* newList() {
     return l;
 }
 
-void addToList(struct list* l, void* item) {
+void* popListHead(struct list* l) {
+    if (!l || !l->head) return 0;
+
+    void* ret = l->head->item;
+    struct list_node* oldh = l->head;
+    l->head = l->head->next;
+    free(oldh);
+
+    return ret;
+}
+
+void pushListHead(struct list* l, void* item) {
+    if (!l) return;
+
+    struct list_node* n = malloc(sizeof(struct list_node));
+    n->item = item;
+    n->next = l->head;
+
+    l->head = n;
+}
+
+void pushListTail(struct list* l, void* item) {
     if (!l) return;
 
     struct list_node* n = malloc(sizeof(struct list_node));
@@ -35,24 +56,6 @@ void addToList(struct list* l, void* item) {
     while (cur->next)
         cur = cur->next;
     cur->next = n;
-}
-
-void* atomicPop(struct list* l) {
-    void* item = (void *) 0;
-
-    no_ints();
-
-    if (!l || !l->head) goto ret;
-
-    item = l->head->item;
-
-    struct list_node* old_head = l->head;
-    l->head = l->head->next;
-    free(old_head);
-
- ret:
-    ints_okay();
-    return item;
 }
 
 void removeFromListWithEquality(struct list* l, int (*equals)(void*)) {
