@@ -11,12 +11,13 @@
 #include "serial.h"
 #include "strings.h"
 
-static void gotChar(char c) {
-    printc(c);
+static void gotInput(struct input i) {
+    if (!i.alt && !i.ctrl)
+        printc(i.key);
 }
 
 static void startTty() {
-    registerKbdListener(&gotChar);
+    registerKbdListener(&gotInput);
 };
 
 void __attribute__((section(".kernel_entry"))) kernel_entry() {
@@ -33,7 +34,8 @@ void __attribute__((section(".kernel_entry"))) kernel_entry() {
     parse_acpi_tables();
     init_hpet();
 
-    log("going to waitloop\n");
     printColor("Ready!\n", 0x0d);
+
+    log("going to waitloop\n");
     waitloop();
 }

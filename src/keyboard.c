@@ -6,30 +6,26 @@
 
 // https://www.win.tue.nl/~aeb/linux/kbd/scancodes-1.html
 
+#define si(k) (struct input) {(k), alt_down, ctrl_down, shift_down}
 // Code, char if shift not down, char if shift down
-#define map(c, n, s) case c: gotInput(shift_down ? s : n); break
+#define map(c, n, s) case c: gotInput(shift_down ? si(s) : si(n)); break
 
 // Let's ignore caps lock for now, but keep track of shift
 static uint8_t shift_down = 0;
+static uint8_t ctrl_down = 0;
+static uint8_t alt_down = 0;
 
 static struct list* inputCallbackList = (struct list*) 0;
 
 // Call for characters that count as input (for now just print them...)
-static inline void gotInput(char c) {
+static inline void gotInput(struct input c) {
     forEachListItem(inputCallbackList, ({
         void __fn__ (void* item) {
-            ((void (*)(char)) item)(c);
-            // void (*cb)(char) = (void (*)(char)) item;
-            // cb(c);
+            ((void (*)(struct input)) item)(c);
         }
         __fn__;
     }));
 }
-
-// TODO:  I can keep a history of 4 items, and if the past 4 were first
-//   a control down a and an alt down (in either order) and the next two
-//   were a control up and an alt up (in either order) and this is '1',
-//   then do nothing.  (QEMU switching back to VGA.)
 
 void keyScanned(uint8_t c) {
     uint8_t hob = c & 0x80;  // Break / release
@@ -45,10 +41,19 @@ void keyScanned(uint8_t c) {
     }
 
     switch (c) {
+    case 0x1d:
+        ctrl_down = hob ? 0 : 1;
+        break;
+
     case 0x2a:
     case 0x36:
         shift_down = hob ? 0 : 1;
         break;
+
+    case 0x38:
+        alt_down = hob ? 0 : 1;
+        break;
+
         map(0x02, '1', '!');
         map(0x03, '2', '@');
         map(0x04, '3', '#');
@@ -110,15 +115,16 @@ void keyScanned(uint8_t c) {
     }
 }
 
-void registerKbdListener(void (*gotChar)(char)) {
+void registerKbdListener(void (*f)(struct input)) {
     if (!inputCallbackList)
         inputCallbackList = newList();
 
-    addToList(inputCallbackList, gotChar);
+    addToList(inputCallbackList, f);
 }
 
-void unregisterKbdListener(void (*gotChar)(char)) {
-    if (!inputCallbackList) return;
+void unregisterKbdListener(void (*f)(struct input)) {
+    if (!inputCallbackList)
+        return;
 
-    removeFromList(inputCallbackList, gotChar);
+    removeFromList(inputCallbackList, f);
 }
