@@ -56,6 +56,10 @@ void keyScanned(uint8_t c) {
 
     case 0x3a:
         caps_lock_on = !caps_lock_on;
+        outb(0x60, 0xed);
+        while(inb(0x64) & 0b10) // TODO: Is this safe, or should I have a counter and crap out after a bit?
+            ;
+        outb(0x60, caps_lock_on << 2);
         break;
 
         shifty(0x02, '1', '!');

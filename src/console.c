@@ -5,6 +5,7 @@
 
 #include "interrupt.h"
 #include "io.h"
+#include "keyboard.h"
 #include "malloc.h"
 #include "periodic_callback.h"
 #include "rtc.h"
@@ -69,10 +70,7 @@ void updateMemUse() {
     if (strlen(s) > MAX_MEMLEN)
         s[MAX_MEMLEN] = 0;
 
-    // Now let's zero-pad so things don't look bad if an interrupt happens after clearing but before writing.
-    // In reality, I plan to next slow down the updates of this to something more reasonable (clock updating 10
-    //   times a second seems great, so so catch second tick quickly, but for mem use, you can't read such frequent
-    //   updates), but this was a good test of my understanding (success!), and fun to try!
+    // Zero-pad so things don't look bad if an interrupt happens after clearing but before writing.
     if (strlen(s) < MAX_MEMLEN) {
         char* f = M_sprintf("%%p %us", MAX_MEMLEN);
         char* t = M_sprintf(f, s);
@@ -104,10 +102,8 @@ static void setStatusBar() {
         *v = 0x5f005f005f005f00;
 
     writeStatusBar("PurpOS", 37);
-    // STATUS_LINE[35*2] = (char*) 3;
-    // STATUS_LINE[35*2+1] = 0x35;
-    // STATUS_LINE[44*2] = (char*) 3;
-    // STATUS_LINE[44*2+1] = 0x35;
+
+    updateMemUse(); // Clock will update very soon, but mem won't for 2 seconds
 
     registerPeriodicCallback((struct periodic_callback) {60, 1, updateClock});
     registerPeriodicCallback((struct periodic_callback) {1, 2, updateMemUse});
@@ -201,3 +197,17 @@ void printf(char* fmt, ...) {
 
 // Have bottom line be a solid color background and have a clock and other status info?  (Or top line?)
 //   Easy enough if this file supports it (with cur, clearScreen, and advanceLine (and printColor, if at bottom).
+
+
+
+static void gotInput(struct input i) {
+    if (!i.alt && !i.ctrl)
+        printc(i.key);
+}
+
+void startTty() {
+    log("starting tty\n");
+    registerKbdListener(&gotInput);
+    clearScreen();
+    printColor("Ready!\n", 0x0d);
+};
