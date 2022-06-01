@@ -386,15 +386,17 @@ static inline void scrollToBottom() {
     //for (int i = 0; i < l && i < l LINES - 1; i++) {
     //for (int i = 0; i < LINES - l; i++) {
 
-    for (uint32_t i = 0; i < l; i++) {
+    uint32_t i;
+    for (i = 0; i < l && i < LINES; i++) {
         uint8_t* line = malloc(160);
         for (int j = 0; j < 160; j++)
             line[j] = VRAM[i * 160 + j];
         pushListHead(scrollUpBuf, line);
     }
+    for (; i < l; i++)
+        pushListHead(scrollUpBuf, popListHead(scrollDownBuf));
 
-    uint32_t i;
-    for (i = 0; i < LINES - l; i++) {
+    for (i = 0; i < (int64_t) LINES - l; i++) {
         for (int j = 0; j < 160; j++)
             VRAM[i* 160 + j] = VRAM[(i + l) * 160 + j];
     }
