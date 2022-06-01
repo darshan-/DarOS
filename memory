@@ -2,12 +2,13 @@
 0x00_1000 - 0x00_1fff :   4 KB : page table 4
 0x00_2000 - 0x00_2fff :   4 KB : page table 3
 0x00_3000 - 0x00_3fff :   4 KB : page table 2
-0x00_4000 - 0x00_7bff :  15 KB : bootloader stack
+0x00_4000 - 0x00_4fff :   4 KB : int 0x15, eax = 0xe820 memory table
+0x00_5000 - 0x00_7bff :  11 KB : bootloader stack
 0x00_7c00 - 0x07_ffff : 481 KB : kernel
 0x08_0000 - 0x09_ffff : 128 KB : EBDA (So available once in long mode)
 0x0a_0000 - 0x0c_ffff : 160 KB : Video
 0x0c_8000 - 0x0e_ffff : 160 KB : BIOS Expansions
-0x0f_0000 - 0x0f_ffff :  64 KB : Motherboard BIOS until long mode, then kernel stack
+0x0f_0000 - 0x0f_ffff :  64 KB : Motherboard BIOS until long mode, then kernel stack (maybe not okay; depends on int 15 info)
 //0x10_0000 - 0x2f_ffff :   2 MB : l2 tables for first 512 GB of address space
 0x10_0000 - 0x1f_ffff :   1 MB : l2 tables for first 256 GB of address space
 0x20_0000 - 0x2f_ffff :   1 MB : l2 tables for misc use

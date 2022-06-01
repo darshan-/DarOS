@@ -17,6 +17,11 @@ void __attribute__((section(".kernel_entry"))) kernel_entry() {
 
     startTty();
 
+    uint32_t* entry_count = (uint32_t*) 0x4000;
+    uint64_t* int_15_mem_table = (uint64_t*) 0x4004;
+    for (uint32_t j = 0; j < 3 * *entry_count; j++)
+        printf("0x%p016h\n", int_15_mem_table[j]);
+
     log("Kernel loaded; going to waitloop\n");
     waitloop();
 }

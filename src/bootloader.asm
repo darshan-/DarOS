@@ -47,6 +47,7 @@
         page_table_l4 equ 0x1000
         page_table_l3 equ 0x2000
         page_table_l2 equ 0x3000
+        int_15_mem_table equ 0x4000
         page_tables_l2 equ 0x100000
         stack_top equ 0x7bff
         idt equ 0               ; 0-0x1000 available in long mode
@@ -114,8 +115,31 @@ lba_success:
         mov bx, loaded
         call teleprint
 
-        ; Apparently I'll want to ask BIOS about memory (https://wiki.osdev.org/Detecting_Memory_(x86))
-        ;   while I'm still in real mode, probably somewhere around here, at some point.
+        mov dword [int_15_mem_table], 0
+        mov ax, int_15_mem_table>>4
+        mov es, ax
+        mov di, 4
+
+        SMAP equ 'S' << 24 | 'M' << 16 | 'A' << 8 | 'P' ; 0x534d4150 aka 'SMAP'
+
+        mov ebx, 0
+        mov edx, SMAP
+
+smap_start:
+        mov eax, 0xe820
+        mov ecx, 20
+        int 0x15
+        jc smap_done
+        mov edx, SMAP
+        cmp eax, edx
+        jne smap_done
+        cmp ebx, 0
+        je smap_done
+        inc dword [int_15_mem_table]
+        add di, 24
+        jmp smap_start
+
+smap_done:
 
         ; Enable A20 bit
         mov ax, 0x2401
