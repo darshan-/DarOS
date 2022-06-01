@@ -351,6 +351,20 @@ static inline void scrollDown() {
         showCursor();
 }
 
+
+// Strangely, the line-at-a-time scrolling seems to work perfectly fine on bochs, exactly as I'd first imagined it,
+//   and I can't reproduce the bug where it starts to take two attempts to switch consoles.  Still happens reliably
+//   after a bit of stress with qemu, but I can't make it happen with bochs.  Next, I'll try the Presario.
+// Yeah, works perfectly on Presario.  I knew it was an inefficient first draft, but I figured it'd be fine to scroll
+//  a line at time if there weren't like a 1000 lines.  And with about a 100 (4 screenfulls) on the Presario, it's
+//  exactly as I imagned.  You scroll to the top, you type something, and you're virtually instantly at the bottom.
+// And I can't reproduce the ignore-console-switches bug there either.  Although I did get a weird default PIC
+//  interrupt (and I don't currently macro-create them to see which one).  So inefficient but essetially working
+//  perfectly everywhere but qemu, other than potential issue with the interrupt.  Except a PIC interrupt wouldn't
+//  ever be a processor-driven issue, right?  It's like, for real hardware letting you know about something physical
+//  happening, not the CPU letting you know you're doing something wrong?  Plus, I have everything masked except
+//  keyboard and PIT, right?  So how'ed I get it?
+
 static inline void scrollToBottom() {
     if (!scrollDownBuf)
         return;
