@@ -64,8 +64,9 @@
         EFER_LONG_MODE_ENABLE equ 1<<8
 
         ; Let's load 960 sectors, 120 at a time (128 is max at a time, 961 total is max in safe area)
-        SECT_PER_LOAD equ 120
-        LOAD_COUNT equ 8
+        ; Well, VirtualBox, and apparently some other BIOSes, can only handle reading one sector at a time...
+        SECT_PER_LOAD equ 1
+        LOAD_COUNT equ 960
 
         INT_0x10_TELETYPE equ 0x0e
         INT_0x13_LBA_READ equ 0x42
@@ -128,18 +129,18 @@ lba_success:
         mov dx, 0x71
         in al, dx
 
-        lgdt [gdtr]
+        jmp sect2
 
-        ; TODO: Intel manual specifically says we need to be in protected mode *with paging enabled* before
-        ;   entering long mode, and then turn it off.  So I guess that might be worth a try too?  AMD says
-        ;   paging doesn't have to be on, only to turn it off if it is on.  And I've seen lots of examples
-        ;   that don't, but presumably work on Intel hardware?
+        ; ; TODO: Intel manual specifically says we need to be in protected mode *with paging enabled* before
+        ; ;   entering long mode, and then turn it off.  So I guess that might be worth a try too?  AMD says
+        ; ;   paging doesn't have to be on, only to turn it off if it is on.  And I've seen lots of examples
+        ; ;   that don't, but presumably work on Intel hardware?
 
-        mov eax, cr0
-        or eax, CR0_PROTECTION
-        mov cr0, eax
+        ; mov eax, cr0
+        ; or eax, CR0_PROTECTION
+        ; mov cr0, eax
 
-        jmp CODE_SEG32:start32
+        ; jmp CODE_SEG32:start32
 
 loaded: db "Sectors loaded!", 0x0d, 0x0a, 0
 lba_error_s: db "LBA returned an error; please check AH for return code", 0x0d, 0x0a, 0
@@ -159,26 +160,26 @@ done:
 
 
         CODE_SEG equ gdt.code - gdt
-        CODE_SEG32 equ gdt.code32 - gdt
-        DATA_SEG32 equ gdt.data32 - gdt
+        ;CODE_SEG32 equ gdt.code32 - gdt
+        ;DATA_SEG32 equ gdt.data32 - gdt
 gdt:
         dq 0
 .code:
         dq SD_PRESENT | SD_NONTSS | SD_CODESEG | SD_READABLE | SD_GRAN4K | SD_MODE64 ; Code segment
-.code32:
-        dw 0xFFFF
-        dw 0x0
-        db 0x0
-        db 10011010b
-        db 11001111b
-        db 0x0
-.data32:
-        dw 0xFFFF
-        dw 0x0
-        db 0x0
-        db 10010010b
-        db 11001111b
-        db 0x0
+; .code32:
+;         dw 0xFFFF
+;         dw 0x0
+;         db 0x0
+;         db 10011010b
+;         db 11001111b
+;         db 0x0
+; .data32:
+;         dw 0xFFFF
+;         dw 0x0
+;         db 0x0
+;         db 10010010b
+;         db 11001111b
+;         db 0x0
 gdtr:
         dw $ - gdt - 1          ; Length in bytes minus 1
         dq gdt                  ; Address
@@ -218,13 +219,12 @@ dap:
 
 sect2:
 
-bits 32
-start32:
-
-        mov ax, DATA_SEG32
-        mov ds, ax
-        mov ss, ax
-        mov esp, stack_top
+;bits 32
+;start32:
+        ; mov ax, DATA_SEG32
+        ; mov ds, ax
+        ; mov ss, ax
+        ; mov esp, stack_top
 
         mov eax, page_table_l3 | PT_PRESENT | PT_WRITABLE
         mov [page_table_l4], eax
