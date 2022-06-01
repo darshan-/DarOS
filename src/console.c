@@ -41,6 +41,10 @@ static uint8_t* cur = VRAM;
 static uint8_t con = CON_TERM;
 static uint8_t* term_cur;
 
+static struct list* scrollBackBuf = (struct list*) 0;
+static struct list* scrollForwBuf = (struct list*) 0;
+static struct list *term_scrollBackBuf, *term_scrollForwBuf;
+
 static inline void updateCursorPosition() {
     uint64_t c = (uint64_t) (cur - VRAM) / 2;
 
@@ -129,6 +133,14 @@ void clearScreen() {
 // Two stacks of pointers to uint8_t[160]?  LIFO for both scroll back and scroll forward...
 // So linked list, but push to head, not tail, right?
 static inline void advanceLine() {
+    if (!scrollBackBuf)
+        scrollBackBuf = newList();
+
+    char* line = malloc(160);
+    for (int i = 0; i < 160; i++)
+        line[i] = VRAM[i];
+    pushListHead(scrollBackBuf, line);
+
     for (int i = 0; i < LINES - 1; i++)
         for (int j = 0; j < 160; j++)
             VRAM[i * 160 + j] = VRAM[(i + 1) * 160 + j];
@@ -217,6 +229,10 @@ static inline void showLogs() {
         term_buf[i] = VRAM[i];
 
     term_cur = cur;
+    term_scrollBackBuf = scrollBackBuf;
+    term_scrollForwBuf = scrollForwBuf;
+    scrollBackBuf = (struct list*) 0;
+    scrollForwBuf = (struct list*) 0;
 
     con = CON_LOGS;
     clearScreen();
@@ -239,6 +255,9 @@ static inline void showTerminal() {
     cur = term_cur;
     updateCursorPosition();
 
+    scrollBackBuf = term_scrollBackBuf;
+    scrollForwBuf = term_scrollForwBuf;
+
     con = CON_TERM;
 }
 
@@ -259,20 +278,49 @@ static inline void showTerminal() {
   having fun and doing what makes sense and is interesting for now.)
  */
 
+/*
+  I think I want to do the ugly, easy thing for now, and just special case the main console and log console, and
+  not worry about process output stuff yet.  So a scrollback and scrollahead buffer for whichever console I'm on,
+  and store/restore those when moving from/to main console, but just recreate log one on demand.  It's the wrong
+  model, but I think the best/easiest/funnest thing short term.
+ */
+
+static inline void scrollBack() {
+    if (!scrollBackBuf)
+        return;
+
+    char* top = (char*) popListHead(scrollBackBuf);
+    if (!top)
+        return;
+
+    char* bot = malloc(160);
+    for (int i = 0; i < 160; i++)
+        bot[i] = VRAM[24 * (LINES - 1) + i];
+    pushListHead(scrollForwBuf, bot);
+
+    for (int i = LINES - 1; i > 0; i--)
+        for (int j = 0; j < 160; j++)
+            VRAM[i * 160 + j] = VRAM[(i - 1) * 160 + j];
+
+    for (int i = 0; i < 160; i++)
+        VRAM[i] = top[i];
+}
+
 static void gotInput(struct input i) {
     if (i.key == '1' && !i.alt && i.ctrl)
         showTerminal();
 
-    // Things that apply to both go here.
+    else if (i.key == KEY_UP && !i.alt && !i.ctrl)
+        scrollBack();
 
-    if (con == CON_TERM) {
+    else if (con == CON_TERM) {
         if (!i.alt && !i.ctrl)
             printc(i.key);
 
-        if (i.key == '2' && !i.alt && i.ctrl)
+        else if (i.key == '2' && !i.alt && i.ctrl)
             showLogs();
 
-        if ((i.key == 'l' || i.key == 'L') && !i.alt && i.ctrl)
+        else if ((i.key == 'l' || i.key == 'L') && !i.alt && i.ctrl)
             clearScreen();
     }
 }

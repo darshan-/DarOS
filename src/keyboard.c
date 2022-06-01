@@ -158,6 +158,8 @@ void keyScanned(uint8_t c) {
         shifty(0x35, '/', '?');
 
         shifty(0x39, ' ', ' ');
+
+        map(0x48, si(KEY_UP));
     default:
         break;
     }
