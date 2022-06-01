@@ -160,6 +160,7 @@ void keyScanned(uint8_t c) {
         shifty(0x39, ' ', ' ');
 
         map(0x48, si(KEY_UP));
+        map(0x50, si(KEY_DOWN));
     default:
         break;
     }

@@ -41,9 +41,9 @@ static uint8_t* cur = VRAM;
 static uint8_t con = CON_TERM;
 static uint8_t* term_cur;
 
-static struct list* scrollBackBuf = (struct list*) 0;
-static struct list* scrollForwBuf = (struct list*) 0;
-static struct list *term_scrollBackBuf, *term_scrollForwBuf;
+static struct list* scrollUpBuf = (struct list*) 0;
+static struct list* scrollDownBuf = (struct list*) 0;
+static struct list *term_scrollUpBuf, *term_scrollDownBuf;
 
 static inline void updateCursorPosition() {
     uint64_t c = (uint64_t) (cur - VRAM) / 2;
@@ -130,16 +130,14 @@ void clearScreen() {
     ints_okay();
 }
 
-// Two stacks of pointers to uint8_t[160]?  LIFO for both scroll back and scroll forward...
-// So linked list, but push to head, not tail, right?
 static inline void advanceLine() {
-    if (!scrollBackBuf)
-        scrollBackBuf = newList();
+    if (!scrollUpBuf)
+        scrollUpBuf = newList();
 
-    char* line = malloc(160);
+    uint8_t* line = malloc(160);
     for (int i = 0; i < 160; i++)
         line[i] = VRAM[i];
-    pushListHead(scrollBackBuf, line);
+    pushListHead(scrollUpBuf, line);
 
     for (int i = 0; i < LINES - 1; i++)
         for (int j = 0; j < 160; j++)
@@ -229,10 +227,10 @@ static inline void showLogs() {
         term_buf[i] = VRAM[i];
 
     term_cur = cur;
-    term_scrollBackBuf = scrollBackBuf;
-    term_scrollForwBuf = scrollForwBuf;
-    scrollBackBuf = (struct list*) 0;
-    scrollForwBuf = (struct list*) 0;
+    term_scrollUpBuf = scrollUpBuf;
+    term_scrollDownBuf = scrollDownBuf;
+    scrollUpBuf = (struct list*) 0;
+    scrollDownBuf = (struct list*) 0;
 
     con = CON_LOGS;
     clearScreen();
@@ -255,8 +253,8 @@ static inline void showTerminal() {
     cur = term_cur;
     updateCursorPosition();
 
-    scrollBackBuf = term_scrollBackBuf;
-    scrollForwBuf = term_scrollForwBuf;
+    scrollUpBuf = term_scrollUpBuf;
+    scrollDownBuf = term_scrollDownBuf;
 
     con = CON_TERM;
 }
@@ -285,18 +283,21 @@ static inline void showTerminal() {
   model, but I think the best/easiest/funnest thing short term.
  */
 
-static inline void scrollBack() {
-    if (!scrollBackBuf)
+static inline void scrollUp() {
+    if (!scrollUpBuf)
         return;
 
-    char* top = (char*) popListHead(scrollBackBuf);
+    uint8_t* top = (uint8_t*) popListHead(scrollUpBuf);
     if (!top)
         return;
 
-    char* bot = malloc(160);
+    if (!scrollDownBuf)
+        scrollDownBuf = newList();
+
+    uint8_t* bot = malloc(160);
     for (int i = 0; i < 160; i++)
-        bot[i] = VRAM[24 * (LINES - 1) + i];
-    pushListHead(scrollForwBuf, bot);
+        bot[i] = VRAM[160 * (LINES - 1) + i];
+    pushListHead(scrollDownBuf, bot);
 
     for (int i = LINES - 1; i > 0; i--)
         for (int j = 0; j < 160; j++)
@@ -304,6 +305,24 @@ static inline void scrollBack() {
 
     for (int i = 0; i < 160; i++)
         VRAM[i] = top[i];
+
+    free(top);
+}
+
+static inline void scrollDown() {
+    if (!scrollDownBuf)
+        return;
+
+    uint8_t* bot = (uint8_t*) popListHead(scrollDownBuf);
+    if (!bot)
+        return;
+
+    advanceLine();
+
+    for (int i = 0; i < 160; i++)
+        VRAM[160 * (LINES - 1) + i] = bot[i];
+
+    free(bot);
 }
 
 static void gotInput(struct input i) {
@@ -311,7 +330,10 @@ static void gotInput(struct input i) {
         showTerminal();
 
     else if (i.key == KEY_UP && !i.alt && !i.ctrl)
-        scrollBack();
+        scrollUp();
+
+    else if (i.key == KEY_DOWN && !i.alt && !i.ctrl)
+        scrollDown();
 
     else if (con == CON_TERM) {
         if (!i.alt && !i.ctrl)
