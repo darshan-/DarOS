@@ -54,6 +54,19 @@ static inline void updateCursorPosition() {
     outb(0x3D4+1, (uint8_t) ((c >> 8) & 0xff));
 }
 
+static inline void hideCursor() {
+    outb(0x3D4, 0x0A);
+    outb(0x3D5, 0x20);
+}
+
+static inline void showCursor() {
+    outb(0x3D4, 0x0A);
+    outb(0x3D5, (inb(0x3D5) & 0xC0) | 13);
+ 
+    outb(0x3D4, 0x0B);
+    outb(0x3D5, (inb(0x3D5) & 0xE0) | 15);
+}
+
 static void writeStatusBar(char* s, uint8_t loc) {
     if (loc >= 80) return;
 
@@ -241,6 +254,8 @@ static inline void showLogs() {
         }
         __fn__;
     }));
+
+    hideCursor();
 }
 
 static inline void showTerminal() {
@@ -253,10 +268,16 @@ static inline void showTerminal() {
     cur = term_cur;
     updateCursorPosition();
 
+    destroyList(scrollUpBuf);
+    destroyList(scrollDownList);
+
     scrollUpBuf = term_scrollUpBuf;
     scrollDownBuf = term_scrollDownBuf;
 
     con = CON_TERM;
+
+    if (listIsEmpty(scrollDownBuf))
+        showCursor();
 }
 
 /*
@@ -291,6 +312,8 @@ static inline void scrollUp() {
     if (!top)
         return;
 
+    hideCursor();
+
     if (!scrollDownBuf)
         scrollDownBuf = newList();
 
@@ -309,6 +332,7 @@ static inline void scrollUp() {
     free(top);
 }
 
+// Hide cursor while scrolling?
 static inline void scrollDown() {
     if (!scrollDownBuf)
         return;
@@ -323,6 +347,26 @@ static inline void scrollDown() {
         VRAM[160 * (LINES - 1) + i] = bot[i];
 
     free(bot);
+
+    if (listIsEmpty(scrollDownBuf))
+        showCursor();
+}
+
+static inline void scrollToBottom() {
+    if (!scrollDownBuf)
+        return;
+
+    uint8_t* bot;
+    while ((bot = (uint8_t*) popListHead(scrollDownBuf))) {
+        advanceLine();
+
+        for (int i = 0; i < 160; i++)
+            VRAM[160 * (LINES - 1) + i] = bot[i];
+
+        free(bot);
+    }
+
+    showCursor();
 }
 
 static void gotInput(struct input i) {
@@ -336,13 +380,15 @@ static void gotInput(struct input i) {
         scrollDown();
 
     else if (con == CON_TERM) {
-        if (!i.alt && !i.ctrl)
+        if (!i.alt && !i.ctrl) {
+            scrollToBottom();
             printc(i.key);
+        }
 
         else if (i.key == '2' && !i.alt && i.ctrl)
             showLogs();
 
-        else if ((i.key == 'l' || i.key == 'L') && !i.alt && i.ctrl)
+        else if ((i.key == 'l' || i.key == 'L') && !i.alt && i.ctrl) // How shall this interact with scrolling?
             clearScreen();
     }
 }
@@ -354,4 +400,5 @@ void startTty() {
     clearScreen();
     setStatusBar();
     printColor("Ready!\n", 0x0d);
+    showCursor();
 };

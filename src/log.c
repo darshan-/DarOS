@@ -11,6 +11,9 @@ void log(char* s) {
     if (!logs)
         logs = newList();
 
+    // TODO: Include timestamp of log.
+    // I could just do an int64_t and format when showing, but I think I like formatting now and just storing
+    //   the string?
     pushListTail(logs, M_scopy(s));
 }
 

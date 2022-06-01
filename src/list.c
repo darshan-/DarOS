@@ -1,3 +1,5 @@
+#include <stdint.h>
+
 #include "list.h"
 
 #include "interrupt.h"
@@ -17,6 +19,11 @@ struct list* newList() {
     l->head = (struct list_node*) 0;
 
     return l;
+}
+
+// Do I want to return -1 if list doesn't exist?  For now, let's treat null list as empty...
+uint8_t listIsEmpty(struct list* l) {
+    return !l || !l->head;
 }
 
 void* popListHead(struct list* l) {
@@ -86,34 +93,6 @@ void removeFromList(struct list* l, void* item) {
         __fn__;
     }));
 }
-
-// void removeFromList(struct list* l, void* item) {
-//     removeFromListWithEquality(l, item, ({
-//         uint64_t __fn__ (void* l, void* r) {
-//             return l == r;
-//         }
-
-//         __fn__;
-//     }));
-// }
-
-// void removeFromListWithEquality(struct list* l, void* item, uint64_t (*equals)(void*, void*)) {
-//     if (!l || !l->head) return;
-
-//     struct list_node* prev = (struct list_node*) 0;
-//     for (struct list_node* cur = l->head; cur; prev = cur, cur = cur->next) {
-//         if (equals(cur->item, item)) {
-//             if (prev)
-//                 prev->next = cur->next;
-//             else
-//                 l->head = cur->next;
-
-//             free(cur);
-
-//             return;
-//         }
-//     }
-// }
 
 void forEachListItem(struct list* l, void (*f)(void*)) {
     if (!l || !l->head) return;
