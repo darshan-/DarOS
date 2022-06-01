@@ -109,6 +109,15 @@ void forEachListItem(struct list* l, void (*f)(void*)) {
         f(cur->item);
 }
 
-void destroyList() {
-    // free() each item, then free() list
+void destroyList(struct list* l) {
+    if (!l) return;
+
+    while(l->head) {
+        struct list_node* next = l->head->next;
+        free(l->head->item);
+        free(l->head);
+        l->head = next;
+    }
+
+    free(l);
 }
