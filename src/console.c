@@ -269,7 +269,7 @@ static inline void showTerminal() {
     updateCursorPosition();
 
     destroyList(scrollUpBuf);
-    destroyList(scrollDownList);
+    destroyList(scrollDownBuf);
 
     scrollUpBuf = term_scrollUpBuf;
     scrollDownBuf = term_scrollDownBuf;
@@ -332,7 +332,6 @@ static inline void scrollUp() {
     free(top);
 }
 
-// Hide cursor while scrolling?
 static inline void scrollDown() {
     if (!scrollDownBuf)
         return;
@@ -356,6 +355,14 @@ static inline void scrollToBottom() {
     if (!scrollDownBuf)
         return;
 
+    // Decide how many lines to scroll down (max(length of scrollDownBuf, LINES))
+    //    Hmm, well, not exactly.
+    // Ah, however many lines are in scrollDownBuf are how many back we want to copy from the screen, and if
+    //   greater than LINES, then not copying from the screen, yes.
+    // But we want to copy 24 lines into the screen (from some combination of screen and scrollDownBuf), and
+    //  copy however many lines are in scrollDownBuf into scrollUpBuf (from some combination of screen and
+    //  scrollUpBuf).
+    // I'm curious how helpful a recycle arena thing would be... But for now, let's now worry about that.
     uint8_t* bot;
     while ((bot = (uint8_t*) popListHead(scrollDownBuf))) {
         advanceLine();
