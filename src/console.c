@@ -276,7 +276,7 @@ static inline void showTerminal() {
 
     con = CON_TERM;
 
-    if (listIsEmpty(scrollDownBuf))
+    if (listLen(scrollDownBuf) == 0)
         showCursor();
 }
 
@@ -347,7 +347,7 @@ static inline void scrollDown() {
 
     free(bot);
 
-    if (listIsEmpty(scrollDownBuf))
+    if (listLen(scrollDownBuf) == 0)
         showCursor();
 }
 
@@ -363,7 +363,7 @@ static inline void scrollDown() {
 //  perfectly everywhere but qemu, other than potential issue with the interrupt.  Except a PIC interrupt wouldn't
 //  ever be a processor-driven issue, right?  It's like, for real hardware letting you know about something physical
 //  happening, not the CPU letting you know you're doing something wrong?  Plus, I have everything masked except
-//  keyboard and PIT, right?  So how'ed I get it?
+//  keyboard and PIT, right?  So how'd I get it?  (VirtualBox can also reproduce the ignore switch issue...)
 
 static inline void scrollToBottom() {
     if (!scrollDownBuf)
@@ -377,14 +377,33 @@ static inline void scrollToBottom() {
     //  copy however many lines are in scrollDownBuf into scrollUpBuf (from some combination of screen and
     //  scrollUpBuf).
     // I'm curious how helpful a recycle arena thing would be... But for now, let's now worry about that.
-    uint8_t* bot;
-    while ((bot = (uint8_t*) popListHead(scrollDownBuf))) {
-        advanceLine();
 
-        for (int i = 0; i < 160; i++)
-            VRAM[160 * (LINES - 1) + i] = bot[i];
+    uint32_t l = listLen(scrollDownBuf);
 
-        free(bot);
+    if (l == 0)
+        return;
+
+    //for (int i = 0; i < l && i < l LINES - 1; i++) {
+    //for (int i = 0; i < LINES - l; i++) {
+
+    for (uint32_t i = 0; i < l; i++) {
+        uint8_t* line = malloc(160);
+        for (int j = 0; j < 160; j++)
+            line[j] = VRAM[i * 160 + j];
+        pushListHead(scrollUpBuf, line);
+    }
+
+    uint32_t i;
+    for (i = 0; i < LINES - l; i++) {
+        for (int j = 0; j < 160; j++)
+            VRAM[i* 160 + j] = VRAM[(i + l) * 160 + j];
+    }
+
+    for (; i < LINES; i++) {
+        uint8_t* line = (uint8_t*) popListHead(scrollDownBuf);
+        for (int j = 0; j < 160; j++)
+            VRAM[(i * 160) + j] = line[j];
+        free(line);
     }
 
     showCursor();

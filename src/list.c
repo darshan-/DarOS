@@ -12,23 +12,28 @@ struct list_node {
 
 struct list {
     struct list_node* head;
+    uint32_t len;
 };
 
 struct list* newList() {
     struct list* l = malloc(sizeof(struct list));
     l->head = (struct list_node*) 0;
+    l-> len = 0;
 
     return l;
 }
 
 // Do I want to return -1 if list doesn't exist?  For now, let's treat null list as empty...
-uint8_t listIsEmpty(struct list* l) {
-    return !l || !l->head;
+uint32_t listLen(struct list* l) {
+    if (!l || !l->head) return 0;
+
+    return l->len;
 }
 
 void* popListHead(struct list* l) {
     if (!l || !l->head) return 0;
 
+    l->len--;
     void* ret = l->head->item;
     struct list_node* oldh = l->head;
     l->head = l->head->next;
@@ -40,6 +45,7 @@ void* popListHead(struct list* l) {
 void pushListHead(struct list* l, void* item) {
     if (!l) return;
 
+    l->len++;
     struct list_node* n = malloc(sizeof(struct list_node));
     n->item = item;
     n->next = l->head;
@@ -50,6 +56,7 @@ void pushListHead(struct list* l, void* item) {
 void pushListTail(struct list* l, void* item) {
     if (!l) return;
 
+    l->len++;
     struct list_node* n = malloc(sizeof(struct list_node));
     n->item = item;
     n->next = (struct list_node*) 0;
@@ -68,6 +75,7 @@ void pushListTail(struct list* l, void* item) {
 void removeFromListWithEquality(struct list* l, int (*equals)(void*)) {
     if (!l || !l->head) return;
 
+    l->len--;
     struct list_node* prev = (struct list_node*) 0;
     for (struct list_node* cur = l->head; cur; prev = cur, cur = cur->next) {
         if (equals(cur->item)) {
