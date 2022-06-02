@@ -9,7 +9,6 @@
 0x0a_0000 - 0x0c_ffff : 160 KB : Video
 0x0c_8000 - 0x0e_ffff : 160 KB : BIOS Expansions
 0x0f_0000 - 0x0f_ffff :  64 KB : Motherboard BIOS until long mode, then kernel stack (maybe not okay; depends on int 15 info)
-//0x10_0000 - 0x2f_ffff :   2 MB : l2 tables for first 512 GB of address space
 0x10_0000 - 0x1f_ffff :   1 MB : l2 tables for first 256 GB of address space
 0x20_0000 - 0x2f_ffff :   1 MB : l2 tables for misc use
 0x30_0000 - 0x30_fff0 :  64 KB : Kernel stack in long mode (16 bytes less than 64 KB)
