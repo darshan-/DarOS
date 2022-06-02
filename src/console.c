@@ -128,7 +128,7 @@ static void setStatusBar() {
     updateMemUse(); // Clock will update very soon, but mem won't for 2 seconds
 
     registerPeriodicCallback((struct periodic_callback) {60, 1, updateClock});
-    registerPeriodicCallback((struct periodic_callback) {1, 2, updateMemUse});
+    registerPeriodicCallback((struct periodic_callback) {2, 1, updateMemUse});
 }
 
 void clearScreen() {
@@ -236,6 +236,8 @@ static inline void showLogs() {
     if (con == CON_LOGS)
         return;
 
+    hideCursor();
+
     for (int i = 0; i < 160 * LINES; i++)
         term_buf[i] = VRAM[i];
 
@@ -254,8 +256,6 @@ static inline void showLogs() {
         }
         __fn__;
     }));
-
-    hideCursor();
 }
 
 static inline void showTerminal() {
@@ -347,7 +347,7 @@ static inline void scrollDown() {
 
     free(bot);
 
-    if (listLen(scrollDownBuf) == 0)
+    if (con == CON_TERM && listLen(scrollDownBuf) == 0)
         showCursor();
 }
 

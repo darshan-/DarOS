@@ -8,6 +8,12 @@
 #include "malloc.h"
 #include "strings.h"
 
+struct mem_table_entry {
+    uint64_t start : 64;
+    uint64_t length : 64;
+    uint64_t type : 64;
+};
+
 void __attribute__((section(".kernel_entry"))) kernel_entry() {
     init_heap(100*1024*1024);
     init_interrupts();
@@ -18,9 +24,9 @@ void __attribute__((section(".kernel_entry"))) kernel_entry() {
     startTty();
 
     uint32_t* entry_count = (uint32_t*) 0x4000;
-    uint64_t* int_15_mem_table = (uint64_t*) 0x4004;
-    for (uint32_t j = 0; j < 3 * *entry_count; j++)
-        printf("0x%p016h\n", int_15_mem_table[j]);
+    struct mem_table_entry* mem_table = (struct mem_table_entry*) 0x4004;
+    for (uint32_t i = 0; i < *entry_count; i++)
+        logf("0x%p016h - 0x%p016h : %u\n", mem_table[i].start, mem_table[i].start + mem_table[i].length - 1, mem_table[i].type);
 
     log("Kernel loaded; going to waitloop\n");
     waitloop();
