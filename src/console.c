@@ -335,13 +335,12 @@ static void scrollUpBy(uint64_t n) {
         for (int j = 0; j < 160; j++)
             VRAM[i * 160 + j] = VRAM[(i - l) * 160 + j];
 
-    for (; ; i--) {
+    do {
         uint8_t* line = (uint8_t*) popListHead(scrollUpBuf);
         for (int j = 0; j < 160; j++)
             VRAM[(i * 160) + j] = line[j];
         free(line);
-        if (i == 0) break;
-    }
+    } while (i-- != 0);
 }
 
 static void scrollDownBy(uint64_t n) {
