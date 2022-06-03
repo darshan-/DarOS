@@ -332,69 +332,28 @@ static inline void scrollUp() {
     free(top);
 }
 
-static inline void scrollDown() {
+// Have scrollDown, scrollToBottom, and pageDown all use this (not sure if ctrl-l will be able to...)
+static void scrollDownBy(uint64_t n) {
     if (!scrollDownBuf)
         return;
-
-    uint8_t* bot = (uint8_t*) popListHead(scrollDownBuf);
-    if (!bot)
-        return;
-
-    advanceLine();
-
-    for (int i = 0; i < 160; i++)
-        VRAM[160 * (LINES - 1) + i] = bot[i];
-
-    free(bot);
-
-    if (con == CON_TERM && listLen(scrollDownBuf) == 0)
-        showCursor();
-}
-
-
-// Strangely, the line-at-a-time scrolling seems to work perfectly fine on bochs, exactly as I'd first imagined it,
-//   and I can't reproduce the bug where it starts to take two attempts to switch consoles.  Still happens reliably
-//   after a bit of stress with qemu, but I can't make it happen with bochs.  Next, I'll try the Presario.
-// Yeah, works perfectly on Presario.  I knew it was an inefficient first draft, but I figured it'd be fine to scroll
-//  a line at time if there weren't like a 1000 lines.  And with about a 100 (4 screenfulls) on the Presario, it's
-//  exactly as I imagned.  You scroll to the top, you type something, and you're virtually instantly at the bottom.
-// And I can't reproduce the ignore-console-switches bug there either.  Although I did get a weird default PIC
-//  interrupt (and I don't currently macro-create them to see which one).  So inefficient but essetially working
-//  perfectly everywhere but qemu, other than potential issue with the interrupt.  Except a PIC interrupt wouldn't
-//  ever be a processor-driven issue, right?  It's like, for real hardware letting you know about something physical
-//  happening, not the CPU letting you know you're doing something wrong?  Plus, I have everything masked except
-//  keyboard and PIT, right?  So how'd I get it?  (VirtualBox can also reproduce the ignore switch issue...)
-
-static inline void scrollToBottom() {
-    if (!scrollDownBuf)
-        return;
-
-    // Decide how many lines to scroll down (max(length of scrollDownBuf, LINES))
-    //    Hmm, well, not exactly.
-    // Ah, however many lines are in scrollDownBuf are how many back we want to copy from the screen, and if
-    //   greater than LINES, then not copying from the screen, yes.
-    // But we want to copy 24 lines into the screen (from some combination of screen and scrollDownBuf), and
-    //  copy however many lines are in scrollDownBuf into scrollUpBuf (from some combination of screen and
-    //  scrollUpBuf).
-    // I'm curious how helpful a recycle arena thing would be... But for now, let's now worry about that.
 
     uint32_t l = listLen(scrollDownBuf);
 
     if (l == 0)
         return;
 
-    //for (int i = 0; i < l && i < l LINES - 1; i++) {
-    //for (int i = 0; i < LINES - l; i++) {
-
     uint32_t i;
-    for (i = 0; i < l && i < LINES; i++) {
+    for (i = 0; i < n && i < l && i < LINES; i++) {
         uint8_t* line = malloc(160);
         for (int j = 0; j < 160; j++)
             line[j] = VRAM[i * 160 + j];
         pushListHead(scrollUpBuf, line);
     }
-    for (; i < l; i++)
+    for (; i < n && i < l; i++)
         pushListHead(scrollUpBuf, popListHead(scrollDownBuf));
+
+    if (n < l)
+        l = n;
 
     for (i = 0; i < (int64_t) LINES - l; i++) {
         for (int j = 0; j < 160; j++)
@@ -408,10 +367,12 @@ static inline void scrollToBottom() {
         free(line);
     }
 
-    showCursor();
+    if (con == CON_TERM && listLen(scrollDownBuf) == 0)
+        showCursor();
 }
 
 static void gotInput(struct input i) {
+    no_ints();
     if (i.key == '1' && !i.alt && i.ctrl)
         showTerminal();
 
@@ -419,11 +380,14 @@ static void gotInput(struct input i) {
         scrollUp();
 
     else if (i.key == KEY_DOWN && !i.alt && !i.ctrl)
-        scrollDown();
+        scrollDownBy(1);
+
+    else if (i.key == KEY_PG_DOWN && !i.alt && !i.ctrl)
+        scrollDownBy(LINES);
 
     else if (con == CON_TERM) {
         if (!i.alt && !i.ctrl) {
-            scrollToBottom();
+            scrollDownBy((uint64_t) -1);
             printc(i.key);
         }
 
@@ -438,6 +402,7 @@ static void gotInput(struct input i) {
         else if ((i.key == 'l' || i.key == 'L') && !i.alt && i.ctrl) // How shall this interact with scrolling?
             clearScreen();
     }
+    ints_okay();
 }
 
 void startTty() {

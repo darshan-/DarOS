@@ -161,6 +161,9 @@ void keyScanned(uint8_t c) {
 
         map(0x48, si(KEY_UP));
         map(0x50, si(KEY_DOWN));
+
+        map(0x49, si(KEY_PG_UP));
+        map(0x51, si(KEY_PG_DOWN));
     default:
         break;
     }

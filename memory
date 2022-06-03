@@ -84,3 +84,21 @@ it's actually the lowset 2**24 and the highest 2**24.
 Any other data structure access I need to wrap in no_ints()/ints_okay()?
 Any modification of a static or global data, right?
 And any reads of those where it would matter if it changed during what we're doing.
+
+
+So I'll want a mutex/lock kind of thing rather than just brute-force stopping all interrupts while accessing
+shared data.  For a lot of things, we'd want to service a timer tick, for example, just not something else that
+would want to access the same data as we're currently using.  But you do have to be careful -- if a timer tick
+could under any circumstances, say, try to print something or format a log (thus use malloc), then the console or
+malloc does care about that.  But just ticking the counter up and coming back here is okay and ideal.
+
+So in general, we want to stop interrupts just long enough to flip a bit, or whatever, to lock the resource for us.
+But I guess there are tricky cases.  And what if you want to access a resource but it's locked?  For now, brute force
+stopping interrupts until we're done is a reasonable and effective strategy, I think.  But once I have processes and
+more infrastructure, locks will probably be useful in a lot of places.  (Process will be able to wait on a lock becoming
+free, with some lock call I come up with...  So it is paused and does nothing until it has access to the resource, when
+it is automatically resumed.)
+
+
+Set free() to just return, and see what allocates.  Without a leak, memory usage is constant, but constantly mallocing and
+freeing is still worth paying attention to, I think, and reusing memory in some places.  Like work queue, I think.
