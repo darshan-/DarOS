@@ -38,7 +38,6 @@ void __attribute__((section(".kernel_entry"))) kernel_entry() {
     uint64_t heap = ((uint64_t) kernel_stack_top + 16) & ~0b1111;
 
     init_heap((uint64_t*) heap, mem_table[il].length - (heap - mem_table[il].start));
-    //init_heap((uint64_t*) heap, 1027ull*1024*1024);
     init_interrupts();
     parse_acpi_tables();
     init_hpet();

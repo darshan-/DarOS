@@ -115,7 +115,7 @@ lba_success:
         mov bx, loaded
         call teleprint
 
-        mov dword [int_15_mem_table], 0
+        mov dword [int_15_mem_table], 1
         mov ax, int_15_mem_table>>4
         mov es, ax
         mov di, 4
