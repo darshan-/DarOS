@@ -78,3 +78,9 @@ bad.  It's fine, actually.  I thought you had to take a real address, and then f
 above a certain amount.  It's just that the address space is only 48-bit (currently, with I think 57-bit
 possible and coming soon-ish?), and rathe than have that address space just be the lowest 2**48 addresses,
 it's actually the lowset 2**24 and the highest 2**24.
+
+
+
+Any other data structure access I need to wrap in no_ints()/ints_okay()?
+Any modification of a static or global data, right?
+And any reads of those where it would matter if it changed during what we're doing.
