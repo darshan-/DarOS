@@ -304,12 +304,13 @@ static inline void showTerminal() {
   model, but I think the best/easiest/funnest thing short term.
  */
 
-static inline void scrollUp() {
+static void scrollUpBy(uint64_t n) {
     if (!scrollUpBuf)
         return;
 
-    uint8_t* top = (uint8_t*) popListHead(scrollUpBuf);
-    if (!top)
+    uint32_t l = listLen(scrollUpBuf);
+
+    if (l == 0)
         return;
 
     hideCursor();
@@ -317,22 +318,32 @@ static inline void scrollUp() {
     if (!scrollDownBuf)
         scrollDownBuf = newList();
 
-    uint8_t* bot = malloc(160);
-    for (int i = 0; i < 160; i++)
-        bot[i] = VRAM[160 * (LINES - 1) + i];
-    pushListHead(scrollDownBuf, bot);
-
-    for (int i = LINES - 1; i > 0; i--)
+    uint32_t i;
+    for (i = 0; i < n && i < l && i < LINES; i++) {
+        uint8_t* line = malloc(160);
         for (int j = 0; j < 160; j++)
-            VRAM[i * 160 + j] = VRAM[(i - 1) * 160 + j];
+            line[j] = VRAM[160 * (LINES - 1 - i) + j];
+        pushListHead(scrollDownBuf, line);
+    }
+    for (; i < n && i < l; i++)
+        pushListHead(scrollDownBuf, popListHead(scrollUpBuf));
 
-    for (int i = 0; i < 160; i++)
-        VRAM[i] = top[i];
+    if (n < l)
+        l = n;
 
-    free(top);
+    for (i = LINES - 1; i >= l; i--)
+        for (int j = 0; j < 160; j++)
+            VRAM[i * 160 + j] = VRAM[(i - l) * 160 + j];
+
+    for (; ; i--) {
+        uint8_t* line = (uint8_t*) popListHead(scrollUpBuf);
+        for (int j = 0; j < 160; j++)
+            VRAM[(i * 160) + j] = line[j];
+        free(line);
+        if (i == 0) break;
+    }
 }
 
-// Have scrollDown, scrollToBottom, and pageDown all use this (not sure if ctrl-l will be able to...)
 static void scrollDownBy(uint64_t n) {
     if (!scrollDownBuf)
         return;
@@ -357,7 +368,7 @@ static void scrollDownBy(uint64_t n) {
 
     for (i = 0; i < (int64_t) LINES - l; i++) {
         for (int j = 0; j < 160; j++)
-            VRAM[i* 160 + j] = VRAM[(i + l) * 160 + j];
+            VRAM[i * 160 + j] = VRAM[(i + l) * 160 + j];
     }
 
     for (; i < LINES; i++) {
@@ -377,13 +388,16 @@ static void gotInput(struct input i) {
         showTerminal();
 
     else if (i.key == KEY_UP && !i.alt && !i.ctrl)
-        scrollUp();
+        scrollUpBy(1);
 
     else if (i.key == KEY_DOWN && !i.alt && !i.ctrl)
         scrollDownBy(1);
 
     else if (i.key == KEY_PG_DOWN && !i.alt && !i.ctrl)
         scrollDownBy(LINES);
+
+    else if (i.key == KEY_PG_UP && !i.alt && !i.ctrl)
+        scrollUpBy(LINES);
 
     else if (con == CON_TERM) {
         if (!i.alt && !i.ctrl) {
