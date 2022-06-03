@@ -431,7 +431,7 @@ static void gotInput(struct input i) {
             showLogs();
 
         else if ((i.key == 'l' || i.key == 'L') && !i.alt && i.ctrl) // How shall this interact with scrolling?
-            clearScreen();
+            clearScreen(); // TODO: Nope, not anymore, since we have scrollback
     }
 }
 

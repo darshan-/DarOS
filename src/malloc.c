@@ -2,24 +2,26 @@
 
 #include "malloc.h"
 
+#include "interrupt.h"
+
 #include "log.h"
 #include "strings.h"
 
 #define BLK_SZ 128
 #define MAP_ENTRY_SZ 2
-#define START 0x310000
+#define MAP_FACTOR (64 / MAP_ENTRY_SZ * BLK_SZ)
 #define BFREE 0b00
 #define BPART 0b11
 #define BEND  0b10
 
 static uint64_t map_size; // Size in quadwords
-static uint64_t* map = (uint64_t*) START;
-static uint64_t* heap = (uint64_t*) START;
+static uint64_t* map = (uint64_t*) 0;
+static uint64_t* heap = (uint64_t*) 0;
 
 // `size' is the number of bytes available to us for (map + heap)
-void init_heap(uint64_t size) {
-    uint64_t factor = 64 / MAP_ENTRY_SZ * BLK_SZ;
-    map_size = size / (1 + factor);
+void init_heap(uint64_t* start, uint64_t size) {
+    map_size = size / (1 + MAP_FACTOR);
+    map = start;
     for (uint64_t i = 0; i < map_size; i++)
         map[i] = 0;
     heap = map + map_size;
@@ -41,8 +43,8 @@ uint64_t memUsed() {
 }
 
 void* malloc(uint64_t nBytes) {
-    if (heap == map) return 0;
-    if (nBytes > 64 / MAP_ENTRY_SZ * BLK_SZ) return 0;  // For now; later will support more than one qword per alloc
+    if (heap == 0) return 0;
+    if (nBytes > MAP_FACTOR) return 0;  // For now; later will support more than one qword per alloc
 
     uint64_t needed = (nBytes / BLK_SZ) + !!(nBytes % BLK_SZ);
     uint64_t mask = 0;
@@ -53,14 +55,17 @@ void* malloc(uint64_t nBytes) {
     for (uint64_t i = 0; i < map_size; i++) {
         uint64_t m = mask;
         for (uint64_t j = 0; j < 64 / MAP_ENTRY_SZ - (needed - 1); j++, m <<= 2) {
+            no_ints();
             if (!(map[i] & m)) {
                 m ^= 1ull << ((needed - 1 + j) * 2);
 
                 map[i] |= m;
                 void* ret = (void*) (uint64_t) heap + (i * (64 / MAP_ENTRY_SZ) + j) * BLK_SZ;
 
+                ints_okay();
                 return ret;
             }
+            ints_okay();
         }
     }
 
@@ -74,10 +79,8 @@ void free(void *p) {
     uint64_t b = (uint64_t) p;
     b -= (uint64_t) heap;
 
-#define align ((64 / MAP_ENTRY_SZ) * BLK_SZ)
-    uint64_t o = (b % align) / BLK_SZ * MAP_ENTRY_SZ;
-    b /= align;
-#undef align
+    uint64_t o = (b % MAP_FACTOR) / BLK_SZ * MAP_ENTRY_SZ;
+    b /= MAP_FACTOR;
 
     uint64_t entry = map[b];
     entry >>= o;
@@ -96,6 +99,7 @@ void free(void *p) {
         return;
     }
 
+    no_ints();
     while (code == BPART) {
         map[b] &= free_mask;
         entry >>= 2;
@@ -103,16 +107,17 @@ void free(void *p) {
         code = entry & 0b11;
     }
 
+    map[b] &= free_mask;
+    ints_okay();
+
     if (code != BEND) {
         log("------------------------------Ooooooooooooooooooops!  Contiguous region didn't end with BEND, and we don't yet support multi-entry regions, so this shouldn't happen...\n");
         return;
     }
-
-    map[b] &= free_mask;
 }
 
 void* realloc(void* p, int newSize) {
-    if (heap == map) return 0;
+    if (heap == 0) return 0;
 
     uint64_t* q1 = (uint64_t*) p;
     uint64_t* q2 = malloc(newSize);

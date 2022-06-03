@@ -294,8 +294,6 @@ start64:
         mov gs, ax
         mov ss, ax
 
-        mov rsp, 0x30fff0
-
         lidt [idtr]
 
 

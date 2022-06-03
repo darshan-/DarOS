@@ -2,9 +2,9 @@
 
 c_objects := $(patsubst src/%.c, build/%.o, $(wildcard src/*.c))
 
-GCC_OPTS := -Wall -Wextra -c -ffreestanding -fno-stack-protector -mgeneral-regs-only -mno-red-zone #-fno-zero-initialized-in-bss
+GCC_OPTS := -Wall -Wextra -c -ffreestanding -fno-stack-protector -mgeneral-regs-only -mno-red-zone -fno-PIC -mcmodel=large #-fno-zero-initialized-in-bss
 
-LD_OPTS := -N --warn-common -T src/linker.ld #--print-map
+LD_OPTS := -N --warn-common -T src/linker.ld #-nostdlib --print-map
 
 include build/headers.mk
 
@@ -35,13 +35,13 @@ out/bochs.img: out/boot.img
 # -cpu host 
 .PHONY: run
 run: out/boot.img
-	qemu-system-x86_64 -rtc base=localtime -enable-kvm -drive format=raw,file=out/boot.img
+	qemu-system-x86_64 -rtc base=localtime -enable-kvm -m 2G -drive format=raw,file=out/boot.img
 
 .PHONY: run-bochs
 run-bochs: out/bochs.img
 	rm -f out/bochs.img.lock
 	echo c >out/bochs.command
-	bochs -qf /dev/null -rc out/bochs.command 'memory: host=256, guest=256' 'boot: disk' 'ata0-master: type=disk, path="out/bochs.img", mode=flat, cylinders=4, heads=4, spt=61, sect_size=512, model="Generic 1234", biosdetect=auto, translation=auto' 'magic_break: enabled=1' 'clock: sync=realtime, time0=local, rtc_sync=1' 'vga: update_freq=30' 'romimage: options=fastboot'
+	bochs -qf /dev/null -rc out/bochs.command 'memory: host=2048, guest=2048' 'boot: disk' 'ata0-master: type=disk, path="out/bochs.img", mode=flat, cylinders=4, heads=4, spt=61, sect_size=512, model="Generic 1234", biosdetect=auto, translation=auto' 'magic_break: enabled=1' 'clock: sync=realtime, time0=local, rtc_sync=1' 'vga: update_freq=30' 'romimage: options=fastboot'
 
 .PHONY: clean
 clean:

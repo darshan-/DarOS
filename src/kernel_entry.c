@@ -21,28 +21,25 @@ void __attribute__((section(".kernel_entry"))) kernel_entry() {
     // Then the heap is the largest region, or what's left of it after putting the stack at the start of it.
 
     uint32_t* entry_count = (uint32_t*) 0x4000;
-    uint64_t l1 = 0, l2 = 0;
-    uint32_t i1, i2;
+    uint64_t largest = 0;
+    uint32_t il;
     struct mem_table_entry* mem_table = (struct mem_table_entry*) 0x4004;
     for (uint32_t i = 0; i < *entry_count; i++) {
         if (mem_table[i].type != 1)
             continue;
 
-        if (mem_table[i].length > l1) {
-            l2 = l1;
-            i2 = i1;
-
-            l1 = mem_table[i].length;
-            i1 = i;
+        if (mem_table[i].length > largest) {
+            largest = mem_table[i].length;
+            il = i;
         }
-
-        // logf("0x%p016h - 0x%p016h : %u\n", mem_table[i].start,
-        //      mem_table[i].start + mem_table[i].length - 1, mem_table[i].type);
     }
 
-    init_heap(100*1024*1024);
-    init_interrupts();
+    kernel_stack_top = (uint64_t*) ((mem_table[il].start + 64 * 1024) & ~0b1111);
+    uint64_t heap = ((uint64_t) kernel_stack_top + 16) & ~0b1111;
 
+    init_heap((uint64_t*) heap, mem_table[il].length - (heap - mem_table[il].start));
+    //init_heap((uint64_t*) heap, 1027ull*1024*1024);
+    init_interrupts();
     parse_acpi_tables();
     init_hpet();
 
@@ -53,8 +50,11 @@ void __attribute__((section(".kernel_entry"))) kernel_entry() {
                mem_table[i].start + mem_table[i].length - 1, mem_table[i].type);
     }
 
-    printf("Most largest: 0x%p016h - 0x%p016h\n", mem_table[i1].start, l1 - 1);
-    printf("Next largest: 0x%p016h - 0x%p016h\n", mem_table[i2].start, l2 - 1);
+    printf("Largest: 0x%p016h - 0x%p016h\n", mem_table[il].start, largest - 1);
+
+    printf("kernel_stack_top: 0x%p016h\n", kernel_stack_top);
+    printf("heap: 0x%p016h\n", heap);
+    printf("heap size: %u MB\n", (mem_table[il].length - (heap - mem_table[il].start)) / 1024 / 1024);
 
     log("Kernel loaded; going to waitloop\n");
     waitloop();

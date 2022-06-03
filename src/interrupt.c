@@ -64,7 +64,7 @@ uint64_t int_tick_hz = TICK_HZ;  // For periodic_callbacks.c to access.
 #define PIT_FREQ 1193182
 #define PIT_COUNT (PIT_FREQ / TICK_HZ)
 
-#define KERNEL_STACK_TOP 0x30fff0
+uint64_t* kernel_stack_top;
 
 // Need extra level of indirection to quote a macro value, due to a special rule around argument prescan.
 #define QUOT(v) #v
@@ -158,11 +158,10 @@ void waitloop() {
             f();
 
         __asm__ __volatile__(
-            "mov $"
-            QUOTE(KERNEL_STACK_TOP)
-            ", %rsp\n" // We'll never return anywhere or use anything currently on the stack, so reset it
+            "mov %0, %%rsp\n" // We'll never return anywhere or use anything currently on the stack, so reset it
             "sti\n"
             "hlt\n"
+            ::"m"(kernel_stack_top)
         );
     }
 }

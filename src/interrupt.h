@@ -8,6 +8,7 @@ void init_interrupts();
 void waitloop();
 
 extern uint64_t int_blocks;
+extern uint64_t* kernel_stack_top;
 
 static inline void no_ints() {
     __asm__ __volatile__("cli");
