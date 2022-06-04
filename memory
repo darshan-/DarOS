@@ -99,6 +99,36 @@ more infrastructure, locks will probably be useful in a lot of places.  (Process
 free, with some lock call I come up with...  So it is paused and does nothing until it has access to the resource, when
 it is automatically resumed.)
 
+On the other hand, then you have to worry about race conditions, where one thing is waiting on resource A in order to
+  finish holding onto resource B, but the thing that's holding onto resouce B is waiting on resource A, I'd think.
+Maybe you don't hold anything while you're waiting for anything.  Like you tentatively hold it, but if you can't hold
+all the things you need, you release everythind and wait, but I picture that getting really messy really fast.
+On systems with HPET, it's okay to miss some ticks, as the HPET itself keeps a counter, so we'll know how many ticks
+have passed.  With justa PIT, I'd really rather not miss a tick.  I wonder if the Presario might have an APIC timer,
+and if that has a counter?  Because clearly locks are good for some things, but I think for a lot of things, it's simpler,
+cleaner, and safer to just disable interrupts, very quickly do what you need to do, and then reenable them.  And as long
+as the longest you might take is still quite short, and having missed a timer tick is fine, that's just the way to go
+quite often, I think.
+
 
 Set free() to just return, and see what allocates.  Without a leak, memory usage is constant, but constantly mallocing and
 freeing is still worth paying attention to, I think, and reusing memory in some places.  Like work queue, I think.
+
+
+
+
+
+Okay, let's trying compiling a 64-bit flat executable that "calls" kernel code by using using a software interrupt.
+
+Already that starts to hint at the sort of thing I'm hoping to learn here by just trying basic things.
+
+How does the kernel know who issued the interrupt?  Either because the kernel's data structures are keeping track of
+which process is currently running, so it must have been that, or because something the processor does helps us here,
+when an interrupt was triggered by non zero ring code.
+
+So, yeah, let's take baby steps toward a user mode by playing around with things like this.
+
+Compile a basic program that calls an interrupt, and include that in my kernel somehow.  Have kernel set up unprivileged
+  memory and load the program there and call it, basically.  I'm sure there's a lot I'm not understanding, and playing
+  around with this should help!
+
