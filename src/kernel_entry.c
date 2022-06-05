@@ -15,6 +15,10 @@ struct mem_table_entry {
 };
 
 void __attribute__((section(".kernel_entry"))) kernel_entry() {
+    no_ints();
+    clearScreen();
+    print("Hi, I'm C!");
+    __asm__ __volatile__("hlt");
     // For now, let's use memory this way:
     // If the second largest usable region is large enough for the stack, make that the stack,
     //   otherwise put it at the start of the largest region.
@@ -37,7 +41,8 @@ void __attribute__((section(".kernel_entry"))) kernel_entry() {
     kernel_stack_top = (uint64_t*) ((mem_table[il].start + 64 * 1024) & ~0b1111);
     uint64_t heap = ((uint64_t) kernel_stack_top + 16) & ~0b1111;
 
-    init_heap((uint64_t*) heap, mem_table[il].length - (heap - mem_table[il].start));
+    //init_heap((uint64_t*) heap, mem_table[il].length - (heap - mem_table[il].start));
+    init_heap((uint64_t*) heap, 100*1024*1024);
     init_interrupts();
     parse_acpi_tables();
     init_hpet();

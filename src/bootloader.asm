@@ -75,28 +75,22 @@
 section .boot
 bits 16
         jmp 0:start16           ; Make sure cs is set to 0
+err_count: db 0
 start16:
-        xor ax, ax
+        ;xor ax, ax
+        mov ax, cs
         mov ds, ax
-        mov es, ax
+        ;mov es, ax
         mov ss, ax
 
         mov esp, stack_top
 
-        mov ah, 0
-        mov al, 3h
-        int 10h
+        ; mov ah, 0
+        ; mov al, 3h
+        ; int 10h
 
         mov bx, loading
         call teleprint
-
-        mov ah, 2
-        mov al, 1
-        mov ch, 0
-        mov cl, 2
-        mov dh, 0
-        mov bx, sect2
-        int 0x13
 
         mov cx, LOAD_COUNT
         mov si, dap
@@ -127,8 +121,78 @@ lba_success:
         mov bx, loaded
         call teleprint
 
+;         mov ax, 0
+;         push ax
+;         mov ax, 0x7e00 >> 4
+;         mov es, ax
+;         mov ch, 0
+;         mov cl, 2
+;         mov dh, 0
+;         mov bx, 0
+
+; readsector:
+;         mov ah, 2
+;         mov al, 1
+;         ;mov bx, sect2
+;         int 0x13
+
+;         jc int13err
+;         cmp al, 0
+;         je int13zero
+;         call teledot
+;         mov byte [err_count], 0
+;         pop ax
+;         inc ax
+;         cmp ax, 960
+;         je reads_done
+;         push ax
+;         inc cl
+;         cmp cl, 0b1000000       ; Only lowest 6 bits are for sector
+;         jne sector_count_okay
+;         call telepipe
+;         mov cl, 1
+;         ;inc dh
+;         add dh, 2
+; sector_count_okay:
+;         mov ax, es
+;         add ax, 512 >> 4
+;         mov es, ax
+;         jmp readsector
+
+; int13zero:
+;         call telezero
+; int13err:
+;         call telecomma
+;         mov al, [err_count]
+;         inc al
+;         mov [err_count], al
+;         cmp al, 3
+;         jb readsector
+;         call teleh
+;         mov byte [err_count], 0
+;         cmp cl, 1
+;         je inc_cyl
+;         ;mov cl, 1
+;         dec cl
+;         ;inc dh
+;         add dh, 3
+;         jmp readsector
+; inc_cyl:
+;         call teleslash
+;         cmp dh, 0
+;         je reads_done
+;         mov dh, 0
+;         inc ch
+;         jmp readsector
+; reads_done:
+
+;         mov bx, loaded
+;         call teleprint
+;         ; cli
+;         ; hlt
+
         mov dword [int_15_mem_table], 1
-        mov ax, int_15_mem_table>>4
+        mov ax, int_15_mem_table >> 4
         mov es, ax
         mov di, 4
 
@@ -178,10 +242,46 @@ smap_done:
 
         ; jmp CODE_SEG32:start32
 
-loading: db "Loading PurpOS...", 0x0d, 0x0a, 0
-loaded: db "Sectors loaded!", 0x0d, 0x0a, 0
-insect2: db "In sector 2", 0x0d, 0x0a, 0
-lba_error_s: db "LBA returned an error; please check AH for return code", 0x0d, 0x0a, 0
+loading: db "Loading PurpOS, just so'as you know.... Okay, friend? ", 0
+loaded: db "Secters loaded!", 0x0d, 0x0a, 0
+insect2: db "In secter 2", 0x0d, 0x0a, 0
+lba_error_s: db "LBA error", 0x0d, 0x0a, 0
+
+teledot:
+        mov ah, INT_0x10_TELETYPE
+        mov al, '.'
+        int 0x10
+        ret
+
+telecomma:
+        mov ah, INT_0x10_TELETYPE
+        mov al, '!'
+        int 0x10
+        ret
+
+teleslash:
+        mov ah, INT_0x10_TELETYPE
+        mov al, '/'
+        int 0x10
+        ret
+
+telepipe:
+        mov ah, INT_0x10_TELETYPE
+        mov al, '|'
+        int 0x10
+        ret
+
+teleh:
+        mov ah, INT_0x10_TELETYPE
+        mov al, 'h'
+        int 0x10
+        ret
+
+telezero:
+        mov ah, INT_0x10_TELETYPE
+        mov al, '0'
+        int 0x10
+        ret
 
 teleprint:
         mov ah, INT_0x10_TELETYPE
@@ -240,16 +340,22 @@ dap:
         db "PURP"
         dw 0
         db BOOTABLE
+        db 0           ; Head of first sector of partition
+        db 5           ; Sector of first sector of partition
+        db 0           ; Cylinder of first sector of parition
+        db 1           ; FAT12
+        db 18          ; Head of last sector of partition
+        db 18          ; Sector of last sector of partition
+        db 0           ; Cylinder of last sector of parition
+        ;dd 0x800                ; LBA of partition start
+        dd 2           ; LBA of partition start
+        dd 0x3c2                ; Number of sectors in partition
         times 510 - ($-$$) db 0
         dw 0xaa55
-
+;63
 sect2:
-
         mov bx, insect2
         call teleprint
-
-        cli
-        hlt
 
 ;bits 32
 ;start32:
@@ -287,6 +393,9 @@ l2_loop:
 
         lgdt [gdtr]
 
+        mov bx, insect2
+        call teleprint
+
         mov eax, cr0
         or eax, CR0_PAGING | CR0_PROTECTION
         mov cr0, eax
@@ -322,3 +431,5 @@ l3_loop2:
         add eax, SZ_QW*512
         add ebx, SZ_QW
         loop l3_loop2
+
+        mov byte [0xb8000], '@'
