@@ -442,8 +442,8 @@ void init_interrupts() {
     SET_GETRAP_N(1e);
 
     print("Set handlers\n");
-    init_rtc();
-    print("Initialized RTC\n");
+    //init_rtc();
+    print("Skipped initializing RTC\n");
     init_pit();
      print("Initialized PIT\n");
     init_pic();
