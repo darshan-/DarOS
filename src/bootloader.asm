@@ -90,8 +90,13 @@ start16:
         mov bx, loading
         call teleprint
 
-        cli
-        hlt
+        mov ah, 2
+        mov al, 1
+        mov ch, 0
+        mov cl, 2
+        mov dh, 0
+        mov bx, sect2
+        int 0x13
 
         mov cx, LOAD_COUNT
         mov si, dap
@@ -175,6 +180,7 @@ smap_done:
 
 loading: db "Loading PurpOS...", 0x0d, 0x0a, 0
 loaded: db "Sectors loaded!", 0x0d, 0x0a, 0
+insect2: db "In sector 2", 0x0d, 0x0a, 0
 lba_error_s: db "LBA returned an error; please check AH for return code", 0x0d, 0x0a, 0
 
 teleprint:
@@ -238,6 +244,12 @@ dap:
         dw 0xaa55
 
 sect2:
+
+        mov bx, insect2
+        call teleprint
+
+        cli
+        hlt
 
 ;bits 32
 ;start32:

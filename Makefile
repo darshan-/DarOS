@@ -37,19 +37,31 @@ out/bochs.img: out/boot.img
 run: out/boot.img
 	qemu-system-x86_64 -rtc base=localtime -enable-kvm -m 4G -drive format=raw,file=out/boot.img
 
+.PHONY: run-qf
+run-qf: out/floppy.img
+	qemu-system-x86_64 -rtc base=localtime -enable-kvm -m 4G -drive format=raw,file=out/floppy.img,index=0,if=floppy
+
 .PHONY: run-bochs
 run-bochs: out/bochs.img
 	rm -f out/bochs.img.lock
 	echo c >out/bochs.command
 	bochs -qf /dev/null -rc out/bochs.command 'memory: host=128, guest=2048' 'boot: disk' 'ata0-master: type=disk, path="out/bochs.img", mode=flat, cylinders=4, heads=4, spt=61, sect_size=512, model="Generic 1234", biosdetect=auto, translation=auto' 'magic_break: enabled=1' 'clock: sync=realtime, time0=local, rtc_sync=1' 'vga: update_freq=30' 'romimage: options=fastboot'
 
+build/iso/boot/floppy.img: out/boot.img
+	mkdir -p build/iso/boot
+	dd if=/dev/zero of=build/iso/boot/floppy.img bs=1474560 count=1
+	dd if=out/boot.img of=build/iso/boot/floppy.img bs=1474560 conv=notrunc
+out/floppy.img: out/boot.img
+	dd if=/dev/zero of=out/floppy.img bs=1474560 count=1
+	dd if=out/boot.img of=out/floppy.img bs=1474560 conv=notrunc
+
 build/esp.img:
-	@mkdir -p build/iso/EFI/BOOT
+	mkdir -p build/iso/EFI/BOOT
 	/sbin/mkdosfs -F12 -C build/esp.img 4096
 	mcopy -s -i build/esp.img build/iso/EFI ::
 
-out/iso: out/boot.img build/esp.img
-	xorrisofs -no-pad --norock -volid PURP_OS -G out/boot.img -append_partition 2 0xef build/esp.img -o out/iso
+out/iso: out/boot.img build/esp.img build/iso/boot/floppy.img
+	xorrisofs -no-pad -volid PURP_OS -graft-points -hide-rr-moved -G out/boot.img -b /boot/floppy.img -append_partition 2 0xef build/esp.img -o out/iso /boot=./build/iso/boot
 
 .PHONY: iso
 iso: out/iso
