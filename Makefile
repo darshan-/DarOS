@@ -43,6 +43,17 @@ run-bochs: out/bochs.img
 	echo c >out/bochs.command
 	bochs -qf /dev/null -rc out/bochs.command 'memory: host=128, guest=2048' 'boot: disk' 'ata0-master: type=disk, path="out/bochs.img", mode=flat, cylinders=4, heads=4, spt=61, sect_size=512, model="Generic 1234", biosdetect=auto, translation=auto' 'magic_break: enabled=1' 'clock: sync=realtime, time0=local, rtc_sync=1' 'vga: update_freq=30' 'romimage: options=fastboot'
 
+build/esp.img:
+	@mkdir -p build/iso/EFI/BOOT
+	/sbin/mkdosfs -F12 -C build/esp.img 4096
+	mcopy -s -i build/esp.img build/iso/EFI ::
+
+out/iso: out/boot.img build/esp.img
+	xorrisofs -no-pad --norock -volid PURP_OS -G out/boot.img -append_partition 2 0xef build/esp.img -o out/iso
+
+.PHONY: iso
+iso: out/iso
+
 .PHONY: clean
 clean:
 	rm -rf out build

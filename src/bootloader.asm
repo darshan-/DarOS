@@ -79,12 +79,19 @@ start16:
         xor ax, ax
         mov ds, ax
         mov es, ax
+        mov ss, ax
 
         mov esp, stack_top
 
         mov ah, 0
         mov al, 3h
         int 10h
+
+        mov bx, loading
+        call teleprint
+
+        cli
+        hlt
 
         mov cx, LOAD_COUNT
         mov si, dap
@@ -166,6 +173,7 @@ smap_done:
 
         ; jmp CODE_SEG32:start32
 
+loading: db "Loading PurpOS...", 0x0d, 0x0a, 0
 loaded: db "Sectors loaded!", 0x0d, 0x0a, 0
 lba_error_s: db "LBA returned an error; please check AH for return code", 0x0d, 0x0a, 0
 
@@ -226,19 +234,7 @@ dap:
         db "PURP"
         dw 0
         db BOOTABLE
-        ;db 0, 2, 0             ; CHS of partition start
-        db 0, 0x28, 0x31        ; CHS of partition start
-        db 0x0b                 ; FAT32
-        ;db 0, 41, 0            ; CHS of partition end
-        db 0, 0xe9, 0xff        ; CHS of partition end
-        dd 0x800                ; LBA of partition start
-        dd 0x7af000             ; Number of sectors in partition
-        dq 0
-        dq 0
-        dq 0
-        dq 0
-        dq 0
-        dq 0
+        times 510 - ($-$$) db 0
         dw 0xaa55
 
 sect2:
