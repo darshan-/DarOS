@@ -17,8 +17,7 @@ struct mem_table_entry {
 void __attribute__((section(".kernel_entry"))) kernel_entry() {
     no_ints();
     clearScreen();
-    print("Hi, I'm C!");
-    __asm__ __volatile__("hlt");
+    print("Hi, I'm C!  You know?\n");
     // For now, let's use memory this way:
     // If the second largest usable region is large enough for the stack, make that the stack,
     //   otherwise put it at the start of the largest region.
@@ -37,28 +36,47 @@ void __attribute__((section(".kernel_entry"))) kernel_entry() {
             il = i;
         }
     }
+    print("Mem table parsed.\n");
 
-    kernel_stack_top = (uint64_t*) ((mem_table[il].start + 64 * 1024) & ~0b1111);
-    uint64_t heap = ((uint64_t) kernel_stack_top + 16) & ~0b1111;
+    //kernel_stack_top = (uint64_t*) ((mem_table[il].start + 64 * 1024) & ~0b1111ull);
+    kernel_stack_top = 0x160000;
+    print("kernel stack set; will be used when we next start waitloop.\n");
+    //__asm__ __volatile__("hlt");
+    uint64_t heap = ((uint64_t) kernel_stack_top + 16) & ~0b1111ull;
 
     //init_heap((uint64_t*) heap, mem_table[il].length - (heap - mem_table[il].start));
-    init_heap((uint64_t*) heap, 100*1024*1024);
-    init_interrupts();
-    parse_acpi_tables();
-    init_hpet();
+    //init_heap((uint64_t*) heap, 1*1024*1024);
+    init_heap((uint64_t*) 0x160000, 1*1024*1024);
+    print("Heap initialized.\n");
+    printf("We've got %u entries:\n", *entry_count);
+    // for (uint32_t i = 0; i < *entry_count; i++) {
+    //     printf("0x%p016h - 0x%p016h : %u\n", mem_table[i].start,
+    //            mem_table[i].start + mem_table[i].length - 1, mem_table[i].type);
+    //     if (i >= 11)
+    //         break;
+    //         //__asm__ __volatile__("hlt");
+    // }
 
-    startTty();
-
-    for (uint32_t i = 0; i < *entry_count; i++) {
-        printf("0x%p016h - 0x%p016h : %u\n", mem_table[i].start,
-               mem_table[i].start + mem_table[i].length - 1, mem_table[i].type);
-    }
-
-    printf("Largest: 0x%p016h - 0x%p016h\n", mem_table[il].start, largest - 1);
+    // __asm__ __volatile__("hlt");
+    printf("Largest: 0x%p016h - 0x%p016h\n", mem_table[il].start, mem_table[il].start + largest - 1);
+    //__asm__ __volatile__("hlt");
 
     printf("kernel_stack_top: 0x%p016h\n", kernel_stack_top);
+    //__asm__ __volatile__("hlt");
     printf("heap: 0x%p016h\n", heap);
     printf("heap size: %u MB\n", (mem_table[il].length - (heap - mem_table[il].start)) / 1024 / 1024);
+
+    init_interrupts();
+    //parse_acpi_tables();
+    //print("Parsed ACPI tables.\n");
+    //__asm__ __volatile__("hlt");
+    //init_hpet();
+    //print("Started initializing HPET.\n");
+
+    //__asm__ __volatile__("hlt");
+    startTty();
+
+    print("Started tty.\n");
 
     log("Kernel loaded; going to waitloop\n");
     waitloop();

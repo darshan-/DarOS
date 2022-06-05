@@ -157,6 +157,8 @@ void waitloop() {
         while ((f = (void (*)()) pop(&wq)))
             f();
 
+        //print("waitloop done with work queue, time to set stack, enable interrupts, and wait.\n");
+        //__asm__ __volatile__("hlt");
         __asm__ __volatile__(
             "mov %0, %%rsp\n" // We'll never return anywhere or use anything currently on the stack, so reset it
             "sti\n"
@@ -172,8 +174,9 @@ void process_keys() {
 }
 
 static void dumpFrame(struct interrupt_frame *frame) {
-    logf("ip: 0x%p016h    cs: 0x%p016h flags: 0x%p016h\n", frame->ip, frame->cs, frame->flags);
-    logf("sp: 0x%p016h    ss: 0x%p016h\n", frame->sp, frame->ss);
+    printf("ip: 0x%p016h    cs: 0x%p016h flags: 0x%p016h\n", frame->ip, frame->cs, frame->flags);
+    printf("sp: 0x%p016h    ss: 0x%p016h\n", frame->sp, frame->ss);
+    __asm__ __volatile__("hlt");
 }
 
 static inline void generic_trap_n(struct interrupt_frame *frame, int n) {
@@ -317,11 +320,14 @@ static void __attribute__((interrupt)) trap_0x0e_page_fault(struct interrupt_fra
 }
 
 static void __attribute__((interrupt)) double_fault_handler(struct interrupt_frame *frame, uint64_t error_code) {
+
     logf("Double fault; error should be zero.  error: 0x%p016h\n", error_code);
     dumpFrame(frame);
 }
 
 static void __attribute__((interrupt)) irq1_kbd(struct interrupt_frame *) {
+    print("irq1\n");
+    __asm__ __volatile__("hlt");
     uint8_t code = inb(0x60);
     outb(PIC_PRIMARY_CMD, PIC_ACK);
     push(&kbd_buf, (void*) (uint64_t) code);
@@ -329,6 +335,8 @@ static void __attribute__((interrupt)) irq1_kbd(struct interrupt_frame *) {
 }
 
 static void __attribute__((interrupt)) irq8_rtc(struct interrupt_frame *) {
+    print("irq8\n");
+    __asm__ __volatile__("hlt");
     outb(PIC_SECONDARY_CMD, PIC_ACK);
     outb(PIC_PRIMARY_CMD, PIC_ACK);
 
@@ -343,6 +351,8 @@ static void __attribute__((interrupt)) irq0_pit(struct interrupt_frame *) {
     //logf("0");
     outb(PIC_PRIMARY_CMD, PIC_ACK);
 
+    print("acked irq0\n");
+    __asm__ __volatile__("hlt");
     // if (cpuCountOffset == 0)
     //     cpuCountOffset = read_tsc();
 
@@ -350,6 +360,8 @@ static void __attribute__((interrupt)) irq0_pit(struct interrupt_frame *) {
 
     ms_since_boot = pitCount * PIT_COUNT * 1000 / PIT_FREQ;
 
+    printf("ms_since_boot: %u\n", ms_since_boot);
+    __asm__ __volatile__("hlt");
     // if (pitCount % TICK_HZ == 0)
     //     logf("Average CPU ticks per PIT tick: %u\n", (read_tsc() - cpuCountOffset) / pitCount);
 
@@ -429,14 +441,20 @@ void init_interrupts() {
     SET_GETRAP_N(1d);
     SET_GETRAP_N(1e);
 
+    print("Set handlers\n");
     init_rtc();
+    print("Initialized RTC\n");
     init_pit();
+     print("Initialized PIT\n");
     init_pic();
-
+    print("Initialized PIC\n");
+ 
     INITQ(wq, INIT_WQ_CAP);
     INITQ(kbd_buf, INIT_KB_CAP);
 
+    print("Initialized queues\n");
+    //__asm__ __volatile__("hlt");
     registerPeriodicCallback((struct periodic_callback) {1, 2, check_queue_caps});
 
-    __asm__ __volatile__("sti");
+    //__asm__ __volatile__("sti");
 }
