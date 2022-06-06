@@ -83,22 +83,6 @@ start16:
         mov ax, 3
         int 0x10
 
-        mov cx, LOAD_COUNT
-        mov si, dap
-                                           ; dl is set by BIOS to drive number we're loaded from, so just leave it as is
-lba_read:
-        mov ah, INT_0x13_LBA_READ          ; Must set on every loop, as ah gets return code
-        int 0x13
-
-        mov ax, [dap.toseg]
-        add ax, (SECT_PER_LOAD * 512) >> 4 ; Increment segment rather than offset (segment is address shifted 4)
-        mov [dap.toseg], ax
-
-        mov eax, [dap.from]
-        add eax, SECT_PER_LOAD
-        mov [dap.from], eax
-        loop lba_read
-
         ; Enable A20 bit
         mov ax, 0x2401
         int 0x15
@@ -197,33 +181,6 @@ idtr:
         dw 4095                 ; Size of IDT minus 1
         dq idt                  ; Address
 
-dap:
-        db 0x10                 ; Size of DAP (Disk Address Packet)
-        db 0                    ; Unused; should be zero
-.cnt:   dw SECT_PER_LOAD        ; Number of sectors to read, 0x80 (128) max; overwritten with number read
-.to:    dw sect2
-.toseg: dw 0                    ; segment
-.from:  dq 1                    ; LBA number (sector to start reading from)
-
-
-        BOOTABLE equ 1<<7
-        times 440 - ($-$$) db 0
-        db "PURP"
-        dw 0
-        db BOOTABLE
-        db 0           ; Head of first sector of partition
-        db 5           ; Sector of first sector of partition
-        db 0           ; Cylinder of first sector of parition
-        db 1           ; FAT12
-        db 18          ; Head of last sector of partition
-        db 18          ; Sector of last sector of partition
-        db 0           ; Cylinder of last sector of parition
-        dd 2           ; LBA of partition start
-        dd 0x3c2                ; Number of sectors in partition
-        times 510 - ($-$$) db 0
-        dw 0xaa55
-
-sect2:
 start64:
         xor ax, ax
         mov ds, ax
@@ -291,3 +248,21 @@ loop_idt2:
 halt_loop:
         hlt
         jmp halt_loop
+
+        BOOTABLE equ 1<<7
+        times 440 - ($-$$) db 0
+        dd 0
+        dw 0
+        db BOOTABLE
+        db 0           ; Head of first sector of partition
+        db 5           ; Sector of first sector of partition
+        db 0           ; Cylinder of first sector of parition
+        db 1           ; FAT12
+        db 18          ; Head of last sector of partition
+        db 18          ; Sector of last sector of partition
+        db 0           ; Cylinder of last sector of parition
+        dd 2           ; LBA of partition start
+        dd 0x3c2                ; Number of sectors in partition
+        times 510 - ($-$$) db 0
+        dw 0xaa55
+
