@@ -75,7 +75,7 @@ bits 16
 start16:
         mov ax, cs
         mov ds, ax
-        ;mov es, ax
+        mov es, ax
         mov ss, ax
 
         mov esp, stack_top
@@ -86,6 +86,14 @@ start16:
         ; Enable A20 bit
         mov ax, 0x2401
         int 0x15
+
+        mov ch, 0
+        mov cl, 2
+        mov dh, 0
+        mov bx, sect2
+        mov ah, 2
+        mov al, 1
+        int 0x13
 
         cli
 
@@ -132,7 +140,7 @@ keyboard_gate:
         in al, 0x60
 
         mov [0xb8000 + 160], al
-        mov byte [0xb8000 + 160 + 1], 0x04
+        mov byte [0xb8000 + 160 + 1], 0x0d
 
         mov al, 0x20
         out PIC_PRIMARY_CMD, al
@@ -207,11 +215,7 @@ loop_idt2:
 
         sti
 
-        mov byte [0xb8000], '@'
-
-halt_loop:
-        hlt
-        jmp halt_loop
+        jmp sect2
 
         BOOTABLE equ 1<<7
         times 440 - ($-$$) db 0
@@ -229,4 +233,12 @@ halt_loop:
         dd 0x3c2                ; Number of sectors in partition
         times 510 - ($-$$) db 0
         dw 0xaa55
+
+sect2:
+
+        mov byte [0xb8000], '@'
+
+halt_loop:
+        hlt
+        jmp halt_loop
 
