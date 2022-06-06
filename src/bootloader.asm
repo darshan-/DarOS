@@ -72,7 +72,6 @@
 section .boot
 bits 16
         jmp 0:start16           ; Make sure cs is set to 0
-err_count: db 0
 start16:
         mov ax, cs
         mov ds, ax
@@ -83,9 +82,6 @@ start16:
 
         mov ax, 3
         int 0x10
-
-        mov bx, loading
-        call teleprint
 
         mov cx, LOAD_COUNT
         mov si, dap
@@ -101,20 +97,7 @@ lba_read:
         mov eax, [dap.from]
         add eax, SECT_PER_LOAD
         mov [dap.from], eax
-        jc lba_error
         loop lba_read
-
-        jmp lba_success
-
-lba_error:
-        mov bx, lba_error_s
-        call teleprint
-        cli
-        hlt
-
-lba_success:
-        mov bx, loaded
-        call teleprint
 
         ; Enable A20 bit
         mov ax, 0x2401
@@ -267,20 +250,15 @@ interrupt_gate:
 
 keyboard_gate:
         push rax
-        push rbx
-        push rcx
 
         in al, 0x60
 
-        mov ebx, 0xb8000 + 160
-        mov [ebx], al
-        mov byte [ebx + 1], 0x04
+        mov [0xb8000 + 160], al
+        mov byte [0xb8000 + 160 + 1], 0x04
 
         mov al, 0x20
         out PIC_PRIMARY_CMD, al
 
-        pop rcx
-        pop rbx
         pop rax
 
         iretq
