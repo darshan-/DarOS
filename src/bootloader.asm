@@ -46,7 +46,7 @@
         page_table_l2 equ 0x3000
         int_15_mem_table equ 0x4000
         page_tables_l2 equ 0x100000
-        stack_top equ 0x7c00
+        stack_top equ 0x7bff
         idt equ 0               ; 0-0x1000 available in long mode
 
         ; Page Table constants
@@ -75,7 +75,7 @@ bits 16
 start16:
         mov ax, cs
         mov ds, ax
-        mov es, ax
+        ;mov es, ax
         mov ss, ax
 
         mov esp, stack_top
@@ -126,18 +126,6 @@ l2_loop:
 
 bits 64
 
-trap_gate:
-        mov byte [0xb8000 + 160 * 10], 'T'
-        iretq
-
-interrupt_gate:
-        mov byte [0xb8000 + 160 * 10], 'I'
-
-        mov al, 0x20
-        out PIC_PRIMARY_CMD, al
-
-        iretq
-
 keyboard_gate:
         push rax
 
@@ -153,7 +141,7 @@ keyboard_gate:
 
         iretq
 
-        ; Note on my note: I havent' ever tried 32-bit protected mode with paging enabled, and I'd forgotten that
+        ; Note on my note: I haven't ever tried 32-bit protected mode with paging enabled, and I'd forgotten that
         ;   I wrote that Intel says we specifically need that on and then back off...
 
         PTABLE_PRESENT equ 1
@@ -190,19 +178,9 @@ start64:
         mov ss, ax
 
         mov ebx, idt
-        mov ecx, 32
-loop_idt:
-        mov rax, trap_gate
-        mov [ebx], ax
-        mov [ebx + 4], rax
-        mov word [ebx + 2], CODE_SEG
-        mov word [ebx + 4], 1 << 15 | 0b1111 << 8
-        add ebx, 16
-        loop loop_idt
-
-        mov ecx, 224
+        mov ecx, 256
 loop_idt2:
-        mov rax, interrupt_gate
+        mov rax, keyboard_gate
         mov [ebx], ax
         mov [ebx + 4], rax
         mov word [ebx + 2], CODE_SEG
@@ -210,34 +188,20 @@ loop_idt2:
         add ebx, 16
         loop loop_idt2
 
-        mov rax, keyboard_gate
-        mov ebx, idt + (16 * 0x21)
-        mov [ebx], ax
-        shr rax, 16
-        mov [ebx+6], rax
-
         mov al, ICW1 | ICW1_ICW4_NEEDED
         out PIC_PRIMARY_CMD, al
-        out PIC_SECONDARY_CMD, al
 
         mov al, 0x20
         out PIC_PRIMARY_DATA, al        ; Map primary PIC to 0x20 - 0x27
-        mov al, 0x28
-        out PIC_SECONDARY_DATA, al      ; Map secondary PIC to 0x28 - 0x2f
 
         mov al, 0x04
         out PIC_PRIMARY_DATA, al
-        mov al, 0x02
-        out PIC_SECONDARY_DATA, al
 
         mov al, 0x01
         out PIC_PRIMARY_DATA, al
-        out PIC_SECONDARY_DATA, al
 
         mov al, 0xfd
         out PIC_PRIMARY_DATA, al
-        mov al, 0xff
-        out PIC_SECONDARY_DATA, al
 
         lidt [idtr]
 
