@@ -16,17 +16,6 @@ struct mem_table_entry {
 
 void __attribute__((section(".kernel_entry"))) kernel_entry() {
     print("Hi, I'm C!  You know?\n");
-    __asm__ __volatile__("sti");
-    for (;;)
-        __asm__ __volatile__("hlt");
-    no_ints();
-    clearScreen();
-    print("Hi, I'm C!  You know?\n");
-    __asm__ __volatile__("hlt");
-    // For now, let's use memory this way:
-    // If the second largest usable region is large enough for the stack, make that the stack,
-    //   otherwise put it at the start of the largest region.
-    // Then the heap is the largest region, or what's left of it after putting the stack at the start of it.
 
     uint32_t* entry_count = (uint32_t*) 0x4000;
     uint64_t largest = 0;
@@ -42,6 +31,33 @@ void __attribute__((section(".kernel_entry"))) kernel_entry() {
         }
     }
     print("Mem table parsed.\n");
+
+    __asm__ __volatile__("sti");
+    for (;;)
+        __asm__ __volatile__("hlt");
+    no_ints();
+    clearScreen();
+    print("Hi, I'm C!  You know?\n");
+    __asm__ __volatile__("hlt");
+    // For now, let's use memory this way:
+    // If the second largest usable region is large enough for the stack, make that the stack,
+    //   otherwise put it at the start of the largest region.
+    // Then the heap is the largest region, or what's left of it after putting the stack at the start of it.
+
+    // uint32_t* entry_count = (uint32_t*) 0x4000;
+    // uint64_t largest = 0;
+    // uint32_t il;
+    // struct mem_table_entry* mem_table = (struct mem_table_entry*) 0x4004;
+    // for (uint32_t i = 0; i < *entry_count; i++) {
+    //     if (mem_table[i].type != 1)
+    //         continue;
+
+    //     if (mem_table[i].length > largest) {
+    //         largest = mem_table[i].length;
+    //         il = i;
+    //     }
+    // }
+    // print("Mem table parsed.\n");
 
     //kernel_stack_top = (uint64_t*) ((mem_table[il].start + 64 * 1024) & ~0b1111ull);
     kernel_stack_top = 0x160000;

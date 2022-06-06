@@ -287,4 +287,3 @@ keyboard_gate:
         iretq
 
 sect2code:
-        ;sti
