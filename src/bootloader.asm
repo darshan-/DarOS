@@ -72,6 +72,7 @@
 section .boot
 bits 16
         jmp 0:start16           ; Make sure cs is set to 0
+err_count: db 0
 start16:
         mov ax, cs
         mov ds, ax
@@ -111,6 +112,32 @@ lba_error:
         hlt
 
 lba_success:
+
+mov dword [int_15_mem_table], 1
+        mov ax, int_15_mem_table >> 4
+        mov es, ax
+        mov di, 4
+
+        SMAP equ 'S' << 24 | 'M' << 16 | 'A' << 8 | 'P' ; 0x534d4150 aka 'SMAP'
+
+        mov ebx, 0
+        mov edx, SMAP
+
+smap_start:
+        mov eax, 0xe820
+        mov ecx, 20
+        int 0x15
+        jc smap_done
+        mov edx, SMAP
+        cmp eax, edx
+        jne smap_done
+        cmp ebx, 0
+        je smap_done
+        inc dword [int_15_mem_table]
+        add di, 24
+        jmp smap_start
+
+smap_done:
 
         cli
 
@@ -222,8 +249,6 @@ loop_idt2:
 
         lidt [idtr]
 
-        sti
-
         jmp sect2
 
         BOOTABLE equ 1<<7
@@ -262,9 +287,4 @@ keyboard_gate:
         iretq
 
 sect2code:
-        mov byte [0xb8000], '@'
-
-halt_loop:
-        hlt
-        jmp halt_loop
-
+        ;sti

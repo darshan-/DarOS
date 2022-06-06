@@ -15,9 +15,14 @@ struct mem_table_entry {
 };
 
 void __attribute__((section(".kernel_entry"))) kernel_entry() {
+    print("Hi, I'm C!  You know?\n");
+    __asm__ __volatile__("sti");
+    for (;;)
+        __asm__ __volatile__("hlt");
     no_ints();
     clearScreen();
     print("Hi, I'm C!  You know?\n");
+    __asm__ __volatile__("hlt");
     // For now, let's use memory this way:
     // If the second largest usable region is large enough for the stack, make that the stack,
     //   otherwise put it at the start of the largest region.
