@@ -41,15 +41,12 @@
         SD_MODE32 equ 1<<54
         SD_MODE64 equ 1<<53
 
-        ; 0x500-0x7bff available and a good place for stack and page tables
-        ; Page tables need to be 0x1000 aligned.  Wasting 0x500 from 0x500 to 0x1000 is better
-        ;   than wasting 0xbff from 0x7000 to 0x7bff, so doing it this way.
         page_table_l4 equ 0x1000
         page_table_l3 equ 0x2000
         page_table_l2 equ 0x3000
         int_15_mem_table equ 0x4000
         page_tables_l2 equ 0x100000
-        stack_top equ 0x7bff
+        stack_top equ 0x7c00
         idt equ 0               ; 0-0x1000 available in long mode
 
         ; Page Table constants
@@ -77,30 +74,28 @@ bits 16
         jmp 0:start16           ; Make sure cs is set to 0
 err_count: db 0
 start16:
-        ;xor ax, ax
         mov ax, cs
         mov ds, ax
-        ;mov es, ax
+        mov es, ax
         mov ss, ax
 
         mov esp, stack_top
 
-        ; mov ah, 0
-        ; mov al, 3h
-        ; int 10h
+        mov ax, 3
+        int 0x10
 
         mov bx, loading
         call teleprint
 
         mov cx, LOAD_COUNT
         mov si, dap
-        ; dl is set by BIOS to drive number we're loaded from, so just leave it as is
+                                           ; dl is set by BIOS to drive number we're loaded from, so just leave it as is
 lba_read:
-        mov ah, INT_0x13_LBA_READ      ; Must set on every loop, as ah gets return code
+        mov ah, INT_0x13_LBA_READ          ; Must set on every loop, as ah gets return code
         int 0x13
 
         mov ax, [dap.toseg]
-        add ax, (SECT_PER_LOAD*512)>>4 ; Increment segment rather than offset (segment is address shifted 4)
+        add ax, (SECT_PER_LOAD * 512) >> 4 ; Increment segment rather than offset (segment is address shifted 4)
         mov [dap.toseg], ax
 
         mov eax, [dap.from]
@@ -127,25 +122,53 @@ lba_success:
 
         cli
 
-        mov al, 0x0b            ; Disable NMIs too
-        mov dx, 0x70
-        out dx, al
-        mov dx, 0x71
-        in al, dx
+        mov eax, page_table_l3 | PT_PRESENT | PT_WRITABLE
+        mov [page_table_l4], eax
+
+        mov eax, page_table_l2 | PT_PRESENT | PT_WRITABLE
+        mov [page_table_l3], eax
+
+        mov eax, PT_PRESENT | PT_WRITABLE | PT_HUGE
+        mov ebx, page_table_l2
+        mov ecx, 512
+l2_loop:
+        mov [ebx], eax
+        add eax, SZ_2MB       ; Huge page bit makes for 2MB pages, so each page is this far apart
+        add ebx, SZ_QW
+        loop l2_loop
+
+        mov eax, page_table_l4
+        mov cr3, eax
+
+        mov eax, cr4
+        or eax, CR4_PAE
+        mov cr4, eax
+
+        mov ecx, MSR_IA32_EFER
+        rdmsr
+        or eax, EFER_LONG_MODE_ENABLE
+        wrmsr
+
+        lgdt [gdtr]
+
+        mov eax, cr0
+        or eax, CR0_PAGING | CR0_PROTECTION
+        mov cr0, eax
 
         jmp sect2
 
-        ; ; TODO: Intel manual specifically says we need to be in protected mode *with paging enabled* before
-        ; ;   entering long mode, and then turn it off.  So I guess that might be worth a try too?  AMD says
-        ; ;   paging doesn't have to be on, only to turn it off if it is on.  And I've seen lots of examples
-        ; ;   that don't, but presumably work on Intel hardware?
+        ; Note on my note: I havent' ever tried 32-bit protected mode with paging enabled, and I'd forgotten that
+        ;   I wrote that Intel says we specifically need that on and then back off...
 
-loading: db "Loading", 0
-loaded: db "Secters loaded!", 0x0d, 0x0a, 0
-insect2: db "In secter 2", 0x0d, 0x0a, 0
+loading: db " Loading...", 0
+loaded: db " sectors loaded.", 0x0d, 0x0a, 0
+insect2: db "In sector 2.", 0x0d, 0x0a, 0
 lba_error_s: db "LBA error", 0x0d, 0x0a, 0
+trap_gate_s: db "Trap gate", 0
+interrupt_gate_s: db "Interrupt gate", 0
+keyboard_gate_s: db "Got a key: ", 0
 
-PTABLE_PRESENT equ 1
+        PTABLE_PRESENT equ 1
         PTABLE_WRITABLE equ 1<<1
         PTABLE_HUGE equ 1<<7
 
@@ -156,7 +179,6 @@ PTABLE_PRESENT equ 1
 
         ICW1 equ 1<<4
         ICW1_ICW4_NEEDED equ 1
-
 
 teleprint:
         mov ah, INT_0x10_TELETYPE
@@ -213,50 +235,6 @@ dap:
 
 sect2:
 
-        jmp sect2code
-trap_gate_s: db "Trap gate: 0", 0
-interrupt_gate_s: db "Interrupt gate: 0", 0
-keyboard_gate_s: db "Got a key, not telling you what      (fine, a hint:  )", 0
-
-sect2code:
-
-        mov bx, insect2
-        call teleprint
-
-
-        mov eax, page_table_l3 | PT_PRESENT | PT_WRITABLE
-        mov [page_table_l4], eax
-
-        mov eax, page_table_l2 | PT_PRESENT | PT_WRITABLE
-        mov [page_table_l3], eax
-
-        mov eax, PT_PRESENT | PT_WRITABLE | PT_HUGE
-        mov ebx, page_table_l2
-        mov ecx, 512
-l2_loop:
-        mov [ebx], eax
-        add eax, SZ_2MB       ; Huge page bit makes for 2MB pages, so each page is this far apart
-        add ebx, SZ_QW
-        loop l2_loop
-
-        mov eax, page_table_l4
-        mov cr3, eax
-
-        mov eax, cr4
-        or eax, CR4_PAE
-        mov cr4, eax
-
-        mov ecx, MSR_IA32_EFER
-        rdmsr
-        or eax, EFER_LONG_MODE_ENABLE
-        wrmsr
-
-        lgdt [gdtr]
-
-        mov eax, cr0
-        or eax, CR0_PAGING | CR0_PROTECTION
-        mov cr0, eax
-
         jmp CODE_SEG:start64
 
 bits 64
@@ -280,34 +258,10 @@ trap_gate:
         push rbx
         push rcx
 
-        mov eax, trap_gate_s
-        mov bl, [trap_gate_s+11]
-        inc bl
-        mov [eax+11], bl
-        mov eax, 0xb8000+960
+        mov eax, 0xb8000 + 320
         mov ebx, trap_gate_s
         mov ch, 0x07
         call print
-
-        pop rcx
-        pop rbx
-        pop rax
-
-        ; Don't return from divide-by-zero handler?  Others not to return from?
-        iretq
-
-interrupt_gate_maybe_0x00:
-        push rax
-        push rbx
-        push rcx
-
-        ;mov rax, 0x00 ; The byte moved to rax is the only differentiator
-        ;shl rax, 3    ; vector number times 8, as addresses are 64 bits
-        ;call [rax]
-
-        mov al, 0x20
-        out PIC_PRIMARY_CMD, al
-        ;out PIC_SECONDARY_CMD, al ; This one too?
 
         pop rcx
         pop rbx
@@ -320,18 +274,13 @@ interrupt_gate:
         push rbx
         push rcx
 
-        mov eax, interrupt_gate_s
-        mov bl, [interrupt_gate_s+16]
-        inc bl
-        mov [eax+16], bl
-        mov eax, 0xb8000+1120
+        mov eax, 0xb8000 + 480
         mov ebx, interrupt_gate_s
         mov ch, 0x07
         call print
 
         mov al, 0x20
         out PIC_PRIMARY_CMD, al
-        ;out PIC_SECONDARY_CMD, al ; This one too?
 
         pop rcx
         pop rbx
@@ -344,22 +293,19 @@ keyboard_gate:
         push rbx
         push rcx
 
-        mov eax, 0xb8000+1280
+        mov eax, 0xb8000 + 640
         mov ebx, keyboard_gate_s
         mov ch, 0x02
         call print
 
         in al, 0x60
 
-        mov ebx, 0xb8000+1280+104
+        mov ebx, 0xb8000+ 640 + (11 * 2)
         mov [ebx], al
-        mov byte [ebx+1], 0x04
-
-        ;int 3
+        mov byte [ebx + 1], 0x04
 
         mov al, 0x20
         out PIC_PRIMARY_CMD, al
-        ;out PIC_SECONDARY_CMD, al ; This one too?
 
         pop rcx
         pop rbx
@@ -374,9 +320,6 @@ start64:
         mov fs, ax
         mov gs, ax
         mov ss, ax
-
-        lidt [idtr]
-
 
         mov eax, PT_PRESENT | PT_WRITABLE | PT_HUGE
         mov ebx, page_tables_l2
@@ -396,18 +339,15 @@ l3_loop2:
         add ebx, SZ_QW
         loop l3_loop2
 
-        mov byte [0xb8000], '@'
-
-
 
         mov ebx, idt
         mov ecx, 32
 loop_idt:
         mov rax, trap_gate
         mov [ebx], ax
-        mov [ebx+4], rax
-        mov word [ebx+2], CODE_SEG
-        mov word [ebx+4], 1<<15 | 0b1111 << 8
+        mov [ebx + 4], rax
+        mov word [ebx + 2], CODE_SEG
+        mov word [ebx + 4], 1 << 15 | 0b1111 << 8
         add ebx, 16
         loop loop_idt
 
@@ -415,9 +355,9 @@ loop_idt:
 loop_idt2:
         mov rax, interrupt_gate
         mov [ebx], ax
-        mov [ebx+4], rax
-        mov word [ebx+2], CODE_SEG
-        mov word [ebx+4], 1<<15 | 0b1110 << 8
+        mov [ebx + 4], rax
+        mov word [ebx + 2], CODE_SEG
+        mov word [ebx + 4], 1 << 15 | 0b1110 << 8
         add ebx, 16
         loop loop_idt2
 
@@ -445,10 +385,6 @@ loop_idt2:
         out PIC_PRIMARY_DATA, al
         out PIC_SECONDARY_DATA, al
 
-        xor al, al
-        out PIC_PRIMARY_DATA, al
-        out PIC_SECONDARY_DATA, al
-
         mov al, 0xfd
         out PIC_PRIMARY_DATA, al
         mov al, 0xff
@@ -457,6 +393,8 @@ loop_idt2:
         lidt [idtr]
 
         sti
+
+        mov byte [0xb8000], '@'
 
 halt_loop:
         hlt
