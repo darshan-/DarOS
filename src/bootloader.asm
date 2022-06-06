@@ -138,7 +138,36 @@ l2_loop:
         or eax, CR0_PAGING | CR0_PROTECTION
         mov cr0, eax
 
-        jmp sect2
+        jmp CODE_SEG:start64
+
+bits 64
+
+trap_gate:
+        mov byte [0xb8000 + 160 * 10], 'T'
+        iretq
+
+interrupt_gate:
+        mov byte [0xb8000 + 160 * 10], 'I'
+
+        mov al, 0x20
+        out PIC_PRIMARY_CMD, al
+
+        iretq
+
+keyboard_gate:
+        push rax
+
+        in al, 0x60
+
+        mov [0xb8000 + 160], al
+        mov byte [0xb8000 + 160 + 1], 0x04
+
+        mov al, 0x20
+        out PIC_PRIMARY_CMD, al
+
+        pop rax
+
+        iretq
 
         ; Note on my note: I havent' ever tried 32-bit protected mode with paging enabled, and I'd forgotten that
         ;   I wrote that Intel says we specifically need that on and then back off...
@@ -195,38 +224,6 @@ dap:
         dw 0xaa55
 
 sect2:
-
-        jmp CODE_SEG:start64
-
-bits 64
-
-trap_gate:
-        mov byte [0xb8000 + 160 * 10], 'T'
-        iretq
-
-interrupt_gate:
-        mov byte [0xb8000 + 160 * 10], 'I'
-
-        mov al, 0x20
-        out PIC_PRIMARY_CMD, al
-
-        iretq
-
-keyboard_gate:
-        push rax
-
-        in al, 0x60
-
-        mov [0xb8000 + 160], al
-        mov byte [0xb8000 + 160 + 1], 0x04
-
-        mov al, 0x20
-        out PIC_PRIMARY_CMD, al
-
-        pop rax
-
-        iretq
-
 start64:
         xor ax, ax
         mov ds, ax
