@@ -134,21 +134,6 @@ l2_loop:
 
 bits 64
 
-keyboard_gate:
-        push rax
-
-        in al, 0x60
-
-        mov [0xb8000 + 160], al
-        mov byte [0xb8000 + 160 + 1], 0x0d
-
-        mov al, 0x20
-        out PIC_PRIMARY_CMD, al
-
-        pop rax
-
-        iretq
-
         ; Note on my note: I haven't ever tried 32-bit protected mode with paging enabled, and I'd forgotten that
         ;   I wrote that Intel says we specifically need that on and then back off...
 
@@ -235,7 +220,24 @@ loop_idt2:
         dw 0xaa55
 
 sect2:
+        jmp sect2code
 
+keyboard_gate:
+        push rax
+
+        in al, 0x60
+
+        mov [0xb8000 + 160], al
+        mov byte [0xb8000 + 160 + 1], 0x0d
+
+        mov al, 0x20
+        out PIC_PRIMARY_CMD, al
+
+        pop rax
+
+        iretq
+
+sect2code:
         mov byte [0xb8000], '@'
 
 halt_loop:
