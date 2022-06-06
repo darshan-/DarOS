@@ -242,10 +242,22 @@ smap_done:
 
         ; jmp CODE_SEG32:start32
 
-loading: db "Loading PurpOS, just so'as you know.... Okay, friend? ", 0
+loading: db "Loading", 0
 loaded: db "Secters loaded!", 0x0d, 0x0a, 0
 insect2: db "In secter 2", 0x0d, 0x0a, 0
 lba_error_s: db "LBA error", 0x0d, 0x0a, 0
+
+PTABLE_PRESENT equ 1
+        PTABLE_WRITABLE equ 1<<1
+        PTABLE_HUGE equ 1<<7
+
+        PIC_PRIMARY_CMD equ 0x20
+        PIC_PRIMARY_DATA equ 0x21
+        PIC_SECONDARY_CMD equ 0xa0
+        PIC_SECONDARY_DATA equ 0xa1
+
+        ICW1 equ 1<<4
+        ICW1_ICW4_NEEDED equ 1
 
 teledot:
         mov ah, INT_0x10_TELETYPE
@@ -354,9 +366,16 @@ dap:
         dw 0xaa55
 ;63
 sect2:
+
+        jmp sect2code
+trap_gate_s: db "Trap gate: 0", 0
+interrupt_gate_s: db "Interrupt gate: 0", 0
+keyboard_gate_s: db "Got a key, not telling you what      (fine, a hint:  )", 0
+
+sect2code:
+
         mov bx, insect2
         call teleprint
-
 ;bits 32
 ;start32:
         ; mov ax, DATA_SEG32
@@ -403,6 +422,113 @@ l2_loop:
         jmp CODE_SEG:start64
 
 bits 64
+
+print:
+        mov cl, [ebx]
+        cmp cl, 0
+        jz .done
+
+        mov byte [eax], cl
+        inc eax
+        mov byte [eax], ch
+        inc eax
+        inc ebx
+        jmp print
+.done:
+        ret
+
+trap_gate:
+        push rax
+        push rbx
+        push rcx
+
+        mov eax, trap_gate_s
+        mov bl, [trap_gate_s+11]
+        inc bl
+        mov [eax+11], bl
+        mov eax, 0xb8000+960
+        mov ebx, trap_gate_s
+        mov ch, 0x07
+        call print
+
+        pop rcx
+        pop rbx
+        pop rax
+
+        ; Don't return from divide-by-zero handler?  Others not to return from?
+        iretq
+
+interrupt_gate_maybe_0x00:
+        push rax
+        push rbx
+        push rcx
+
+        ;mov rax, 0x00 ; The byte moved to rax is the only differentiator
+        ;shl rax, 3    ; vector number times 8, as addresses are 64 bits
+        ;call [rax]
+
+        mov al, 0x20
+        out PIC_PRIMARY_CMD, al
+        ;out PIC_SECONDARY_CMD, al ; This one too?
+
+        pop rcx
+        pop rbx
+        pop rax
+
+        iretq
+
+interrupt_gate:
+        push rax
+        push rbx
+        push rcx
+
+        mov eax, interrupt_gate_s
+        mov bl, [interrupt_gate_s+16]
+        inc bl
+        mov [eax+16], bl
+        mov eax, 0xb8000+1120
+        mov ebx, interrupt_gate_s
+        mov ch, 0x07
+        call print
+
+        mov al, 0x20
+        out PIC_PRIMARY_CMD, al
+        ;out PIC_SECONDARY_CMD, al ; This one too?
+
+        pop rcx
+        pop rbx
+        pop rax
+
+        iretq
+
+keyboard_gate:
+        push rax
+        push rbx
+        push rcx
+
+        mov eax, 0xb8000+1280
+        mov ebx, keyboard_gate_s
+        mov ch, 0x02
+        call print
+
+        in al, 0x60
+
+        mov ebx, 0xb8000+1280+104
+        mov [ebx], al
+        mov byte [ebx+1], 0x04
+
+        ;int 3
+
+        mov al, 0x20
+        out PIC_PRIMARY_CMD, al
+        ;out PIC_SECONDARY_CMD, al ; This one too?
+
+        pop rcx
+        pop rbx
+        pop rax
+
+        iretq
+
 start64:
         xor ax, ax
         mov ds, ax
@@ -433,3 +559,67 @@ l3_loop2:
         loop l3_loop2
 
         mov byte [0xb8000], '@'
+
+
+
+        mov ebx, idt
+        mov ecx, 32
+loop_idt:
+        mov rax, trap_gate
+        mov [ebx], ax
+        mov [ebx+4], rax
+        mov word [ebx+2], CODE_SEG
+        mov word [ebx+4], 1<<15 | 0b1111 << 8
+        add ebx, 16
+        loop loop_idt
+
+        mov ecx, 224
+loop_idt2:
+        mov rax, interrupt_gate
+        mov [ebx], ax
+        mov [ebx+4], rax
+        mov word [ebx+2], CODE_SEG
+        mov word [ebx+4], 1<<15 | 0b1110 << 8
+        add ebx, 16
+        loop loop_idt2
+
+        mov rax, keyboard_gate
+        mov ebx, idt + (16 * 0x21)
+        mov [ebx], ax
+        shr rax, 16
+        mov [ebx+6], rax
+
+        mov al, ICW1 | ICW1_ICW4_NEEDED
+        out PIC_PRIMARY_CMD, al
+        out PIC_SECONDARY_CMD, al
+
+        mov al, 0x20
+        out PIC_PRIMARY_DATA, al        ; Map primary PIC to 0x20 - 0x27
+        mov al, 0x28
+        out PIC_SECONDARY_DATA, al      ; Map secondary PIC to 0x28 - 0x2f
+
+        mov al, 0x04
+        out PIC_PRIMARY_DATA, al
+        mov al, 0x02
+        out PIC_SECONDARY_DATA, al
+
+        mov al, 0x01
+        out PIC_PRIMARY_DATA, al
+        out PIC_SECONDARY_DATA, al
+
+        xor al, al
+        out PIC_PRIMARY_DATA, al
+        out PIC_SECONDARY_DATA, al
+
+        mov al, 0xfd
+        out PIC_PRIMARY_DATA, al
+        mov al, 0xff
+        out PIC_SECONDARY_DATA, al
+
+        lidt [idtr]
+
+        sti
+
+halt_loop:
+        hlt
+        jmp halt_loop
