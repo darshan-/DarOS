@@ -254,37 +254,14 @@ print:
         ret
 
 trap_gate:
-        push rax
-        push rbx
-        push rcx
-
-        mov eax, 0xb8000 + 320
-        mov ebx, trap_gate_s
-        mov ch, 0x07
-        call print
-
-        pop rcx
-        pop rbx
-        pop rax
-
+        mov byte [0xb8000 + 160 * 10], 'T'
         iretq
 
 interrupt_gate:
-        push rax
-        push rbx
-        push rcx
-
-        mov eax, 0xb8000 + 480
-        mov ebx, interrupt_gate_s
-        mov ch, 0x07
-        call print
+        mov byte [0xb8000 + 160 * 10], 'I'
 
         mov al, 0x20
         out PIC_PRIMARY_CMD, al
-
-        pop rcx
-        pop rbx
-        pop rax
 
         iretq
 
@@ -293,14 +270,9 @@ keyboard_gate:
         push rbx
         push rcx
 
-        mov eax, 0xb8000 + 640
-        mov ebx, keyboard_gate_s
-        mov ch, 0x02
-        call print
-
         in al, 0x60
 
-        mov ebx, 0xb8000+ 640 + (11 * 2)
+        mov ebx, 0xb8000 + 160
         mov [ebx], al
         mov byte [ebx + 1], 0x04
 
@@ -320,25 +292,6 @@ start64:
         mov fs, ax
         mov gs, ax
         mov ss, ax
-
-        mov eax, PT_PRESENT | PT_WRITABLE | PT_HUGE
-        mov ebx, page_tables_l2
-        mov ecx, 512*256
-l2s_loop:
-        mov [ebx], eax
-        add eax, SZ_2MB       ; Huge page bit makes for 2MB pages, so each page is this far apart
-        add ebx, SZ_QW
-        loop l2s_loop
-
-        mov eax, page_tables_l2 | PT_PRESENT | PT_WRITABLE
-        mov ebx, page_table_l3
-        mov ecx, 256
-l3_loop2:
-        mov [ebx], eax
-        add eax, SZ_QW*512
-        add ebx, SZ_QW
-        loop l3_loop2
-
 
         mov ebx, idt
         mov ecx, 32
