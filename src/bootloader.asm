@@ -143,14 +143,6 @@ l2_loop:
         ; Note on my note: I havent' ever tried 32-bit protected mode with paging enabled, and I'd forgotten that
         ;   I wrote that Intel says we specifically need that on and then back off...
 
-loading: db " Loading...", 0
-loaded: db " sectors loaded.", 0x0d, 0x0a, 0
-insect2: db "In sector 2.", 0x0d, 0x0a, 0
-lba_error_s: db "LBA error", 0x0d, 0x0a, 0
-trap_gate_s: db "Trap gate", 0
-interrupt_gate_s: db "Interrupt gate", 0
-keyboard_gate_s: db "Got a key: ", 0
-
         PTABLE_PRESENT equ 1
         PTABLE_WRITABLE equ 1<<1
         PTABLE_HUGE equ 1<<7
@@ -162,20 +154,6 @@ keyboard_gate_s: db "Got a key: ", 0
 
         ICW1 equ 1<<4
         ICW1_ICW4_NEEDED equ 1
-
-teleprint:
-        mov ah, INT_0x10_TELETYPE
-.loop:
-        mov al, [bx]
-        test al, al
-        jz done
-
-        int 0x10
-        inc bx
-        jmp .loop
-done:
-        ret
-
 
         CODE_SEG equ gdt.code - gdt
 gdt:
@@ -221,20 +199,6 @@ sect2:
         jmp CODE_SEG:start64
 
 bits 64
-
-print:
-        mov cl, [ebx]
-        cmp cl, 0
-        jz .done
-
-        mov byte [eax], cl
-        inc eax
-        mov byte [eax], ch
-        inc eax
-        inc ebx
-        jmp print
-.done:
-        ret
 
 trap_gate:
         mov byte [0xb8000 + 160 * 10], 'T'
