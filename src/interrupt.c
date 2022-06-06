@@ -268,7 +268,7 @@ static void init_pic() {
 
     // Mask interrupts as you see fit
     //outb(PIC_PRIMARY_DATA, 0x7c);
-    outb(PIC_PRIMARY_DATA, 0x7f);
+    outb(PIC_PRIMARY_DATA, 0xfd);
     outb(PIC_SECONDARY_DATA, 0xff);
 }
 
@@ -327,8 +327,8 @@ static void __attribute__((interrupt)) double_fault_handler(struct interrupt_fra
 }
 
 static void __attribute__((interrupt)) irq1_kbd(struct interrupt_frame *) {
-    print("irq1\n");
     __asm__ __volatile__("hlt");
+    print("irq1\n");
     uint8_t code = inb(0x60);
     outb(PIC_PRIMARY_CMD, PIC_ACK);
     push(&kbd_buf, (void*) (uint64_t) code);
