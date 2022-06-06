@@ -121,102 +121,6 @@ lba_success:
         mov bx, loaded
         call teleprint
 
-;         mov ax, 0
-;         push ax
-;         mov ax, 0x7e00 >> 4
-;         mov es, ax
-;         mov ch, 0
-;         mov cl, 2
-;         mov dh, 0
-;         mov bx, 0
-
-; readsector:
-;         mov ah, 2
-;         mov al, 1
-;         ;mov bx, sect2
-;         int 0x13
-
-;         jc int13err
-;         cmp al, 0
-;         je int13zero
-;         call teledot
-;         mov byte [err_count], 0
-;         pop ax
-;         inc ax
-;         cmp ax, 960
-;         je reads_done
-;         push ax
-;         inc cl
-;         cmp cl, 0b1000000       ; Only lowest 6 bits are for sector
-;         jne sector_count_okay
-;         call telepipe
-;         mov cl, 1
-;         ;inc dh
-;         add dh, 2
-; sector_count_okay:
-;         mov ax, es
-;         add ax, 512 >> 4
-;         mov es, ax
-;         jmp readsector
-
-; int13zero:
-;         call telezero
-; int13err:
-;         call telecomma
-;         mov al, [err_count]
-;         inc al
-;         mov [err_count], al
-;         cmp al, 3
-;         jb readsector
-;         call teleh
-;         mov byte [err_count], 0
-;         cmp cl, 1
-;         je inc_cyl
-;         ;mov cl, 1
-;         dec cl
-;         ;inc dh
-;         add dh, 3
-;         jmp readsector
-; inc_cyl:
-;         call teleslash
-;         cmp dh, 0
-;         je reads_done
-;         mov dh, 0
-;         inc ch
-;         jmp readsector
-; reads_done:
-
-;         mov bx, loaded
-;         call teleprint
-;         ; cli
-;         ; hlt
-
-        mov dword [int_15_mem_table], 1
-        mov ax, int_15_mem_table >> 4
-        mov es, ax
-        mov di, 4
-
-        SMAP equ 'S' << 24 | 'M' << 16 | 'A' << 8 | 'P' ; 0x534d4150 aka 'SMAP'
-
-        mov ebx, 0
-        mov edx, SMAP
-
-smap_start:
-        mov eax, 0xe820
-        mov ecx, 20
-        int 0x15
-        jc smap_done
-        mov edx, SMAP
-        cmp eax, edx
-        jne smap_done
-        cmp ebx, 0
-        je smap_done
-        inc dword [int_15_mem_table]
-        add di, 24
-        jmp smap_start
-
-smap_done:
-
         ; Enable A20 bit
         mov ax, 0x2401
         int 0x15
@@ -269,26 +173,10 @@ done:
 
 
         CODE_SEG equ gdt.code - gdt
-        CODE_SEG32 equ gdt.code32 - gdt
-        DATA_SEG32 equ gdt.data32 - gdt
 gdt:
         dq 0
 .code:
-        dq SD_PRESENT | SD_NONTSS | SD_CODESEG | SD_READABLE | SD_GRAN4K | SD_MODE64 ; Code segment
-.code32:
-        dw 0xFFFF
-        dw 0x0
-        db 0x0
-        db 10011010b
-        db 11001111b
-        db 0x0
-.data32:
-        dw 0xFFFF
-        dw 0x0
-        db 0x0
-        db 10010010b
-        db 11001111b
-        db 0x0
+        dq SD_PRESENT | SD_NONTSS | SD_CODESEG | SD_READABLE | SD_GRAN4K | SD_MODE64
 gdtr:
         dw $ - gdt - 1          ; Length in bytes minus 1
         dq gdt                  ; Address
@@ -318,7 +206,6 @@ dap:
         db 18          ; Head of last sector of partition
         db 18          ; Sector of last sector of partition
         db 0           ; Cylinder of last sector of parition
-        ;dd 0x800                ; LBA of partition start
         dd 2           ; LBA of partition start
         dd 0x3c2                ; Number of sectors in partition
         times 510 - ($-$$) db 0
@@ -336,20 +223,6 @@ sect2code:
         mov bx, insect2
         call teleprint
 
-        lgdt [gdtr]
-
-        mov eax, cr0
-        or eax, CR0_PROTECTION
-        mov cr0, eax
-
-        jmp CODE_SEG32:start32
-
-bits 32
-start32:
-        mov ax, DATA_SEG32
-        mov ds, ax
-        mov ss, ax
-        mov esp, stack_top
 
         mov eax, page_table_l3 | PT_PRESENT | PT_WRITABLE
         mov [page_table_l4], eax
@@ -378,7 +251,7 @@ l2_loop:
         or eax, EFER_LONG_MODE_ENABLE
         wrmsr
 
-        ;lgdt [gdtr]
+        lgdt [gdtr]
 
         mov eax, cr0
         or eax, CR0_PAGING | CR0_PROTECTION
