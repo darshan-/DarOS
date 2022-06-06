@@ -87,13 +87,30 @@ start16:
         mov ax, 0x2401
         int 0x15
 
-        mov ch, 0
-        mov cl, 2
-        mov dh, 0
-        mov bx, sect2
-        mov ah, 2
-        mov al, 1
+mov cx, LOAD_COUNT
+        mov si, dap
+        ; dl is set by BIOS to drive number we're loaded from, so just leave it as is
+lba_read:
+        mov ah, INT_0x13_LBA_READ      ; Must set on every loop, as ah gets return code
         int 0x13
+
+        mov ax, [dap.toseg]
+        add ax, (SECT_PER_LOAD * 512) >> 4 ; Increment segment rather than offset (segment is address shifted 4)
+        mov [dap.toseg], ax
+
+        mov eax, [dap.from]
+        add eax, SECT_PER_LOAD
+        mov [dap.from], eax
+        jc lba_error
+        loop lba_read
+
+        jmp lba_success
+
+lba_error:
+        cli
+        hlt
+
+lba_success:
 
         cli
 
@@ -161,6 +178,13 @@ gdtr:
 idtr:
         dw 4095                 ; Size of IDT minus 1
         dq idt                  ; Address
+dap:
+        db 0x10                 ; Size of DAP (Disk Address Packet)
+        db 0                    ; Unused; should be zero
+.cnt:   dw SECT_PER_LOAD        ; Number of sectors to read, 0x80 (128) max; overwritten with number read
+.to:    dw sect2
+.toseg: dw 0                    ; segment
+.from:  dq 1                    ; LBA number (sector to start reading from)
 
 start64:
         xor ax, ax
