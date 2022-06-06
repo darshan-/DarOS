@@ -236,12 +236,6 @@ smap_done:
         ; ;   paging doesn't have to be on, only to turn it off if it is on.  And I've seen lots of examples
         ; ;   that don't, but presumably work on Intel hardware?
 
-        ; mov eax, cr0
-        ; or eax, CR0_PROTECTION
-        ; mov cr0, eax
-
-        ; jmp CODE_SEG32:start32
-
 loading: db "Loading", 0
 loaded: db "Secters loaded!", 0x0d, 0x0a, 0
 insect2: db "In secter 2", 0x0d, 0x0a, 0
@@ -259,41 +253,6 @@ PTABLE_PRESENT equ 1
         ICW1 equ 1<<4
         ICW1_ICW4_NEEDED equ 1
 
-teledot:
-        mov ah, INT_0x10_TELETYPE
-        mov al, '.'
-        int 0x10
-        ret
-
-telecomma:
-        mov ah, INT_0x10_TELETYPE
-        mov al, '!'
-        int 0x10
-        ret
-
-teleslash:
-        mov ah, INT_0x10_TELETYPE
-        mov al, '/'
-        int 0x10
-        ret
-
-telepipe:
-        mov ah, INT_0x10_TELETYPE
-        mov al, '|'
-        int 0x10
-        ret
-
-teleh:
-        mov ah, INT_0x10_TELETYPE
-        mov al, 'h'
-        int 0x10
-        ret
-
-telezero:
-        mov ah, INT_0x10_TELETYPE
-        mov al, '0'
-        int 0x10
-        ret
 
 teleprint:
         mov ah, INT_0x10_TELETYPE
@@ -310,26 +269,26 @@ done:
 
 
         CODE_SEG equ gdt.code - gdt
-        ;CODE_SEG32 equ gdt.code32 - gdt
-        ;DATA_SEG32 equ gdt.data32 - gdt
+        CODE_SEG32 equ gdt.code32 - gdt
+        DATA_SEG32 equ gdt.data32 - gdt
 gdt:
         dq 0
 .code:
         dq SD_PRESENT | SD_NONTSS | SD_CODESEG | SD_READABLE | SD_GRAN4K | SD_MODE64 ; Code segment
-; .code32:
-;         dw 0xFFFF
-;         dw 0x0
-;         db 0x0
-;         db 10011010b
-;         db 11001111b
-;         db 0x0
-; .data32:
-;         dw 0xFFFF
-;         dw 0x0
-;         db 0x0
-;         db 10010010b
-;         db 11001111b
-;         db 0x0
+.code32:
+        dw 0xFFFF
+        dw 0x0
+        db 0x0
+        db 10011010b
+        db 11001111b
+        db 0x0
+.data32:
+        dw 0xFFFF
+        dw 0x0
+        db 0x0
+        db 10010010b
+        db 11001111b
+        db 0x0
 gdtr:
         dw $ - gdt - 1          ; Length in bytes minus 1
         dq gdt                  ; Address
@@ -364,7 +323,7 @@ dap:
         dd 0x3c2                ; Number of sectors in partition
         times 510 - ($-$$) db 0
         dw 0xaa55
-;63
+
 sect2:
 
         jmp sect2code
@@ -376,12 +335,21 @@ sect2code:
 
         mov bx, insect2
         call teleprint
-;bits 32
-;start32:
-        ; mov ax, DATA_SEG32
-        ; mov ds, ax
-        ; mov ss, ax
-        ; mov esp, stack_top
+
+        lgdt [gdtr]
+
+        mov eax, cr0
+        or eax, CR0_PROTECTION
+        mov cr0, eax
+
+        jmp CODE_SEG32:start32
+
+bits 32
+start32:
+        mov ax, DATA_SEG32
+        mov ds, ax
+        mov ss, ax
+        mov esp, stack_top
 
         mov eax, page_table_l3 | PT_PRESENT | PT_WRITABLE
         mov [page_table_l4], eax
@@ -410,10 +378,7 @@ l2_loop:
         or eax, EFER_LONG_MODE_ENABLE
         wrmsr
 
-        lgdt [gdtr]
-
-        mov bx, insect2
-        call teleprint
+        ;lgdt [gdtr]
 
         mov eax, cr0
         or eax, CR0_PAGING | CR0_PROTECTION
