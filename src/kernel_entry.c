@@ -32,13 +32,18 @@ void __attribute__((section(".kernel_entry"))) kernel_entry() {
     }
     print("Mem table parsed.\n");
 
+    kernel_stack_top = 0x160000;
+    uint64_t heap = ((uint64_t) kernel_stack_top + 16) & ~0b1111ull;
+    init_heap((uint64_t*) heap, 1*1024*1024);
+    print("Heap initialized.\n");
+
     __asm__ __volatile__("sti");
     for (;;)
         __asm__ __volatile__("hlt");
-    no_ints();
-    clearScreen();
-    print("Hi, I'm C!  You know?\n");
-    __asm__ __volatile__("hlt");
+    // no_ints();
+    // clearScreen();
+    // print("Hi, I'm C!  You know?\n");
+    // __asm__ __volatile__("hlt");
     // For now, let's use memory this way:
     // If the second largest usable region is large enough for the stack, make that the stack,
     //   otherwise put it at the start of the largest region.
@@ -60,15 +65,15 @@ void __attribute__((section(".kernel_entry"))) kernel_entry() {
     // print("Mem table parsed.\n");
 
     //kernel_stack_top = (uint64_t*) ((mem_table[il].start + 64 * 1024) & ~0b1111ull);
-    kernel_stack_top = 0x160000;
-    print("kernel stack set; will be used when we next start waitloop.\n");
+    //kernel_stack_top = 0x160000;
+    //print("kernel stack set; will be used when we next start waitloop.\n");
     //__asm__ __volatile__("hlt");
-    uint64_t heap = ((uint64_t) kernel_stack_top + 16) & ~0b1111ull;
+    //uint64_t heap = ((uint64_t) kernel_stack_top + 16) & ~0b1111ull;
 
     //init_heap((uint64_t*) heap, mem_table[il].length - (heap - mem_table[il].start));
     //init_heap((uint64_t*) heap, 1*1024*1024);
-    init_heap((uint64_t*) 0x160000, 1*1024*1024);
-    print("Heap initialized.\n");
+    // init_heap((uint64_t*) 0x160000, 1*1024*1024);
+    // print("Heap initialized.\n");
     printf("We've got %u entries:\n", *entry_count);
     // for (uint32_t i = 0; i < *entry_count; i++) {
     //     printf("0x%p016h - 0x%p016h : %u\n", mem_table[i].start,
