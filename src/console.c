@@ -424,7 +424,6 @@ void startTty() {
     registerKbdListener(&gotInput);
     clearScreen();
     setStatusBar();
-    //no_ints();
     printColor("Ready!\n", 0x0d);
     //showCursor();
 };

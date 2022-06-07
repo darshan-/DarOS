@@ -174,9 +174,8 @@ void process_keys() {
 }
 
 static void dumpFrame(struct interrupt_frame *frame) {
-    printf("ip: 0x%p016h    cs: 0x%p016h flags: 0x%p016h\n", frame->ip, frame->cs, frame->flags);
-    printf("sp: 0x%p016h    ss: 0x%p016h\n", frame->sp, frame->ss);
-    __asm__ __volatile__("hlt");
+    logf("ip: 0x%p016h    cs: 0x%p016h flags: 0x%p016h\n", frame->ip, frame->cs, frame->flags);
+    logf("sp: 0x%p016h    ss: 0x%p016h\n", frame->sp, frame->ss);
 }
 
 static inline void generic_trap_n(struct interrupt_frame *frame, int n) {
@@ -334,8 +333,6 @@ static void __attribute__((interrupt)) irq1_kbd(struct interrupt_frame *) {
 }
 
 static void __attribute__((interrupt)) irq8_rtc(struct interrupt_frame *) {
-    print("irq8\n");
-    __asm__ __volatile__("hlt");
     outb(PIC_SECONDARY_CMD, PIC_ACK);
     outb(PIC_PRIMARY_CMD, PIC_ACK);
 
@@ -405,7 +402,7 @@ static void check_queue_caps() {
 }
 
 void init_interrupts() {
-    //return;
+    no_ints();
     for (int i = 32; i < 40; i++)
         set_handler(i, default_PIC_P_handler, TYPE_INT);
     for (int i = 40; i < 48; i++)
@@ -444,14 +441,9 @@ void init_interrupts() {
     INITQ(wq, INIT_WQ_CAP);
     INITQ(kbd_buf, INIT_KB_CAP);
 
-    print("Initialized queues\n");
-    //__asm__ __volatile__("hlt");
-    registerPeriodicCallback((struct periodic_callback) {1, 2, check_queue_caps});
-    return;
-
     cpuCountOffset = read_tsc();
-    // for (int i = 0; i < 32; i++)
-    //     set_handler(i, default_trap_handler, TYPE_INT);
 
-    //print("Set handlers\n");
+    registerPeriodicCallback((struct periodic_callback) {1, 2, check_queue_caps});
+
+    ints_okay();
 }

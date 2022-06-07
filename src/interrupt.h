@@ -23,6 +23,6 @@ static inline void ints_okay() {
 
     int_blocks--;
 
-    // if (int_blocks == 0)
-    //     __asm__ __volatile__("sti");
+    if (int_blocks == 0)
+        __asm__ __volatile__("sti");
 }

@@ -58,6 +58,8 @@ void __attribute__((section(".kernel_entry"))) kernel_entry() {
     printf("Largest: 0x%p016h - 0x%p016h\n", mem_table[il].start, mem_table[il].start + largest - 1);
     printf("Stack top / heap bottom: 0x%h\n", kernel_stack_top);
     printf("Heap is %u MB.\n", heapSize() / 1024 / 1024);
+    parse_acpi_tables();
+    init_hpet();
 
     waitloop();
 
