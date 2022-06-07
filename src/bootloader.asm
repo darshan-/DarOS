@@ -238,11 +238,6 @@ l3_loop2:
         add rax, SZ_QW * 512
         add rbx, SZ_QW
         loop l3_loop2
-        ;lgdt [gdtr]
-
-;         mov rax, 0x100000000
-;         mov byte [rax], 'Q'
-;         hlt
 
         lidt [idtr]
 
@@ -266,22 +261,3 @@ l3_loop2:
         dw 0xaa55
 
 sect2:
-        jmp sect2code
-
-keyboard_gate:
-        push rax
-
-        in al, 0x60
-
-        mov [0xb8000 + 160], al
-        mov byte [0xb8000 + 160 + 1], 0x0d
-
-        mov al, 0x20
-        out PIC_PRIMARY_CMD, al
-
-        pop rax
-
-        iretq
-
-sect2code:
-        mov byte [0xb8000], 'Q'
