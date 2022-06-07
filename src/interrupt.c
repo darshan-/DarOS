@@ -408,6 +408,7 @@ static void check_queue_caps() {
 
 void init_interrupts() {
     //return;
+    init_pic();
     set_handler(0x21, irq1_kbd, TYPE_INT);
     INITQ(wq, INIT_WQ_CAP);
     INITQ(kbd_buf, INIT_KB_CAP);
@@ -455,7 +456,7 @@ void init_interrupts() {
     //print("Skipped initializing RTC\n");
     //init_pit();
     //print("Initialized PIT\n");
-     //init_pic();
+    init_pic();
     //print("Initialized PIC\n");
  
     INITQ(wq, INIT_WQ_CAP);

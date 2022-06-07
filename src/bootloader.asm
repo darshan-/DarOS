@@ -232,20 +232,20 @@ loop_idt2:
         add ebx, 16
         loop loop_idt2
 
-        mov al, ICW1 | ICW1_ICW4_NEEDED
-        out PIC_PRIMARY_CMD, al
+        ; mov al, ICW1 | ICW1_ICW4_NEEDED
+        ; out PIC_PRIMARY_CMD, al
 
-        mov al, 0x20
-        out PIC_PRIMARY_DATA, al        ; Map primary PIC to 0x20 - 0x27
+        ; mov al, 0x20
+        ; out PIC_PRIMARY_DATA, al        ; Map primary PIC to 0x20 - 0x27
 
-        mov al, 0x04
-        out PIC_PRIMARY_DATA, al
+        ; mov al, 0x04
+        ; out PIC_PRIMARY_DATA, al
 
-        mov al, 0x01
-        out PIC_PRIMARY_DATA, al
+        ; mov al, 0x01
+        ; out PIC_PRIMARY_DATA, al
 
-        mov al, 0xfd
-        out PIC_PRIMARY_DATA, al
+        ; mov al, 0xfd
+        ; out PIC_PRIMARY_DATA, al
 
         lidt [idtr]
 
