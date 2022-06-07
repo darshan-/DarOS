@@ -419,11 +419,11 @@ static void gotInput(struct input i) {
 }
 
 void startTty() {
-    log("starting tty\n");
+    log("Starting tty\n");
     init_keyboard();
     registerKbdListener(&gotInput);
     clearScreen();
     setStatusBar();
     printColor("Ready!\n", 0x0d);
-    //showCursor();
+    showCursor();
 };

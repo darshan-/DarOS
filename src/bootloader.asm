@@ -72,7 +72,6 @@
 section .boot
 bits 16
         jmp 0:start16           ; Make sure cs is set to 0
-err_count: db 0
 start16:
         mov ax, cs
         mov ds, ax
@@ -184,14 +183,6 @@ bits 64
         PTABLE_PRESENT equ 1
         PTABLE_WRITABLE equ 1<<1
         PTABLE_HUGE equ 1<<7
-
-        PIC_PRIMARY_CMD equ 0x20
-        PIC_PRIMARY_DATA equ 0x21
-        PIC_SECONDARY_CMD equ 0xa0
-        PIC_SECONDARY_DATA equ 0xa1
-
-        ICW1 equ 1<<4
-        ICW1_ICW4_NEEDED equ 1
 
         CODE_SEG equ gdt.code - gdt
 gdt:
