@@ -25,38 +25,36 @@ void __attribute__((section(".kernel_entry"))) kernel_entry() {
         if (mem_table[i].type != 1)
             continue;
 
+        if (mem_table[i].start < 0x200000) {
+            if (mem_table[i].start + mem_table[i].length < 0x200000) {
+                mem_table[i].type = 2;
+                continue;
+            }
+
+            mem_table[i].length -= 0x200000 - mem_table[i].start;
+            mem_table[i].start = 0x200000;
+        }
+
         if (mem_table[i].length > largest) {
             largest = mem_table[i].length;
             il = i;
         }
     }
 
-    // kernel_stack_top = 0x260000;
-    // init_heap(kernel_stack_top, 100*1024*1024);
     kernel_stack_top = (uint64_t*) ((mem_table[il].start + STACK_SIZE) & ~0b1111ull);
     init_heap(kernel_stack_top, mem_table[il].length - STACK_SIZE);
-    //init_heap(kernel_stack_top, 100*1024*1024);
-    //__asm__ __volatile__("hlt");
 
     init_interrupts();
-    //kernel_stack_top = (uint64_t*) ((mem_table[il].start + STACK_SIZE) & ~0b1111ull);
     startTty();
 
     printf("We've got %u entries:\n", *entry_count);
     for (uint32_t i = 0; i < *entry_count; i++) {
         printf("0x%p016h - 0x%p016h : %u\n", mem_table[i].start,
                mem_table[i].start + mem_table[i].length - 1, mem_table[i].type);
-        // if (i >= 11)
-        //     break;
-        //     //__asm__ __volatile__("hlt");
     }
     printf("Largest: 0x%p016h - 0x%p016h\n", mem_table[il].start, mem_table[il].start + largest - 1);
-    //heap = ((uint64_t) kernel_stack_top + 16) & ~0b1111ull;
     printf("stack top / heap bottom: 0x%h\n", kernel_stack_top);
 
-    // uint64_t* p = 0x100000000ull;
-    // *p = 0xfacecafe;
-    // printf("%h has %h\n", p, *p);
     waitloop();
 
     // no_ints();
