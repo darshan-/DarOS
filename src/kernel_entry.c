@@ -40,7 +40,6 @@ void __attribute__((section(".kernel_entry"))) kernel_entry() {
     init_interrupts();
 
     startTty();
-    print("Doing sti and waitloop?\n");
     __asm__ __volatile__("sti");
     waitloop();
     for (;;)

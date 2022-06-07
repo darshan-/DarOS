@@ -66,9 +66,7 @@ static inline void kbd_cmd(uint8_t cmd, uint8_t arg) {
 }
 
 void init_keyboard() {
-    print("Initializing keyboard...\n");
     kbd_cmd(0xf3, 0b0100000); // Set Typematic to 0.5 sec delay, 30.0 per second
-    __asm__ __volatile__("hlt");
 }
 
 void keyScanned(uint8_t c) {
