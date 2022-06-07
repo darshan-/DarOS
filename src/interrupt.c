@@ -408,7 +408,9 @@ static void check_queue_caps() {
 
 void init_interrupts() {
     //return;
+    init_pit();
     init_pic();
+    set_handler(0x20, irq0_pit, TYPE_INT);
     set_handler(0x21, irq1_kbd, TYPE_INT);
     INITQ(wq, INIT_WQ_CAP);
     INITQ(kbd_buf, INIT_KB_CAP);
