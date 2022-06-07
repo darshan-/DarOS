@@ -20,23 +20,12 @@ static uint64_t* heap = (uint64_t*) 0;
 
 // `size' is the number of bytes available to us for (map + heap)
 void init_heap(uint64_t* start, uint64_t size) {
-    print("init_heap: 01\n");
     map_size = size / (1 + MAP_FACTOR);
-    print("init_heap: 02\n");
     map = start;
-    print("init_heap: 03-A\n");
     map[0] = 0;
-    print("init_heap: 03-B\n");
-    //__asm__ __volatile__("hlt");
-    for (uint64_t i = 0; i < map_size; i++) {
-        //print("m");
+    for (uint64_t i = 0; i < map_size; i++)
         map[i] = 0;
-    }
-    print("\ninit_heap: 04\n");
-    //__asm__ __volatile__("hlt");
     heap = map + map_size;
-    print("init_heap: 05\n");
-    //__asm__ __volatile__("hlt");
 }
 
 uint64_t memUsed() {
@@ -52,6 +41,11 @@ uint64_t memUsed() {
     }
 
     return p * 128;
+}
+
+// Returns number of bytes in the heap (not counting map)
+uint64_t heapSize() {
+    return map_size * MAP_FACTOR;
 }
 
 void* malloc(uint64_t nBytes) {

@@ -25,6 +25,9 @@ void __attribute__((section(".kernel_entry"))) kernel_entry() {
         if (mem_table[i].type != 1)
             continue;
 
+        // L2 pages mapping first 256 GB of address space take up the MB from 0x100000 to 0x200000
+        // At some point I'll probably want to make that part of this process, but for now it's fixed there,
+        //   and we'll just account for it here.
         if (mem_table[i].start < 0x200000) {
             if (mem_table[i].start + mem_table[i].length < 0x200000) {
                 mem_table[i].type = 2;
@@ -53,7 +56,8 @@ void __attribute__((section(".kernel_entry"))) kernel_entry() {
                mem_table[i].start + mem_table[i].length - 1, mem_table[i].type);
     }
     printf("Largest: 0x%p016h - 0x%p016h\n", mem_table[il].start, mem_table[il].start + largest - 1);
-    printf("stack top / heap bottom: 0x%h\n", kernel_stack_top);
+    printf("Stack top / heap bottom: 0x%h\n", kernel_stack_top);
+    printf("Heap is %u MB.\n", heapSize() / 1024 / 1024);
 
     waitloop();
 
