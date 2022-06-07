@@ -37,6 +37,9 @@ void __attribute__((section(".kernel_entry"))) kernel_entry() {
     init_heap((uint64_t*) heap, 1*1024*1024);
     print("Heap initialized.\n");
 
+    //init_interrupts();
+
+    startTty();
     __asm__ __volatile__("sti");
     for (;;)
         __asm__ __volatile__("hlt");

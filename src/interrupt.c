@@ -442,13 +442,13 @@ void init_interrupts() {
     SET_GETRAP_N(1d);
     SET_GETRAP_N(1e);
 
-    print("Set handlers\n");
+    //print("Set handlers\n");
     //init_rtc();
-    print("Skipped initializing RTC\n");
-    init_pit();
-     print("Initialized PIT\n");
-    init_pic();
-    print("Initialized PIC\n");
+    //print("Skipped initializing RTC\n");
+    //init_pit();
+    //print("Initialized PIT\n");
+     //init_pic();
+    //print("Initialized PIC\n");
  
     INITQ(wq, INIT_WQ_CAP);
     INITQ(kbd_buf, INIT_KB_CAP);
