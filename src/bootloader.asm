@@ -63,8 +63,8 @@
 
         ; Let's load 960 sectors, 120 at a time (128 is max at a time, 961 total is max in safe area)
         ; Well, VirtualBox, and apparently some other BIOSes, can only handle reading one sector at a time...
-        SECT_PER_LOAD equ 1
-        LOAD_COUNT equ 960
+        SECT_PER_LOAD equ 120
+        LOAD_COUNT equ 8
 
         INT_0x10_TELETYPE equ 0x0e
         INT_0x13_LBA_READ equ 0x42

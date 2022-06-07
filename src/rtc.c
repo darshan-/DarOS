@@ -78,43 +78,34 @@ static int equal(uint8_t* a, uint8_t* b) {
 // Assumes interrupts are off and leaves them off.  Call either before interrupts are first enabled at boot, or
 //  from a helper function that knows what it's doing and turns them off before calling and back on afterward.
 static void sync_rtc_seconds() {
-    print("sync_rtc_seconds - 01\n");
-
     struct rtc_time t;
     uint8_t pm = 0;
     uint8_t a[9], b[9];
 
-    print("sync_rtc_seconds - 02\n");
     while (!equal(read(a), read(b)))
         ;
 
-    print("sync_rtc_seconds - 03\n");
     uint8_t* c = (uint8_t*) &t;
     for (int i = 0; i < 8; i++)
         c[i] = a[i];
 
-    print("sync_rtc_seconds - 04\n");
     if (!(a[8] & HRS24)) {
         pm = t.hours & PM_BIT;
         t.hours ^= PM_BIT;
     }
 
-    print("sync_rtc_seconds - 05\n");
     if (!(a[8] & BCD_OFF))
         for (int i = 0; i < 8; i++)
             c[i] = (c[i] >> 4) * 10 + (c[i] & 0x0f);
 
-    print("sync_rtc_seconds - 06\n");
     if (pm)
         t.hours += 12;
     if (t.hours == 24) // Midnight
         t.hours = 0;
 
-    print("sync_rtc_seconds - 07\n");
     // Now calculate seconds into day
     rtc_seconds = (t.hours * 60 + t.minutes) * 60 + t.seconds;
 
-    print("sync_rtc_seconds - 08\n");
     // TODO: Let's also store rest of data.
 }
 
@@ -180,10 +171,7 @@ void get_rtc_time(struct rtc_time* t) {
 
 // To be called only before interrupts are first turned on at boot.
 void init_rtc() {
-    print("Initializing RTC - 01\n");
     sync_rtc_seconds();
-    print("Initializing RTC - 02\n");
     seconds_at_boot = rtc_seconds;
-    print("Initializing RTC - 03\n");
     //enable_rtc_timer();
 }
