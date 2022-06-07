@@ -37,6 +37,26 @@
 #define CON_TERM 1
 #define CON_LOGS 2
 
+/*
+  Okay, I think I like the idea of each vterm being backed by one linked list of pages of memory, not a combination of the VRAM
+    itself (or the array backing that up) and two linked lists of lines.  And we never write directly to screen, only to the backing
+    store, which we then sync to the display.
+
+  I probably want pages larger than 4K (about one screenful), so I'll want to improve malloc soon.
+
+  But for now we can, I think, clean up, simplify, and increase performance by using either a linked list of 4000-byte pages (25x160)
+    or an array of addresses of such pages.
+
+  Since for this, we don't have anything curses like, whether in terminal or logs, we only write to the bottom.  Instead of worrying
+    abou scrolling while writing, we only worry about finishing a page and starting a new one.  Then we scroll by adjusting the window
+    if necessary.
+
+  My hypothesis is that video memory is slower than normal RAM, so scrolling by reading and writing from/to vram is slower then what we
+    hopefully will see when we never read from video RAM, just do one screenful of writes.  (I guess for some writes we do just want to
+    add something to blank space on the screen, so that'll have to be worked out, but all in all, I think this will be cleaner code and
+    more effiecient.)
+ */
+
 static uint8_t* cur = VRAM;
 static uint8_t con = CON_TERM;
 static uint8_t* term_cur;
@@ -238,6 +258,9 @@ uint8_t term_buf[160 * LINES];
 uint8_t logs_buf[160 * LINES];
 
 static void scrollDownBy(uint64_t n);
+static inline void scrollToBottom() {
+    scrollDownBy((uint64_t) -1);
+}
 
 static void* last_log = 0;
 
@@ -262,9 +285,12 @@ static inline void showLogs() {
 
     con = CON_LOGS;
 
+    // If we're already at the bottom, we want to print to new lines below, then scroll to bottom -- the hiccup is that
+    //   some lines could be more than one line (more than 80 characters)..
     void (*printLog)(char*) = ({
         void __fn__ (char* s) {
-            scrollDownBy((uint64_t) -1);
+            // If
+            scrollToBottom();
             print(s);
         }
         __fn__;
@@ -421,10 +447,12 @@ static void gotInput(struct input i) {
 
     else if (con == CON_TERM) {
         if (!i.alt && !i.ctrl) {
-            scrollDownBy((uint64_t) -1);
+            scrollToBottom();
             printc(i.key);
-            // if (i.key == 'd')
-            //     log("d was typed\n");
+            if (i.key == 'd')
+                log("d was typed\n");
+            if (i.key == 'f')
+                log("f was typed\n");
         }
 
         else if (i.key == '2' && !i.alt && i.ctrl)
