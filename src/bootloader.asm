@@ -221,31 +221,16 @@ start64:
         mov gs, ax
         mov ss, ax
 
-        mov ebx, idt
-        mov ecx, 256
-loop_idt2:
-        mov rax, keyboard_gate
-        mov [ebx], ax
-        mov [ebx + 4], rax
-        mov word [ebx + 2], CODE_SEG
-        mov word [ebx + 4], 1 << 15 | 0b1110 << 8
-        add ebx, 16
-        loop loop_idt2
-
-        ; mov al, ICW1 | ICW1_ICW4_NEEDED
-        ; out PIC_PRIMARY_CMD, al
-
-        ; mov al, 0x20
-        ; out PIC_PRIMARY_DATA, al        ; Map primary PIC to 0x20 - 0x27
-
-        ; mov al, 0x04
-        ; out PIC_PRIMARY_DATA, al
-
-        ; mov al, 0x01
-        ; out PIC_PRIMARY_DATA, al
-
-        ; mov al, 0xfd
-        ; out PIC_PRIMARY_DATA, al
+;         mov ebx, idt
+;         mov ecx, 256
+; loop_idt2:
+;         mov rax, keyboard_gate
+;         mov [ebx], ax
+;         mov [ebx + 4], rax
+;         mov word [ebx + 2], CODE_SEG
+;         mov word [ebx + 4], 1 << 15 | 0b1110 << 8
+;         add ebx, 16
+;         loop loop_idt2
 
         lidt [idtr]
 
