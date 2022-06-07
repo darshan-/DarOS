@@ -164,7 +164,7 @@ static void setStatusBar() {
     registerPeriodicCallback((struct periodic_callback) {2, 1, updateMemUse});
 }
 
-void clearScreen() {
+static void clearScreen() {
     no_ints();
 
     for (uint64_t* v = (uint64_t*) VRAM; v < (uint64_t*) STATUS_LINE; v++)
