@@ -359,8 +359,6 @@ static void __attribute__((interrupt)) irq0_pit(struct interrupt_frame *) {
 
     ms_since_boot = pitCount * PIT_COUNT * 1000 / PIT_FREQ;
 
-    if (pitCount % 1000 == 0)
-        printf("ms_since_boot: %u\n", ms_since_boot);
     // if (pitCount % TICK_HZ == 0)
     //     logf("Average CPU ticks per PIT tick: %u\n", (read_tsc() - cpuCountOffset) / pitCount);
 
@@ -438,7 +436,7 @@ void init_interrupts() {
     SET_GETRAP_N(1d);
     SET_GETRAP_N(1e);
 
-    //init_rtc();
+    init_rtc();
     init_pit();
     init_pic();
     set_handler(0x20, irq0_pit, TYPE_INT);

@@ -127,7 +127,7 @@ static void setStatusBar() {
 
     updateMemUse(); // Clock will update very soon, but mem won't for 2 seconds
 
-    //registerPeriodicCallback((struct periodic_callback) {60, 1, updateClock});
+    registerPeriodicCallback((struct periodic_callback) {60, 1, updateClock});
     registerPeriodicCallback((struct periodic_callback) {2, 1, updateMemUse});
 }
 
