@@ -29,7 +29,7 @@ void init_heap(uint64_t* start, uint64_t size) {
     print("init_heap: 03-B\n");
     //__asm__ __volatile__("hlt");
     for (uint64_t i = 0; i < map_size; i++) {
-        print("m");
+        //print("m");
         map[i] = 0;
     }
     print("\ninit_heap: 04\n");
