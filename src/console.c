@@ -55,6 +55,15 @@
     hopefully will see when we never read from video RAM, just do one screenful of writes.  (I guess for some writes we do just want to
     add something to blank space on the screen, so that'll have to be worked out, but all in all, I think this will be cleaner code and
     more effiecient.)
+
+  I do rather like the idea of an array of heads -- a page table.  So we can jump wherever we want easily.  Although I supposed a doubly
+    linked list is good enough too.  We either want to jump to the beginning (head) end (tail), next page (next) or preview page (prev).
+    We otherwise don't jump to any arbitrary location.  As long as I store head and tail of list, and prev and next in each node, it
+    seems it would work fine.  But for some reason the array seems nicer or easier somehow...  Maybe I just prefer subscripts and
+    arithmetic rather than using arrow operators on struct pointers?
+
+  I'd still be limited right now by max 4096 malloc, unless I had mulitple arrays or used a static fixed one.  Most dynamic option
+    currently then is that doubly linked list then, I guess.
  */
 
 static uint8_t* cur = VRAM;
