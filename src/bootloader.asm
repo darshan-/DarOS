@@ -221,16 +221,28 @@ start64:
         mov gs, ax
         mov ss, ax
 
-;         mov ebx, idt
-;         mov ecx, 256
-; loop_idt2:
-;         mov rax, keyboard_gate
-;         mov [ebx], ax
-;         mov [ebx + 4], rax
-;         mov word [ebx + 2], CODE_SEG
-;         mov word [ebx + 4], 1 << 15 | 0b1110 << 8
-;         add ebx, 16
-;         loop loop_idt2
+        mov rax, PT_PRESENT | PT_WRITABLE | PT_HUGE
+        mov rbx, page_tables_l2
+        mov rcx, 512 * 256
+l2s_loop:
+        mov [rbx], rax
+        add rax, SZ_2MB       ; Huge page bit makes for 2MB pages, so each page is this far apart
+        add rbx, SZ_QW
+        loop l2s_loop
+
+        mov rax, page_tables_l2 | PT_PRESENT | PT_WRITABLE
+        mov rbx, page_table_l3
+        mov rcx, 256
+l3_loop2:
+        mov [rbx], rax
+        add rax, SZ_QW * 512
+        add rbx, SZ_QW
+        loop l3_loop2
+        ;lgdt [gdtr]
+
+;         mov rax, 0x100000000
+;         mov byte [rax], 'Q'
+;         hlt
 
         lidt [idtr]
 
@@ -272,3 +284,4 @@ keyboard_gate:
         iretq
 
 sect2code:
+        mov byte [0xb8000], 'Q'

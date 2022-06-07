@@ -4,7 +4,7 @@ c_objects := $(patsubst src/%.c, build/%.o, $(wildcard src/*.c))
 
 GCC_OPTS := -Wall -Wextra -c -ffreestanding -fno-stack-protector -mgeneral-regs-only -mno-red-zone -fno-PIC -mcmodel=large -momit-leaf-frame-pointer #-fno-zero-initialized-in-bss
 
-LD_OPTS := -N --warn-common -T src/linker.ld #-nostdlib --print-map
+LD_OPTS := -N --warn-common -T src/linker.ld #--print-map #-nostdlib --print-map
 
 include build/headers.mk
 
@@ -45,7 +45,7 @@ run-qf: out/floppy.img
 run-bochs: out/bochs.img
 	rm -f out/bochs.img.lock
 	echo c >out/bochs.command
-	bochs -qf /dev/null -rc out/bochs.command 'memory: host=128, guest=2048' 'boot: disk' 'ata0-master: type=disk, path="out/bochs.img", mode=flat, cylinders=4, heads=4, spt=61, sect_size=512, model="Generic 1234", biosdetect=auto, translation=auto' 'magic_break: enabled=1' 'clock: sync=realtime, time0=local, rtc_sync=1' 'vga: update_freq=30' 'romimage: options=fastboot'
+	bochs -qf /dev/null -rc out/bochs.command 'memory: host=128, guest=8192' 'boot: disk' 'ata0-master: type=disk, path="out/bochs.img", mode=flat, cylinders=4, heads=4, spt=61, sect_size=512, model="Generic 1234", biosdetect=auto, translation=auto' 'magic_break: enabled=1' 'clock: sync=realtime, time0=local, rtc_sync=1' 'vga: update_freq=30' 'romimage: options=fastboot'
 
 build/iso/boot/floppy.img: out/boot.img
 	mkdir -p build/iso/boot
