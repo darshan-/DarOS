@@ -40,10 +40,14 @@
 static uint8_t* cur = VRAM;
 static uint8_t con = CON_TERM;
 static uint8_t* term_cur;
+static uint8_t* logs_cur = VRAM;
 
 static struct list* scrollUpBuf = (struct list*) 0;
 static struct list* scrollDownBuf = (struct list*) 0;
-static struct list *term_scrollUpBuf, *term_scrollDownBuf;
+static struct list* term_scrollUpBuf = (struct list*) 0;
+static struct list* term_scrollDownBuf = (struct list*) 0;
+static struct list* logs_scrollUpBuf = (struct list*) 0;
+static struct list* logs_scrollDownBuf = (struct list*) 0;
 
 static inline void updateCursorPosition() {
     uint64_t c = (uint64_t) (cur - VRAM) / 2;
@@ -231,6 +235,11 @@ void printf(char* fmt, ...) {
 // For now maybe lets have no scrolling, just have a static buffer that holds a screenful of data (including color).
 
 uint8_t term_buf[160 * LINES];
+uint8_t logs_buf[160 * LINES];
+
+static void scrollDownBy(uint64_t n);
+
+static void* last_log = 0;
 
 static inline void showLogs() {
     if (con == CON_LOGS)
@@ -241,21 +250,30 @@ static inline void showLogs() {
     for (int i = 0; i < 160 * LINES; i++)
         term_buf[i] = VRAM[i];
 
+    for (int i = 0; i < 160 * LINES; i++) // TODO: Empty it out initially, or don't do this withough checking it has real data
+        VRAM[i] = logs_buf[i];
+
     term_cur = cur;
+    cur = logs_cur;
     term_scrollUpBuf = scrollUpBuf;
     term_scrollDownBuf = scrollDownBuf;
-    scrollUpBuf = (struct list*) 0;
-    scrollDownBuf = (struct list*) 0;
+    scrollUpBuf = logs_scrollUpBuf;
+    scrollDownBuf = logs_scrollDownBuf;
 
     con = CON_LOGS;
-    clearScreen();
 
-    forEachLog(({
+    void (*printLog)(char*) = ({
         void __fn__ (char* s) {
+            scrollDownBy((uint64_t) -1);
             print(s);
         }
         __fn__;
-    }));
+    });
+
+    if (last_log)
+        last_log = forEachNewLog(last_log, printLog);
+    else
+        last_log = forEachLog(printLog);
 }
 
 static inline void showTerminal() {
@@ -263,13 +281,16 @@ static inline void showTerminal() {
         return;
 
     for (int i = 0; i < 160 * LINES; i++)
+        logs_buf[i] = VRAM[i];
+
+    for (int i = 0; i < 160 * LINES; i++)
         VRAM[i] = term_buf[i];
 
+    logs_cur = cur;
     cur = term_cur;
     updateCursorPosition();
-
-    destroyList(scrollUpBuf);
-    destroyList(scrollDownBuf);
+    logs_scrollUpBuf = scrollUpBuf;
+    logs_scrollDownBuf = scrollDownBuf;
 
     scrollUpBuf = term_scrollUpBuf;
     scrollDownBuf = term_scrollDownBuf;
@@ -402,6 +423,8 @@ static void gotInput(struct input i) {
         if (!i.alt && !i.ctrl) {
             scrollDownBy((uint64_t) -1);
             printc(i.key);
+            // if (i.key == 'd')
+            //     log("d was typed\n");
         }
 
         else if (i.key == '2' && !i.alt && i.ctrl)

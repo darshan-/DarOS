@@ -21,8 +21,17 @@ void logf(char* fmt, ...) {
     VARIADIC_PRINT(log);
 }
 
-void forEachLog(void (*f)(char*)) {
-    forEachListItem(logs, ({
+void* forEachLog(void (*f)(char*)) {
+    return forEachListItem(logs, ({
+        void __fn__ (void* s) {
+            f((char*) s);
+        }
+        __fn__;
+    }));
+}
+
+void* forEachNewLog(void* last, void (*f)(char*)) {
+    return forEachNewListItem(last, ({
         void __fn__ (void* s) {
             f((char*) s);
         }

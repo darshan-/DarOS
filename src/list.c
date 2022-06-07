@@ -102,11 +102,29 @@ void removeFromList(struct list* l, void* item) {
     }));
 }
 
-void forEachListItem(struct list* l, void (*f)(void*)) {
-    if (!l || !l->head) return;
+static void* forEachLI(struct list_node* n, void (*f)(void*)) {
+    struct list_node* last = (void*) 0;
+    for (; n; n = n->next) {
+        last = n;
+        f(n->item);
+    }
 
-    for (struct list_node* cur = l->head; cur; cur = cur->next)
-        f(cur->item);
+    return last;
+}
+
+void* forEachListItem(struct list* l, void (*f)(void*)) {
+    if (!l || !l->head) return (void*) 0;
+
+    return forEachLI(l->head, f);
+}
+
+void* forEachNewListItem(void* last, void (*f)(void*)) {
+    if (!last) return (void*) 0;
+
+    void* ret = forEachLI(((struct list_node*) last)->next, f);
+    if (!ret) ret = last;
+
+    return ret;
 }
 
 void destroyList(struct list* l) {
