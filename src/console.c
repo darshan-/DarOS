@@ -382,6 +382,7 @@ static void scrollDownBy(uint64_t n) {
 }
 
 static void gotInput(struct input i) {
+    print("console.getInput...\n");
     no_ints();
     if (i.key == '1' && !i.alt && i.ctrl)
         showTerminal();

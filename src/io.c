@@ -33,9 +33,9 @@ uint8_t inb(uint32_t source) {
     uint8_t val;
 
     __asm__ __volatile__(
-        "mov %0, %%dx\n"
+        "mov %1, %%dx\n"
         "in %%dx, %%al\n"
-        "mov %%al, %1\n"
+        "mov %%al, %0\n"
         :"=m"(val): "m"(source)
     );
 
@@ -46,9 +46,9 @@ uint16_t inw(uint32_t source) {
     uint16_t val;
 
     __asm__ __volatile__(
-        "mov %0, %%dx\n"
+        "mov %1, %%dx\n"
         "in %%dx, %%ax\n"
-        "mov %%ax, %1\n"
+        "mov %%ax, %0\n"
         :"=m"(val): "m"(source)
     );
 
@@ -59,9 +59,9 @@ uint32_t ind(uint32_t source) {
     uint32_t val;
 
     __asm__ __volatile__(
-        "mov %0, %%dx\n"
+        "mov %1, %%dx\n"
         "in %%dx, %%eax\n"
-        "mov %%eax, %1\n"
+        "mov %%eax, %0\n"
         :"=m"(val): "m"(source)
     );
 

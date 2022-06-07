@@ -152,24 +152,31 @@ static inline void push(struct queue* q, void* p) {
 
 void waitloop() {
     for (;;) {
+        print("waitloop top\n");
         void (*f)();
 
-        while ((f = (void (*)()) pop(&wq)))
+        while ((f = (void (*)()) pop(&wq))) {
+            print("Waitloop doing work we found on the queue...\n");
             f();
+        }
 
         //print("waitloop done with work queue, time to set stack, enable interrupts, and wait.\n");
         //__asm__ __volatile__("hlt");
+        print("watiloop: rsp, sti, hlt\n");
         __asm__ __volatile__(
             "mov %0, %%rsp\n" // We'll never return anywhere or use anything currently on the stack, so reset it
             "sti\n"
             "hlt\n"
             ::"m"(kernel_stack_top)
         );
+        print("waitloop bottom\n");
     }
 }
 
 void process_keys() {
+    print("process_keys\n");
     uint8_t code = (uint8_t) (uint64_t) pop(&kbd_buf);
+    printf("Got code: %h\n", code);
     keyScanned(code);
 }
 
@@ -327,12 +334,17 @@ static void __attribute__((interrupt)) double_fault_handler(struct interrupt_fra
 }
 
 static void __attribute__((interrupt)) irq1_kbd(struct interrupt_frame *) {
-    __asm__ __volatile__("hlt");
     print("irq1\n");
     uint8_t code = inb(0x60);
+    printf("keyboard reports code: %h\n", code);
     outb(PIC_PRIMARY_CMD, PIC_ACK);
+    if (code == 0) {
+        print("Code is zero, so nto pushing to kbd buf and not enqueueing work...\n");
+        return;
+    }
     push(&kbd_buf, (void*) (uint64_t) code);
     push(&wq, process_keys);
+    print("irq1 end\n");
 }
 
 static void __attribute__((interrupt)) irq8_rtc(struct interrupt_frame *) {
@@ -409,6 +421,16 @@ static void check_queue_caps() {
 }
 
 void init_interrupts() {
+    //return;
+    set_handler(0x21, irq1_kbd, TYPE_INT);
+    INITQ(wq, INIT_WQ_CAP);
+    INITQ(kbd_buf, INIT_KB_CAP);
+
+    print("Initialized queues\n");
+    //__asm__ __volatile__("hlt");
+    registerPeriodicCallback((struct periodic_callback) {1, 2, check_queue_caps});
+    return;
+
     cpuCountOffset = read_tsc();
     // for (int i = 0; i < 32; i++)
     //     set_handler(i, default_trap_handler, TYPE_INT);
