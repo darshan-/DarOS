@@ -359,7 +359,8 @@ static void __attribute__((interrupt)) irq0_pit(struct interrupt_frame *) {
 
     ms_since_boot = pitCount * PIT_COUNT * 1000 / PIT_FREQ;
 
-    //printf("ms_since_boot: %u\n", ms_since_boot);
+    if (pitCount % 1000 == 0)
+        printf("ms_since_boot: %u\n", ms_since_boot);
     // if (pitCount % TICK_HZ == 0)
     //     logf("Average CPU ticks per PIT tick: %u\n", (read_tsc() - cpuCountOffset) / pitCount);
 
