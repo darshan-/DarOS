@@ -408,21 +408,6 @@ static void check_queue_caps() {
 
 void init_interrupts() {
     //return;
-    init_pit();
-    init_pic();
-    set_handler(0x20, irq0_pit, TYPE_INT);
-    set_handler(0x21, irq1_kbd, TYPE_INT);
-    INITQ(wq, INIT_WQ_CAP);
-    INITQ(kbd_buf, INIT_KB_CAP);
-
-    print("Initialized queues\n");
-    //__asm__ __volatile__("hlt");
-    registerPeriodicCallback((struct periodic_callback) {1, 2, check_queue_caps});
-    return;
-
-    cpuCountOffset = read_tsc();
-    // for (int i = 0; i < 32; i++)
-    //     set_handler(i, default_trap_handler, TYPE_INT);
     for (int i = 32; i < 40; i++)
         set_handler(i, default_PIC_P_handler, TYPE_INT);
     for (int i = 40; i < 48; i++)
@@ -453,20 +438,22 @@ void init_interrupts() {
     SET_GETRAP_N(1d);
     SET_GETRAP_N(1e);
 
-    //print("Set handlers\n");
     //init_rtc();
-    //print("Skipped initializing RTC\n");
-    //init_pit();
-    //print("Initialized PIT\n");
+    init_pit();
     init_pic();
-    //print("Initialized PIC\n");
- 
+    set_handler(0x20, irq0_pit, TYPE_INT);
+    set_handler(0x21, irq1_kbd, TYPE_INT);
     INITQ(wq, INIT_WQ_CAP);
     INITQ(kbd_buf, INIT_KB_CAP);
 
     print("Initialized queues\n");
     //__asm__ __volatile__("hlt");
     registerPeriodicCallback((struct periodic_callback) {1, 2, check_queue_caps});
+    return;
 
-    //__asm__ __volatile__("sti");
+    cpuCountOffset = read_tsc();
+    // for (int i = 0; i < 32; i++)
+    //     set_handler(i, default_trap_handler, TYPE_INT);
+
+    //print("Set handlers\n");
 }
