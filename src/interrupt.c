@@ -268,7 +268,7 @@ static void init_pic() {
 
     // Mask interrupts as you see fit
     //outb(PIC_PRIMARY_DATA, 0x7c);
-    outb(PIC_PRIMARY_DATA, 0xfd);
+    outb(PIC_PRIMARY_DATA, 0xfc);
     outb(PIC_SECONDARY_DATA, 0xff);
 }
 
@@ -374,7 +374,6 @@ static void __attribute__((interrupt)) irq0_pit(struct interrupt_frame *) {
         if (pitCount % (TICK_HZ * periodicCallbacks.pcs[i]->period / periodicCallbacks.pcs[i]->count) == 0)
             push(&wq, periodicCallbacks.pcs[i]->f);
     }
-    __asm__ __volatile__("hlt");
 }
 
 static void set_handler(uint64_t vec, void* handler, uint8_t type) {
