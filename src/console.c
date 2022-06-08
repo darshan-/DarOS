@@ -35,8 +35,8 @@
 #define STATUS_LINE LINE(LINES)
 #define VRAM_END LINE(LINES + 1)
 
-#define CON_TERM 1
-#define CON_LOGS 2
+#define LOGS 0
+#define TERM_COUNT 7 // One of which is logs
 
 /*
   Okay, I think I like the idea of each vterm being backed by one linked list of pages of memory, not a combination of the VRAM
@@ -73,13 +73,9 @@ struct vterm {
 };
 
 static uint8_t* cur = VRAM;
-static uint8_t con = CON_TERM;
-static uint8_t* term_cur;
-static uint8_t* logs_cur;
+static uint8_t at = 1;
 
-static struct list* termBuf = (struct list*) 0;
-static struct list* logsBuf = (struct list*) 0;
-static struct list* buf;
+static vterm terms[TERM_COUNT];
 
 static inline void updateCursorPosition() {
     uint64_t c = (uint64_t) (cur - VRAM) / 2;
@@ -179,22 +175,22 @@ static void clearScreen() {
     ints_okay();
 }
 
-static inline void advanceLine() {
-    if (!scrollUpBuf)
-        scrollUpBuf = newList();
+// static inline void advanceLine() {
+//     if (!scrollUpBuf)
+//         scrollUpBuf = newList();
 
-    uint8_t* line = malloc(160);
-    for (int i = 0; i < 160; i++)
-        line[i] = VRAM[i];
-    pushListHead(scrollUpBuf, line);
+//     uint8_t* line = malloc(160);
+//     for (int i = 0; i < 160; i++)
+//         line[i] = VRAM[i];
+//     pushListHead(scrollUpBuf, line);
 
-    for (int i = 0; i < LINES - 1; i++)
-        for (int j = 0; j < 160; j++)
-            VRAM[i * 160 + j] = VRAM[(i + 1) * 160 + j];
+//     for (int i = 0; i < LINES - 1; i++)
+//         for (int j = 0; j < 160; j++)
+//             VRAM[i * 160 + j] = VRAM[(i + 1) * 160 + j];
 
-    for (uint64_t* v = (uint64_t*) LAST_LINE; v < (uint64_t*) STATUS_LINE; v++)
-        *v = 0x0700070007000700;
-}
+//     for (uint64_t* v = (uint64_t*) LAST_LINE; v < (uint64_t*) STATUS_LINE; v++)
+//         *v = 0x0700070007000700;
+// }
 
 // We want to only update screen when done with current update.
 // For a keypress we're only adding a character. But something might right multiple characters, multiple lines, or even multiple pages
@@ -205,34 +201,31 @@ static inline void advanceLine() {
 // I want to be able to "print" to log buffer even when not at logs, I think...  Yes.
 // So keep working through this.
 
-static inline void printcc(uint8_t c, uint8_t cl) {
-    *cur++ = c;
-    *cur++ = cl;
+static inline void printcc(uint16_t term, uint8_t c, uint8_t cl) {
+    *(terms[term].cur++) = c;
+    *(terms[term].cur++) = cl;
 }
 
-static inline void printCharColor(uint8_t c, uint8_t color) {
+static inline void printCharColor(uint16_t term, uint8_t c, uint8_t color) {
     if (c == '\n')
         for (uint64_t n = 160 - ((uint64_t) cur) % 160; n > 0; n -= 2)
-            printcc(0, color);
+            printcc(term, 0, color);
     else
-        printcc(c, color);
+        printcc(term, c, color);
 
     if (cur == BUF_LINES * 160) {
-        cur = malloc(BUF_LINES * 160);
-        pushListTail(buf, cur);
+        terms[term].cur = malloc(BUF_LINES * 160);
+        pushListTail(terms[term].buf, terms[term]cur);
     }
-}
-
-static inline void printChar(uint8_t c) {
-    printCharColor(c, 0x07);
 }
 
 void printColor(char* s, uint8_t c) {
     no_ints();
 
     while (*s != 0)
-        printCharColor(*s++, c);
+        printCharColor(at, *s++, c);
 
+    // TODO: Sync screen
     updateCursorPosition();
 
     ints_okay();
@@ -245,7 +238,9 @@ void print(char* s) {
 void printc(char c) {
     no_ints();
 
-    printCharColor(c, 0x07);
+    printCharColor(at, c, 0x07);
+
+    // TODO: Sync screen
     updateCursorPosition();
 
     ints_okay();
@@ -267,9 +262,6 @@ void printf(char* fmt, ...) {
 
 
 // For now maybe lets have no scrolling, just have a static buffer that holds a screenful of data (including color).
-
-uint8_t term_buf[160 * LINES];
-uint8_t logs_buf[160 * LINES];
 
 static void scrollDownBy(uint64_t n);
 static inline void scrollToBottom() {
