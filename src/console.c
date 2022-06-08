@@ -312,8 +312,8 @@ static inline void showTerm(uint16_t t) {
 
     if (!terms[t].buf) {
         terms[t].buf = newList();
-        terms[t].cur = malloc(LINES * 160);
-        pushListTail(terms[t].buf, terms[t].cur);
+        terms[t].cur = newPage();
+        terms[t].cur_page = pushListTail(terms[t].buf, terms[t].cur);
     }
 
     // Figure out which buf page and line to copy from...
