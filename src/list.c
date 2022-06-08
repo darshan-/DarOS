@@ -33,16 +33,16 @@ uint32_t listLen(struct list* l) {
     return l->len;
 }
 
-void* nextNode(struct list_node* ln) {
+void* nextNode(void* ln) {
     if (!ln) return 0;
 
-    return ln->next;
+    return ((struct list_node*) ln)->next;
 }
 
-void* nodeItem(struct list_node* ln) {
+void* nodeItem(void* ln) {
     if (!ln) return 0;
 
-    return ln->item;
+    return ((struct list_node*) ln)->item;
 }
 
 void* popListHead(struct list* l) {

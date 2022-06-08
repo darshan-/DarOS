@@ -6,8 +6,8 @@ struct list;
 
 struct list* newList();
 uint32_t listLen(struct list* l);
-void* nextNode(struct list_node* ln);
-void* nodeItem(struct list_node* ln);
+void* nextNode(void*);
+void* nodeItem(void*);
 void* pushListHead(struct list* l, void* item);
 void* pushListTail(struct list* l, void* item);
 void* popListHead(struct list* l);

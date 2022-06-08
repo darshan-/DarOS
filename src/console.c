@@ -81,17 +81,16 @@
 // Okay, but I guess I need the list_node?  So I need to expose that outside of the list implementation?  Well, I guess I can do
 //   like I did with ForEachNewListItem(), and expose it as an opaque continuation object.
 struct vterm {
-    uint8_t* cur;
-    uint64_t line;
+    uint64_t cur;     // "cursor" -- index into whole buffer where next character goes
+    uint64_t line;    // Which line of whole buffer is the top displayed line
     struct list* buf;
-    //uint8_t* page;
     void* cur_page;
 };
 
 static uint8_t* cur = VRAM;
 static uint8_t at = 1;
 
-static vterm terms[TERM_COUNT];
+static struct vterm terms[TERM_COUNT];
 
 static inline uint8_t* newPage() {
     uint64_t* p = malloc(LINES * 160);
@@ -363,80 +362,9 @@ static inline void showTerm(uint16_t t) {
  */
 
 static void scrollUpBy(uint64_t n) {
-    if (!scrollUpBuf)
-        return;
-
-    uint32_t l = listLen(scrollUpBuf);
-
-    if (l == 0)
-        return;
-
-    hideCursor();
-
-    if (!scrollDownBuf)
-        scrollDownBuf = newList();
-
-    uint32_t i;
-    for (i = 0; i < n && i < l && i < LINES; i++) {
-        uint8_t* line = malloc(160);
-        for (int j = 0; j < 160; j++)
-            line[j] = VRAM[160 * (LINES - 1 - i) + j];
-        pushListHead(scrollDownBuf, line);
-    }
-    for (; i < n && i < l; i++)
-        pushListHead(scrollDownBuf, popListHead(scrollUpBuf));
-
-    if (n < l)
-        l = n;
-
-    for (i = LINES - 1; i >= l; i--)
-        for (int j = 0; j < 160; j++)
-            VRAM[i * 160 + j] = VRAM[(i - l) * 160 + j];
-
-    do {
-        uint8_t* line = (uint8_t*) popListHead(scrollUpBuf);
-        for (int j = 0; j < 160; j++)
-            VRAM[(i * 160) + j] = line[j];
-        free(line);
-    } while (i-- != 0);
 }
 
 static void scrollDownBy(uint64_t n) {
-    if (!scrollDownBuf)
-        return;
-
-    uint32_t l = listLen(scrollDownBuf);
-
-    if (l == 0)
-        return;
-
-    uint32_t i;
-    for (i = 0; i < n && i < l && i < LINES; i++) {
-        uint8_t* line = malloc(160);
-        for (int j = 0; j < 160; j++)
-            line[j] = VRAM[i * 160 + j];
-        pushListHead(scrollUpBuf, line);
-    }
-    for (; i < n && i < l; i++)
-        pushListHead(scrollUpBuf, popListHead(scrollDownBuf));
-
-    if (n < l)
-        l = n;
-
-    for (i = 0; i < (int64_t) LINES - l; i++) {
-        for (int j = 0; j < 160; j++)
-            VRAM[i * 160 + j] = VRAM[(i + l) * 160 + j];
-    }
-
-    for (; i < LINES; i++) {
-        uint8_t* line = (uint8_t*) popListHead(scrollDownBuf);
-        for (int j = 0; j < 160; j++)
-            VRAM[(i * 160) + j] = line[j];
-        free(line);
-    }
-
-    if (con == CON_TERM && listLen(scrollDownBuf) == 0)
-        showCursor();
 }
 
 static void gotInput(struct input i) {
@@ -456,7 +384,7 @@ static void gotInput(struct input i) {
     else if (i.key == KEY_PG_UP && !i.alt && !i.ctrl)
         scrollUpBy(LINES);
 
-    else if (con == CON_TERM) {
+    else if (at > 0) {
         if (!i.alt && !i.ctrl) {
             scrollToBottom();
             printc(i.key);
@@ -483,13 +411,7 @@ static void gotInput(struct input i) {
 void startTty() {
     log("Starting tty\n");
 
-    termBuf = newList();
-    buf = termBuf;
-    cur = malloc(BUF_LINES * 160);
-    pushListTail(buf, cur);
-    term_cur = cur;
-
-    // Set up logs buf too?
+    showTerm(1);
 
     init_keyboard();
     registerKbdListener(&gotInput);
