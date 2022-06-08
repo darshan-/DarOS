@@ -29,6 +29,7 @@
 
 #define VRAM ((uint8_t*) 0xb8000)
 #define LINES 24
+#define BUF_LINES 25
 #define LINE(l) (VRAM + 160 * (l))
 #define LAST_LINE LINE(LINES - 1)
 #define STATUS_LINE LINE(LINES)
@@ -66,17 +67,19 @@
     currently then is that doubly linked list then, I guess.
  */
 
+struct vterm {
+    uint8_t* cur;
+    struct list* buf;
+};
+
 static uint8_t* cur = VRAM;
 static uint8_t con = CON_TERM;
 static uint8_t* term_cur;
-static uint8_t* logs_cur = VRAM;
+static uint8_t* logs_cur;
 
-static struct list* scrollUpBuf = (struct list*) 0;
-static struct list* scrollDownBuf = (struct list*) 0;
-static struct list* term_scrollUpBuf = (struct list*) 0;
-static struct list* term_scrollDownBuf = (struct list*) 0;
-static struct list* logs_scrollUpBuf = (struct list*) 0;
-static struct list* logs_scrollDownBuf = (struct list*) 0;
+static struct list* termBuf = (struct list*) 0;
+static struct list* logsBuf = (struct list*) 0;
+static struct list* buf;
 
 static inline void updateCursorPosition() {
     uint64_t c = (uint64_t) (cur - VRAM) / 2;
@@ -193,15 +196,14 @@ static inline void advanceLine() {
         *v = 0x0700070007000700;
 }
 
-static inline void curAdvanced() {
-    if (cur < STATUS_LINE)
-        return;
+// We want to only update screen when done with current update.
+// For a keypress we're only adding a character. But something might right multiple characters, multiple lines, or even multiple pages
+//   at once, we we don't want to do anything with the screen until the end of that call.
+// So I guess have the exported function call sync at the very end?  It complicates exported functions using other exported functions,
+//   but I can probably work something reasonable out.
 
-    advanceLine();
-    cur = LAST_LINE;
-    // We don't want to waste time updating VGA cursor position for every character of a string, so don't
-    //  call updateCursorPosition() here, but only at end of exported functions that move cursor.
-}
+// I want to be able to "print" to log buffer even when not at logs, I think...  Yes.
+// So keep working through this.
 
 static inline void printcc(uint8_t c, uint8_t cl) {
     *cur++ = c;
@@ -210,12 +212,15 @@ static inline void printcc(uint8_t c, uint8_t cl) {
 
 static inline void printCharColor(uint8_t c, uint8_t color) {
     if (c == '\n')
-        for (uint64_t n = 160 - ((uint64_t) (cur - VRAM)) % 160; n > 0; n -= 2)
+        for (uint64_t n = 160 - ((uint64_t) cur) % 160; n > 0; n -= 2)
             printcc(0, color);
     else
         printcc(c, color);
 
-    curAdvanced();
+    if (cur == BUF_LINES * 160) {
+        cur = malloc(BUF_LINES * 160);
+        pushListTail(buf, cur);
+    }
 }
 
 static inline void printChar(uint8_t c) {
@@ -277,7 +282,18 @@ static inline void showLogs() {
     if (con == CON_LOGS)
         return;
 
+    term_cur = cur;
+
     hideCursor();
+
+    if (!logsBuf) {
+        logsBuf = newList();
+        logs_cur = malloc(BUF_LINES * 160);
+        pushListTail(logsBuf, logs_cur);
+    }
+
+    buf = logsBuf;
+    cur = logs_cur;
 
     for (int i = 0; i < 160 * LINES; i++)
         term_buf[i] = VRAM[i];
@@ -480,6 +496,15 @@ static void gotInput(struct input i) {
 
 void startTty() {
     log("Starting tty\n");
+
+    termBuf = newList();
+    buf = termBuf;
+    cur = malloc(BUF_LINES * 160);
+    pushListTail(buf, cur);
+    term_cur = cur;
+
+    // Set up logs buf too?
+
     init_keyboard();
     registerKbdListener(&gotInput);
     clearScreen();
