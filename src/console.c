@@ -73,11 +73,15 @@
 //
 // Okay, so `line' will be the line at the top of the screen, so that combined with `cur' will uniquely identify what page
 //   `page' is.
+//
+// Okay, but I guess I need the list_node?  So I need to expose that outside of the list implementation?  Well, I guess I can do
+//   like I did with ForEachNewListItem(), and expose it as an opaque continuation object.
 struct vterm {
     uint8_t* cur;
     uint64_t line;
     struct list* buf;
-    uint8_t* page;
+    //uint8_t* page;
+    void* cur_page;
 };
 
 static uint8_t* cur = VRAM;
@@ -232,7 +236,7 @@ static inline void printCharColor(uint16_t term, uint8_t c, uint8_t color) {
 
     if (cur == BUF_LINES * 160) {
         terms[term].cur = newPage();
-        pushListTail(terms[term].buf, terms[term]cur);
+        terms[term].cur_page = pushListTail(terms[term].buf, terms[term]cur);
     }
 }
 
@@ -308,10 +312,12 @@ static inline void showTerm(uint16_t t) {
     //   terms[t].line is what line of overall buffer is the top line visible.
     if (terms[t].line % 2 == 0) {
         int i;
+        uint64_t* page = (uint64_t*) nodeItem(terms[t].cur_page);
         for (i = 0; i < LINES / 2 && terms[t].line + i * 2 < LINES; i++) {
             for (int j = 0; j < 160 * 2 / 64; j++)
-                VRAM[i * 160 * 2 / 64 + j] = terms[t].page[((terms[t].line / 2) + i) * i * 160 * 2 / 64 + j];
+                VRAM[i * 160 * 2 / 64 + j] = .page[((terms[t].line / 2) + i) * i * 160 * 2 / 64 + j];
         }
+        page = (uint64_t*) nodeItem(nextNode(terms[t].cur_page));
         for (i; i < LINES / 2; i++) {
             for (int j = 0; j < 160 * 2 / 64; j++)
                 VRAM[i * 160 * 2 / 64 + j] = terms[t].page[((terms[t].line / 2) + i) * i * 160 * 2 / 64 + j];

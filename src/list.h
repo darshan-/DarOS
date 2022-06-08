@@ -6,8 +6,10 @@ struct list;
 
 struct list* newList();
 uint32_t listLen(struct list* l);
-void pushListHead(struct list* l, void* item);
-void pushListTail(struct list* l, void* item);
+void* nextNode(struct list_node* ln);
+void* nodeItem(struct list_node* ln);
+void* pushListHead(struct list* l, void* item);
+void* pushListTail(struct list* l, void* item);
 void* popListHead(struct list* l);
 void removeFromList(struct list* l, void* item);
 void removeFromListWithEquality(struct list* l, int (*equals)(void*));

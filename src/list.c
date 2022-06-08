@@ -33,6 +33,14 @@ uint32_t listLen(struct list* l) {
     return l->len;
 }
 
+void* nextNode(struct list_node* ln) {
+    return ln->next;
+}
+
+void* nodeItem(struct list_node* ln) {
+    return ln->item;
+}
+
 void* popListHead(struct list* l) {
     if (!l || !l->head) return 0;
 
@@ -51,8 +59,8 @@ void* popListHead(struct list* l) {
     return ret;
 }
 
-void pushListHead(struct list* l, void* item) {
-    if (!l) return;
+void* pushListHead(struct list* l, void* item) {
+    if (!l) return 0;
 
     l->len++;
     struct list_node* n = malloc(sizeof(struct list_node));
@@ -66,10 +74,12 @@ void pushListHead(struct list* l, void* item) {
         l->tail = n;
 
     l->head = n;
+
+    return n;
 }
 
-void pushListTail(struct list* l, void* item) {
-    if (!l) return;
+void* pushListTail(struct list* l, void* item) {
+    if (!l) return 0;
 
     l->len++;
     struct list_node* n = malloc(sizeof(struct list_node));
@@ -83,6 +93,8 @@ void pushListTail(struct list* l, void* item) {
         l->head = n;
 
     l->tail = n;
+
+    return n;
 }
 
 void removeFromListWithEquality(struct list* l, int (*equals)(void*)) {
