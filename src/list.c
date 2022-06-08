@@ -34,10 +34,14 @@ uint32_t listLen(struct list* l) {
 }
 
 void* nextNode(struct list_node* ln) {
+    if (!ln) return 0;
+
     return ln->next;
 }
 
 void* nodeItem(struct list_node* ln) {
+    if (!ln) return 0;
+
     return ln->item;
 }
 

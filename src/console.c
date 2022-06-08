@@ -27,9 +27,13 @@
     is just a matter of what I copy into vram.
  */
 
+// I'd planned on 25 lines per buffer page, as it fits in 4096-byte malloc page, but clearing/copying with 64-bit words means we need
+//   an even number of lines, so 24 is easier.  And it turn out to be otherwise convenient to have visible lines the same as buffer
+//   pages, like checking if we're at the bottom by there being no next page.  Obviously things will get more complicated again if I
+//   eve want to remove the bottom status bar or add a top bar or anything.  But for now, lets go with just LINES for both things...
+
 #define VRAM ((uint8_t*) 0xb8000)
 #define LINES 24
-#define PG_LINES 24 // I'd planned 25, as it fits in 4096-byte malloc page, but clearing/copying with 64-bit words means need even number
 #define LINE(l) (VRAM + 160 * (l))
 #define LAST_LINE LINE(LINES - 1)
 #define STATUS_LINE LINE(LINES)
@@ -90,9 +94,9 @@ static uint8_t at = 1;
 static vterm terms[TERM_COUNT];
 
 static inline uint8_t* newPage() {
-    uint64_t* p = malloc(PG_LINES * 160);
+    uint64_t* p = malloc(LINES * 160);
 
-    for (int i = 0; i < PG_LINES * 160 / 64; i++)
+    for (int i = 0; i < LINES * 160 / 64; i++)
         *p = 0x0700070007000700;
 
     return (uint8_t*) p;
@@ -234,7 +238,7 @@ static inline void printCharColor(uint16_t term, uint8_t c, uint8_t color) {
     else
         printcc(term, c, color);
 
-    if (cur == BUF_LINES * 160) {
+    if (cur == LINES * 160) {
         terms[term].cur = newPage();
         terms[term].cur_page = pushListTail(terms[term].buf, terms[term]cur);
     }
@@ -298,12 +302,12 @@ static inline void showTerm(uint16_t t) {
 
     at = t;
 
-    if (att == LOGS)
+    if (t == LOGS)
         hideCursor();
 
     if (!terms[t].buf) {
         terms[t].buf = newList();
-        terms[t].cur = malloc(BUF_LINES * 160);
+        terms[t].cur = malloc(LINES * 160);
         pushListTail(terms[t].buf, terms[t].cur);
     }
 
@@ -315,62 +319,22 @@ static inline void showTerm(uint16_t t) {
         uint64_t* page = (uint64_t*) nodeItem(terms[t].cur_page);
         for (i = 0; i < LINES / 2; i++) {
             for (int j = 0; j < 160 * 2 / 64; j++)
-                VRAM[i * 160 * 2 / 64 + j] = page[((terms[t].line % LINES / 2) + i) * i * 160 * 2 / 64 + j];
+                VRAM[i * 160 * 2 / 64 + j] = page[(terms[t].line % LINES / 2 + i) * i * 160 * 2 / 64 + j];
             if (terms[t].line + (i + 1) * 2 == LINES)
                 page = (uint64_t*) nodeItem(nextNode(terms[t].cur_page));
         }
     } else {
-        for 
+        int i;
+        uint32_t* page = (uint32_t*) nodeItem(terms[t].cur_page);
+        for (i = 0; i < LINES; i++) {
+            for (int j = 0; j < 160 / 32; j++)
+                VRAM[i * 160 / 32 + j] = page[(terms[t].line % LINES + i) * i * 160 / 32 + j];
+            if (terms[t].line + i + 1 == LINES)
+                page = (uint32_t*) nodeItem(nextNode(terms[t].cur_page));
+        }
     }
 
-    term_cur = cur;
-    cur = logs_cur;
-    term_scrollUpBuf = scrollUpBuf;
-    term_scrollDownBuf = scrollDownBuf;
-    scrollUpBuf = logs_scrollUpBuf;
-    scrollDownBuf = logs_scrollDownBuf;
-
-    con = CON_LOGS;
-
-    // If we're already at the bottom, we want to print to new lines below, then scroll to bottom -- the hiccup is that
-    //   some lines could be more than one line (more than 80 characters)..
-    void (*printLog)(char*) = ({
-        void __fn__ (char* s) {
-            // If
-            scrollToBottom();
-            print(s);
-        }
-        __fn__;
-    });
-
-    if (last_log)
-        last_log = forEachNewLog(last_log, printLog);
-    else
-        last_log = forEachLog(printLog);
-}
-
-static inline void showTerminal() {
-    if (con == CON_TERM)
-        return;
-
-    for (int i = 0; i < 160 * LINES; i++)
-        logs_buf[i] = VRAM[i];
-
-    for (int i = 0; i < 160 * LINES; i++)
-        VRAM[i] = term_buf[i];
-
-    logs_cur = cur;
-    cur = term_cur;
-    updateCursorPosition();
-    logs_scrollUpBuf = scrollUpBuf;
-    logs_scrollDownBuf = scrollDownBuf;
-
-    scrollUpBuf = term_scrollUpBuf;
-    scrollDownBuf = term_scrollDownBuf;
-
-    con = CON_TERM;
-
-    if (listLen(scrollDownBuf) == 0)
+    if (t != LOGS && !nextNode(terms[t].cur_page))
         showCursor();
 }
 
