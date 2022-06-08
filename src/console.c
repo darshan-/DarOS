@@ -313,14 +313,11 @@ static inline void showTerm(uint16_t t) {
     if (terms[t].line % 2 == 0) {
         int i;
         uint64_t* page = (uint64_t*) nodeItem(terms[t].cur_page);
-        for (i = 0; i < LINES / 2 && terms[t].line + i * 2 < LINES; i++) {
+        for (i = 0; i < LINES / 2; i++) {
             for (int j = 0; j < 160 * 2 / 64; j++)
-                VRAM[i * 160 * 2 / 64 + j] = .page[((terms[t].line / 2) + i) * i * 160 * 2 / 64 + j];
-        }
-        page = (uint64_t*) nodeItem(nextNode(terms[t].cur_page));
-        for (i; i < LINES / 2; i++) {
-            for (int j = 0; j < 160 * 2 / 64; j++)
-                VRAM[i * 160 * 2 / 64 + j] = terms[t].page[((terms[t].line / 2) + i) * i * 160 * 2 / 64 + j];
+                VRAM[i * 160 * 2 / 64 + j] = page[((terms[t].line % LINES / 2) + i) * i * 160 * 2 / 64 + j];
+            if (terms[t].line + (i + 1) * 2 == LINES)
+                page = (uint64_t*) nodeItem(nextNode(terms[t].cur_page));
         }
     } else {
         for 
