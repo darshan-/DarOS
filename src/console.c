@@ -88,7 +88,7 @@ struct vterm {
 };
 
 static uint8_t* cur = VRAM;
-static uint8_t at = 1;
+static uint8_t at = 256;
 
 static struct vterm terms[TERM_COUNT];
 
@@ -311,20 +311,20 @@ static inline void showTerm(uint16_t t) {
         hideCursor();
 
     if (!terms[t].buf) {
+        com1_print("Making buf page...\n");
         terms[t].buf = newList();
         terms[t].cur = newPage();
         terms[t].cur_page = pushListTail(terms[t].buf, terms[t].cur);
     }
 
-    // Figure out which buf page and line to copy from...
-    //   Okay, so terms[t].page is the first (and probably only) page to copy from, and
-    //   terms[t].line is what line of overall buffer is the top line visible.
     if (terms[t].line % 2 == 0) {
+        com1_print("Copying to VRAM with 64-bit words...\n");
         int i;
         uint64_t* page = (uint64_t*) nodeItem(terms[t].cur_page);
+        com1_printf("cur: %h; page: %h\n", terms[t].cur, page);
         for (i = 0; i < LINES / 2; i++) {
             for (int j = 0; j < 160 * 2 / 64; j++)
-                VRAM[i * 160 * 2 / 64 + j] = page[(terms[t].line % LINES / 2 + i) * i * 160 * 2 / 64 + j];
+                VRAM[i * 160 * 2 / 64 + j] = page[(terms[t].line % LINES / 2 + i) * 160 * 2 / 64 + j];
             if (terms[t].line + (i + 1) * 2 == LINES)
                 page = (uint64_t*) nodeItem(nextNode(terms[t].cur_page));
         }
