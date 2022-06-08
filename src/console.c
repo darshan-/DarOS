@@ -29,7 +29,7 @@
 
 #define VRAM ((uint8_t*) 0xb8000)
 #define LINES 24
-#define BUF_LINES 25
+#define PG_LINES 24 // I'd planned 25, as it fits in 4096-byte malloc page, but clearing/copying with 64-bit words means need even number
 #define LINE(l) (VRAM + 160 * (l))
 #define LAST_LINE LINE(LINES - 1)
 #define STATUS_LINE LINE(LINES)
@@ -76,6 +76,15 @@ static uint8_t* cur = VRAM;
 static uint8_t at = 1;
 
 static vterm terms[TERM_COUNT];
+
+static inline uint8_t* newPage() {
+    uint64_t* p = malloc(PG_LINES * 160);
+
+    for (int i = 0; i < PG_LINES * 160 / 64; i++)
+        *p = 0x0700070007000700;
+
+    return (uint8_t*) p;
+}
 
 static inline void updateCursorPosition() {
     uint64_t c = (uint64_t) (cur - VRAM) / 2;
@@ -214,7 +223,7 @@ static inline void printCharColor(uint16_t term, uint8_t c, uint8_t color) {
         printcc(term, c, color);
 
     if (cur == BUF_LINES * 160) {
-        terms[term].cur = malloc(BUF_LINES * 160);
+        terms[term].cur = newPage();
         pushListTail(terms[term].buf, terms[term]cur);
     }
 }
@@ -264,32 +273,31 @@ void printf(char* fmt, ...) {
 // For now maybe lets have no scrolling, just have a static buffer that holds a screenful of data (including color).
 
 static void scrollDownBy(uint64_t n);
+
 static inline void scrollToBottom() {
     scrollDownBy((uint64_t) -1);
 }
 
 static void* last_log = 0;
 
-static inline void showLogs() {
-    if (con == CON_LOGS)
+static inline void showTerm(uint16_t t) {
+    if (t == at)
         return;
 
-    term_cur = cur;
+    at = t;
 
-    hideCursor();
+    if (att == LOGS)
+        hideCursor();
 
-    if (!logsBuf) {
-        logsBuf = newList();
-        logs_cur = malloc(BUF_LINES * 160);
-        pushListTail(logsBuf, logs_cur);
+    if (!terms[t].buf) {
+        terms[t].buf = newList();
+        terms[t].cur = malloc(BUF_LINES * 160);
+        pushListTail(terms[t].buf, terms[t].cur);
     }
 
-    buf = logsBuf;
-    cur = logs_cur;
-
-    for (int i = 0; i < 160 * LINES; i++)
-        term_buf[i] = VRAM[i];
-
+    // Once we've started a second page, we'll always be able to copy
+    if (listLen(terms[t].buf) < 2)
+        clearScreen();
     for (int i = 0; i < 160 * LINES; i++) // TODO: Empty it out initially, or don't do this withough checking it has real data
         VRAM[i] = logs_buf[i];
 
