@@ -307,9 +307,12 @@ static inline void showTerm(uint16_t t) {
     //   Okay, so terms[t].page is the first (and probably only) page to copy from, and
     //   terms[t].line is what line of overall buffer is the top line visible.
     if (terms[t].line % 2 == 0) {
-        for (int i = 0; i < LINES / 2; i++) {
+        int i;
+        for (i = 0; i < LINES / 2 && terms[t].line + i * 2 < LINES; i++) {
             for (int j = 0; j < 160 * 2 / 64; j++)
                 VRAM[i * 160 * 2 / 64 + j] = terms[t].page[((terms[t].line / 2) + i) * i * 160 * 2 / 64 + j];
+        }
+        for (i; i < LINES / 2; i++) {
             for (int j = 0; j < 160 * 2 / 64; j++)
                 VRAM[i * 160 * 2 / 64 + j] = terms[t].page[((terms[t].line / 2) + i) * i * 160 * 2 / 64 + j];
         }
