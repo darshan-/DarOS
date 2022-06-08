@@ -81,8 +81,8 @@
 // Okay, but I guess I need the list_node?  So I need to expose that outside of the list implementation?  Well, I guess I can do
 //   like I did with ForEachNewListItem(), and expose it as an opaque continuation object.
 struct vterm {
-    uint64_t cur;     // "cursor" -- index into whole buffer where next character goes
-    uint64_t line;    // Which line of whole buffer is the top displayed line
+    uint8_t* cur;
+    uint64_t line;
     struct list* buf;
     void* cur_page;
 };
@@ -230,16 +230,22 @@ static inline void printcc(uint16_t term, uint8_t c, uint8_t cl) {
     *(terms[term].cur++) = cl;
 }
 
-static inline void printCharColor(uint16_t term, uint8_t c, uint8_t color) {
-    if (c == '\n')
-        for (uint64_t n = 160 - ((uint64_t) cur) % 160; n > 0; n -= 2)
-            printcc(term, 0, color);
-    else
-        printcc(term, c, color);
+static inline uint64_t curPosInPage(uint16_t term) {
+    return terms[term].cur - (uint8_t*) nodeItem(terms[term].cur_page);
+}
 
-    if (cur == LINES * 160) {
+static inline void printCharColor(uint16_t term, uint8_t c, uint8_t color) {
+    if (c == '\n') {
+        uint64_t cpip = curPosInPage(term);
+        for (uint64_t n = 160 - cpip % 160; n > 0; n -= 2)
+            printcc(term, 0, color);
+    } else {
+        printcc(term, c, color);
+    }
+
+    if (curPosInPage(term) == LINES * 160 - 1) {
         terms[term].cur = newPage();
-        terms[term].cur_page = pushListTail(terms[term].buf, terms[term]cur);
+        terms[term].cur_page = pushListTail(terms[term].buf, terms[term].cur);
     }
 }
 
@@ -370,7 +376,7 @@ static void scrollDownBy(uint64_t n) {
 static void gotInput(struct input i) {
     no_ints();
     if (i.key == '1' && !i.alt && i.ctrl)
-        showTerminal();
+        showTerm(1);
 
     else if (i.key == KEY_UP && !i.alt && !i.ctrl)
         scrollUpBy(1);
@@ -394,8 +400,8 @@ static void gotInput(struct input i) {
                 log("f was typed\n");
         }
 
-        else if (i.key == '2' && !i.alt && i.ctrl)
-            showLogs();
+        else if (i.key == '0' && !i.alt && i.ctrl)
+            showTerm(0);
 
         // TODO: Nope, not clearScreen() anymore, since we have scrollback.
         //   We'll want to scroll, kind of, but differently from advanceLine() and scrollDown(), by our line
