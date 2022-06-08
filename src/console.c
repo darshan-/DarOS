@@ -67,9 +67,17 @@
     currently then is that doubly linked list then, I guess.
  */
 
+// Oh, we *will* want to jump to an arbitrary page, if we go away and come back, unless we keep a pointer to a currently shown page,
+//   which I guess was the idea, which is why I had in mind we'll never *jump* to an arbitrary page.  So yeah, point is, keep another
+//   pointer in here, and scroll position.
+//
+// Okay, so `line' will be the line at the top of the screen, so that combined with `cur' will uniquely identify what page
+//   `page' is.
 struct vterm {
     uint8_t* cur;
+    uint64_t line;
     struct list* buf;
+    uint8_t* page;
 };
 
 static uint8_t* cur = VRAM;
@@ -295,11 +303,19 @@ static inline void showTerm(uint16_t t) {
         pushListTail(terms[t].buf, terms[t].cur);
     }
 
-    // Once we've started a second page, we'll always be able to copy
-    if (listLen(terms[t].buf) < 2)
-        clearScreen();
-    for (int i = 0; i < 160 * LINES; i++) // TODO: Empty it out initially, or don't do this withough checking it has real data
-        VRAM[i] = logs_buf[i];
+    // Figure out which buf page and line to copy from...
+    //   Okay, so terms[t].page is the first (and probably only) page to copy from, and
+    //   terms[t].line is what line of overall buffer is the top line visible.
+    if (terms[t].line % 2 == 0) {
+        for (int i = 0; i < LINES / 2; i++) {
+            for (int j = 0; j < 160 * 2 / 64; j++)
+                VRAM[i * 160 * 2 / 64 + j] = terms[t].page[((terms[t].line / 2) + i) * i * 160 * 2 / 64 + j];
+            for (int j = 0; j < 160 * 2 / 64; j++)
+                VRAM[i * 160 * 2 / 64 + j] = terms[t].page[((terms[t].line / 2) + i) * i * 160 * 2 / 64 + j];
+        }
+    } else {
+        for 
+    }
 
     term_cur = cur;
     cur = logs_cur;
