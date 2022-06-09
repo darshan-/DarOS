@@ -93,8 +93,9 @@ static struct vterm terms[TERM_COUNT];
 
 static inline void addPage(uint8_t term) {
     terms[term].cur = malloc(LINES * 160);
-    terms[term].cur_page = pushListTail(terms[term].buf, terms[term].cur);
-    com1_printf("Added page with cur: %h and page: %h\n", terms[term].cur, nodeItem(terms[term].cur_page));
+    void * np = pushListTail(terms[term].buf, terms[term].cur);
+    if (!terms[term].cur_page)
+        terms[term].cur_page = np;
 
     uint64_t* p = (uint64_t*) terms[term].cur;
     for (int i = 0; i < LINES * 160 / 8; i++)
@@ -226,13 +227,13 @@ static void clearScreen() {
 // I want to be able to "print" to log buffer even when not at logs, I think...  Yes.
 // So keep working through this.
 
-static void syncScreen(uint8_t t) {
-    uint64_t* page = (uint64_t*) nodeItem(terms[t].cur_page);
+static void syncScreen(uint8_t term) {
+    uint64_t* page = (uint64_t*) nodeItem(terms[term].cur_page);
     for (int i = 0; i < LINES; i++) {
         for (int j = 0; j < 160 / 8; j++)
-            ((uint64_t*) VRAM)[i * 160 / 8 + j] = page[(terms[t].line % LINES + i) * 160 / 8 + j];
-        if (terms[t].line + i + 1 == LINES)
-            page = (uint64_t*) nodeItem(nextNode(terms[t].cur_page));
+            ((uint64_t*) VRAM)[i * 160 / 8 + j] = page[(terms[term].line % LINES + i) * 160 / 8 + j];
+        if (terms[term].line + i + 1 == LINES)
+            page = (uint64_t*) nodeItem(nextNode(terms[term].cur_page));
     }
 
     updateCursorPosition();
@@ -252,8 +253,15 @@ static inline void printCharColor(uint8_t term, uint8_t c, uint8_t color) {
         printcc(term, c, color);
     }
 
-    if (curPositionInPage(term) == LINES * 160 - 1)
-        addPage(term);
+    if (curPositionInPage(term) == LINES * 160) {
+        if (terms[term].line % LINES == 0)
+            addPage(term);
+
+        terms[term].line++;
+
+        if (terms[term].line % LINES == 0)
+            terms[term].cur_page = nextNode(terms[term].cur_page);
+    }        
 }
 
 void printColor(char* s, uint8_t c) {
@@ -314,7 +322,7 @@ static void showTerm(uint8_t t) {
         hideCursor();
 
     if (!terms[t].buf) {
-        com1_print("Making buf page...\n");
+        com1_print("Making buf...\n");
         terms[t].buf = newList();
         addPage(t);
     }
