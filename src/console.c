@@ -115,7 +115,7 @@ static inline uint64_t curPositionInScreen(uint8_t term) {
 
     uint8_t* cp = (uint8_t*) listItem(terms[term].cur_page);
     if (terms[term].cur >= cp && terms[term].cur <= cp + LINES * 160)
-        return terms[term].cur - (uint8_t*) listItem(terms[term].cur_page) - terms[term].line * 160;
+        return terms[term].cur - (uint8_t*) listItem(terms[term].cur_page) - terms[term].line % LINES * 160;
     else
         return terms[term].cur - (uint8_t*) listItem(nextNode(terms[term].cur_page)) + (LINES - terms[term].line % LINES) * 160;
 }
@@ -247,7 +247,7 @@ static void syncScreen() {
     for (int i = 0; i < LINES; i++) {
         for (int j = 0; j < 160 / 8; j++)
             ((uint64_t*) VRAM)[i * 160 / 8 + j] = page[(terms[at].line + i) % LINES * 160 / 8 + j];
-        if (terms[at].line + i + 1 == LINES) {
+        if ((terms[at].line + i + 1) % LINES == 0) {
             page = (uint64_t*) listItem(nextNode(terms[at].cur_page));
             com1_printf("--with i: %u, line: %u, curpos: %u, and cur_page: %h\n", i, terms[at].line, curPositionInScreen(at), page);
         }
