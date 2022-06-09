@@ -45,6 +45,12 @@ void* nextNode(void* ln) {
     return ((struct list_node*) ln)->next;
 }
 
+void* prevNode(void* ln) {
+    if (!ln) return 0;
+
+    return ((struct list_node*) ln)->prev;
+}
+
 void* listItem(void* ln) {
     if (!ln) return 0;
 

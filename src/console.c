@@ -266,10 +266,8 @@ static inline void printCharColor(uint8_t term, uint8_t c, uint8_t color) {
 
         terms[term].line++;
 
-        if (terms[term].line % LINES == 0) {
-            com1_print("Set cur_page to next page\n");
+        if (terms[term].line % LINES == 0)
             terms[term].cur_page = nextNode(terms[term].cur_page);
-        }
     }        
 }
 
@@ -373,19 +371,24 @@ static void showTerm(uint8_t t) {
  */
 
 static void scrollUpBy(uint64_t n) {
-    if (terms[at].line == 0)
+    if (terms[at].line == 0 || n == 0) // Don't expect n to be zero, but the code can't handle it, and doing nothing is correct...
         return;
 
     if (n > terms[at].line)
-        terms[at].line = 0;
-    else
-        terms[at].line -= n;
+        n = terms[at].line;
 
-    // cur_page might be invalidated...
+    terms[at].line -= n;
+
+    if (terms[at].line - n % LINES >= terms[at].line % LINES)
+        terms[at].cur_page = prevNode(terms[at].cur_page);
+
     syncScreen();
 }
 
 static void scrollDownBy(uint64_t n) {
+
+    // if (terms[at].line % LINES == 0)
+    //     terms[at].cur_page = nextNode(terms[at].cur_page);
 }
 
 static void gotInput(struct input i) {
