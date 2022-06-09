@@ -97,8 +97,8 @@ static inline void addPage(uint8_t term) {
     com1_printf("Added page with cur: %h and page: %h\n", terms[term].cur, nodeItem(terms[term].cur_page));
 
     uint64_t* p = (uint64_t*) terms[term].cur;
-    for (int i = 0; i < LINES * 160 / 64; i++)
-        *p++ = 0x0700070007000700;
+    for (int i = 0; i < LINES * 160 / 8; i++)
+        *p++ = 0x0700070007000700ull;
 }
 
 static inline uint64_t curPositionInPage(uint8_t term) {
@@ -106,7 +106,7 @@ static inline uint64_t curPositionInPage(uint8_t term) {
 }
 
 static inline void updateCursorPosition() {
-    uint64_t c = (uint64_t) (curPositionInPage(at)) / 2;
+    uint64_t c = curPositionInPage(at) / 2;
 
     outb(0x3D4, 0x0F);
     outb(0x3D5, (uint8_t) (c & 0xff));
@@ -181,7 +181,7 @@ void updateClock() {
 
 static void setStatusBar() {
     for (uint64_t* v = (uint64_t*) STATUS_LINE; v < (uint64_t*) VRAM_END; v++)
-        *v = 0x5f005f005f005f00;
+        *v = 0x5f005f005f005f00ull;
 
     writeStatusBar("PurpOS", 37);
 
@@ -195,7 +195,7 @@ static void clearScreen() {
     no_ints();
 
     for (uint64_t* v = (uint64_t*) VRAM; v < (uint64_t*) STATUS_LINE; v++)
-        *v = 0x0700070007000700;
+        *v = 0x0700070007000700ull;
 
     ints_okay();
 }
@@ -227,26 +227,12 @@ static void clearScreen() {
 // So keep working through this.
 
 static void syncScreen(uint8_t t) {
-    if (terms[t].line % 2 == 0) {
-        com1_print("Copying to VRAM with 64-bit words...\n");
-        int i;
-        uint64_t* page = (uint64_t*) nodeItem(terms[t].cur_page);
-        com1_printf("cur: %h; page: %h\n", terms[t].cur, page);
-        for (i = 0; i < LINES / 2; i++) {
-            for (int j = 0; j < 160 * 2 / 64; j++)
-                ((uint64_t*) VRAM)[i * 160 * 2 / 64 + j] = page[(terms[t].line % LINES / 2 + i) * 160 * 2 / 64 + j];
-            if (terms[t].line + (i + 1) * 2 == LINES)
-                page = (uint64_t*) nodeItem(nextNode(terms[t].cur_page));
-        }
-    } else {
-        int i;
-        uint32_t* page = (uint32_t*) nodeItem(terms[t].cur_page);
-        for (i = 0; i < LINES; i++) {
-            for (int j = 0; j < 160 / 32; j++)
-                ((uint32_t*) VRAM)[i * 160 / 32 + j] = page[(terms[t].line % LINES + i) * 160 / 32 + j];
-            if (terms[t].line + i + 1 == LINES)
-                page = (uint32_t*) nodeItem(nextNode(terms[t].cur_page));
-        }
+    uint64_t* page = (uint64_t*) nodeItem(terms[t].cur_page);
+    for (int i = 0; i < LINES; i++) {
+        for (int j = 0; j < 160 / 8; j++)
+            ((uint64_t*) VRAM)[i * 160 / 8 + j] = page[(terms[t].line % LINES + i) * 160 / 8 + j];
+        if (terms[t].line + i + 1 == LINES)
+            page = (uint64_t*) nodeItem(nextNode(terms[t].cur_page));
     }
 
     updateCursorPosition();
