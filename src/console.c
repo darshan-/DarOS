@@ -104,22 +104,6 @@ static inline uint64_t curPositionInPage(uint8_t term) {
     return terms[term].cur - (uint8_t*) nodeItem(terms[term].cur_page);
 }
 
-static inline void updateCursorPosition() {
-    uint64_t c = (uint64_t) (curPositionInPage(at)) / 2;
-    com1_printf("calculated c as: %u\n", c);
-
-    outb(0x3D4, 0x0F);
-    outb(0x3D4+1, (uint8_t) (c & 0xff));
-    outb(0x3D4, 0x0E);
-    outb(0x3D4+1, (uint8_t) ((c >> 8) & 0xff));
-}
-
-static inline void hideCursor() {
-    com1_print("hideCursor\n");
-    outb(0x3D4, 0x0A);
-    outb(0x3D5, 0x20);
-}
-
 static inline void showCursor() {
     com1_print("showCursor\n");
     outb(0x3D4, 0x0A);
@@ -127,6 +111,24 @@ static inline void showCursor() {
  
     outb(0x3D4, 0x0B);
     outb(0x3D5, (inb(0x3D5) & 0xE0) | 15);
+}
+
+static inline void updateCursorPosition() {
+    uint64_t c = (uint64_t) (curPositionInPage(at)) / 2;
+    com1_printf("calculated c as: %u\n", c);
+    c = 160;
+
+    outb(0x3D4, 0x0F);
+    outb(0x3D4+1, (uint8_t) (c & 0xff));
+    outb(0x3D4, 0x0E);
+    outb(0x3D4+1, (uint8_t) ((c >> 8) & 0xff));
+    showCursor();
+}
+
+static inline void hideCursor() {
+    com1_print("hideCursor\n");
+    outb(0x3D4, 0x0A);
+    outb(0x3D5, 0x20);
 }
 
 static void writeStatusBar(char* s, uint8_t loc) {
