@@ -33,13 +33,19 @@ uint32_t listLen(struct list* l) {
     return l->len;
 }
 
+void* listHead(struct list* l) {
+    if (!l) return 0;
+
+    return l->head;
+}
+
 void* nextNode(void* ln) {
     if (!ln) return 0;
 
     return ((struct list_node*) ln)->next;
 }
 
-void* nodeItem(void* ln) {
+void* listItem(void* ln) {
     if (!ln) return 0;
 
     return ((struct list_node*) ln)->item;

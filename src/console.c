@@ -92,25 +92,36 @@ static uint8_t at = 255;
 static struct vterm terms[TERM_COUNT];
 
 static inline void addPage(uint8_t term) {
-    void* buf = malloc(LINES * 160);
-    if (!terms[term].cur)
-        terms[term].cur = buf;
+    void* p = malloc(LINES * 160);
+    pushListTail(terms[term].buf, p);
 
-    void* np = pushListTail(terms[term].buf, terms[term].cur);
-    if (!terms[term].cur_page)
-        terms[term].cur_page = np;
-
-    uint64_t* p = (uint64_t*) terms[term].cur;
+    uint64_t* q = (uint64_t*) p;
     for (int i = 0; i < LINES * 160 / 8; i++)
-        *p++ = 0x0700070007000700ull;
+        *q++ = 0x0700070007000700ull;
 }
 
-static inline uint64_t curPositionInPage(uint8_t term) {
-    return terms[term].cur - (uint8_t*) nodeItem(terms[term].cur_page);
+static inline uint64_t curPositionInScreen(uint8_t term) {
+    com1_printf("cPIP line: %u, cur: %h, cur_page: %h\n", terms[term].line, terms[term].cur,
+                listItem(terms[term].cur_page));
+    // if (terms[term].line == 0)
+    //     return terms[term].cur - (uint8_t*) listItem(terms[term].cur_page) - terms[term].line * 160;
+    // else
+    //     return terms[term].cur - (uint8_t*) listItem(nextNode(terms[term].cur_page)) + (LINES - terms[term].line % LINES) * 160;
+
+    // if (terms[term].line == 0)
+    //     return terms[term].cur - (uint8_t*) listItem(terms[term].cur_page);
+    // else
+    //     return terms[term].cur - (uint8_t*) listItem(nextNode(terms[term].cur_page)) - terms[term].line * 160;
+
+    uint8_t* cp = (uint8_t*) listItem(terms[term].cur_page);
+    if (terms[term].cur >= cp && terms[term].cur <= cp + LINES * 160)
+        return terms[term].cur - (uint8_t*) listItem(terms[term].cur_page) - terms[term].line * 160;
+    else
+        return terms[term].cur - (uint8_t*) listItem(nextNode(terms[term].cur_page)) + (LINES - terms[term].line % LINES) * 160;
 }
 
 static inline void updateCursorPosition() {
-    uint64_t c = curPositionInPage(at) / 2;
+    uint64_t c = curPositionInScreen(at) / 2;
 
     outb(0x3D4, 0x0F);
     outb(0x3D5, (uint8_t) (c & 0xff));
@@ -230,13 +241,16 @@ static void clearScreen() {
 // I want to be able to "print" to log buffer even when not at logs, I think...  Yes.
 // So keep working through this.
 
-static void syncScreen(uint8_t term) {
-    uint64_t* page = (uint64_t*) nodeItem(terms[term].cur_page);
+static void syncScreen() {
+    uint64_t* page = (uint64_t*) listItem(terms[at].cur_page);
+    com1_printf("ss with line: %u, curpos: %u, and cur_page: %h\n", terms[at].line, curPositionInScreen(at), page);
     for (int i = 0; i < LINES; i++) {
         for (int j = 0; j < 160 / 8; j++)
-            ((uint64_t*) VRAM)[i * 160 / 8 + j] = page[(terms[term].line % LINES + i) * 160 / 8 + j];
-        if (terms[term].line + i + 1 == LINES)
-            page = (uint64_t*) nodeItem(nextNode(terms[term].cur_page));
+            ((uint64_t*) VRAM)[i * 160 / 8 + j] = page[(terms[at].line + i) % LINES * 160 / 8 + j];
+        if (terms[at].line + i + 1 == LINES) {
+            page = (uint64_t*) listItem(nextNode(terms[at].cur_page));
+            com1_printf("--with i: %u, line: %u, curpos: %u, and cur_page: %h\n", i, terms[at].line, curPositionInScreen(at), page);
+        }
     }
 
     updateCursorPosition();
@@ -249,18 +263,20 @@ static inline void printcc(uint8_t term, uint8_t c, uint8_t cl) {
 
 static inline void printCharColor(uint8_t term, uint8_t c, uint8_t color) {
     if (c == '\n') {
-        uint64_t cpip = curPositionInPage(term);
+        uint64_t cpip = curPositionInScreen(term);
         for (uint64_t n = 160 - cpip % 160; n > 0; n -= 2)
             printcc(term, 0, color);
     } else {
         printcc(term, c, color);
     }
 
-    if (curPositionInPage(term) == LINES * 160) {
+    if (curPositionInScreen(term) == LINES * 160) {
         com1_print("Let's advance by a line\n");
         if (terms[term].line % LINES == 0) {
             com1_print("Let's add a page\n");
             addPage(term);
+            terms[term].cur = listItem(nextNode(terms[term].cur_page));
+            com1_printf("cur is now: %h\n", terms[term].cur);
         }
 
         terms[term].line++;
@@ -272,14 +288,19 @@ static inline void printCharColor(uint8_t term, uint8_t c, uint8_t color) {
     }        
 }
 
-void printColor(char* s, uint8_t c) {
+void printColorTo(uint8_t* t, char* s, uint8_t c) {
     no_ints();
 
     while (*s != 0)
-        printCharColor(at, *s++, c);
+        printCharColor(t, *s++, c);
 
-    syncScreen(at);
+    ints_okay();
+}
 
+void printColor(char* s, uint8_t c) {
+    no_ints();
+    printColorTo(at, s, c);
+    syncScreen();
     ints_okay();
 }
 
@@ -292,7 +313,7 @@ void printc(char c) {
 
     printCharColor(at, c, 0x07);
 
-    syncScreen(at);
+    syncScreen();
 
     ints_okay();
 }
@@ -330,12 +351,13 @@ static void showTerm(uint8_t t) {
         hideCursor();
 
     if (!terms[t].buf) {
-        com1_print("Making buf...\n");
         terms[t].buf = newList();
         addPage(t);
+        terms[t].cur_page = listHead(terms[t].buf);
+        terms[t].cur = listItem(terms[t].cur_page);
     }
 
-    syncScreen(t);
+    syncScreen();
 
     if (t != LOGS && !nextNode(terms[t].cur_page))
         showCursor();
@@ -392,7 +414,7 @@ static void gotInput(struct input i) {
         if (!i.alt && !i.ctrl) {
             scrollToBottom();
             printc(i.key);
-            syncScreen(at);
+            syncScreen();
             if (i.key == 'd')
                 log("d was typed\n");
             if (i.key == 'f')
@@ -417,6 +439,7 @@ void startTty() {
     log("Starting tty\n");
 
     no_ints();
+    //printColor("Ready!\n", 0x0d);
     showTerm(1);
 
     init_keyboard();
