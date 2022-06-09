@@ -87,7 +87,6 @@ struct vterm {
     void* cur_page;
 };
 
-static uint8_t* cur = VRAM;
 static uint8_t at = 255;
 
 static struct vterm terms[TERM_COUNT];
@@ -100,8 +99,12 @@ static inline void addPage(uint8_t term) {
         terms[term].cur[i] = 0x0700070007000700;
 }
 
+static inline uint64_t curPositionInPage(uint8_t term) {
+    return terms[term].cur - (uint8_t*) nodeItem(terms[term].cur_page);
+}
+
 static inline void updateCursorPosition() {
-    uint64_t c = (uint64_t) (cur - VRAM) / 2;
+    uint64_t c = (uint64_t) (curPositionInPage(at));
 
     outb(0x3D4, 0x0F);
     outb(0x3D4+1, (uint8_t) (c & 0xff));
@@ -192,9 +195,6 @@ static void clearScreen() {
     for (uint64_t* v = (uint64_t*) VRAM; v < (uint64_t*) STATUS_LINE; v++)
         *v = 0x0700070007000700;
 
-    cur = VRAM;
-    updateCursorPosition();
-
     ints_okay();
 }
 
@@ -224,26 +224,47 @@ static void clearScreen() {
 // I want to be able to "print" to log buffer even when not at logs, I think...  Yes.
 // So keep working through this.
 
-static inline void printcc(uint8_t term, uint8_t c, uint8_t cl) {
-    *(terms[term].cur) = c;
-    *(terms[term].cur + 1) = cl;
-    terms[term].cur += 2;
+static void syncScreen(uint8_t t) {
+    if (terms[t].line % 2 == 0) {
+        com1_print("Copying to VRAM with 64-bit words...\n");
+        int i;
+        uint64_t* page = (uint64_t*) nodeItem(terms[t].cur_page);
+        com1_printf("cur: %h; page: %h\n", terms[t].cur, page);
+        for (i = 0; i < LINES / 2; i++) {
+            for (int j = 0; j < 160 * 2 / 64; j++)
+                ((uint64_t*) VRAM)[i * 160 * 2 / 64 + j] = page[(terms[t].line % LINES / 2 + i) * 160 * 2 / 64 + j];
+            if (terms[t].line + (i + 1) * 2 == LINES)
+                page = (uint64_t*) nodeItem(nextNode(terms[t].cur_page));
+        }
+    } else {
+        int i;
+        uint32_t* page = (uint32_t*) nodeItem(terms[t].cur_page);
+        for (i = 0; i < LINES; i++) {
+            for (int j = 0; j < 160 / 32; j++)
+                ((uint32_t*) VRAM)[i * 160 / 32 + j] = page[(terms[t].line % LINES + i) * 160 / 32 + j];
+            if (terms[t].line + i + 1 == LINES)
+                page = (uint32_t*) nodeItem(nextNode(terms[t].cur_page));
+        }
+    }
+
+    updateCursorPosition();
 }
 
-static inline uint64_t curPosInPage(uint8_t term) {
-    return terms[term].cur - (uint8_t*) nodeItem(terms[term].cur_page);
+static inline void printcc(uint8_t term, uint8_t c, uint8_t cl) {
+    *(terms[term].cur++) = c;
+    *(terms[term].cur++) = cl;
 }
 
 static inline void printCharColor(uint8_t term, uint8_t c, uint8_t color) {
     if (c == '\n') {
-        uint64_t cpip = curPosInPage(term);
+        uint64_t cpip = curPositionInPage(term);
         for (uint64_t n = 160 - cpip % 160; n > 0; n -= 2)
             printcc(term, 0, color);
     } else {
         printcc(term, c, color);
     }
 
-    if (curPosInPage(term) == LINES * 160 - 1)
+    if (curPositionInPage(term) == LINES * 160 - 1)
         addPage(term);
 }
 
@@ -253,8 +274,7 @@ void printColor(char* s, uint8_t c) {
     while (*s != 0)
         printCharColor(at, *s++, c);
 
-    // TODO: Sync screen
-    updateCursorPosition();
+    syncScreen(at);
 
     ints_okay();
 }
@@ -268,8 +288,7 @@ void printc(char c) {
 
     printCharColor(at, c, 0x07);
 
-    // TODO: Sync screen
-    updateCursorPosition();
+    syncScreen(at);
 
     ints_okay();
 }
@@ -295,30 +314,6 @@ static void scrollDownBy(uint64_t n);
 
 static inline void scrollToBottom() {
     scrollDownBy((uint64_t) -1);
-}
-
-static void syncScreen(uint8_t t) {
-    if (terms[t].line % 2 == 0) {
-        com1_print("Copying to VRAM with 64-bit words...\n");
-        int i;
-        uint64_t* page = (uint64_t*) nodeItem(terms[t].cur_page);
-        com1_printf("cur: %h; page: %h\n", terms[t].cur, page);
-        for (i = 0; i < LINES / 2; i++) {
-            for (int j = 0; j < 160 * 2 / 64; j++)
-                ((uint64_t*) VRAM)[i * 160 * 2 / 64 + j] = page[(terms[t].line % LINES / 2 + i) * 160 * 2 / 64 + j];
-            if (terms[t].line + (i + 1) * 2 == LINES)
-                page = (uint64_t*) nodeItem(nextNode(terms[t].cur_page));
-        }
-    } else {
-        int i;
-        uint32_t* page = (uint32_t*) nodeItem(terms[t].cur_page);
-        for (i = 0; i < LINES; i++) {
-            for (int j = 0; j < 160 / 32; j++)
-                ((uint32_t*) VRAM)[i * 160 / 32 + j] = page[(terms[t].line % LINES + i) * 160 / 32 + j];
-            if (terms[t].line + i + 1 == LINES)
-                page = (uint32_t*) nodeItem(nextNode(terms[t].cur_page));
-        }
-    }
 }
 
 static void showTerm(uint8_t t) {
