@@ -373,6 +373,16 @@ static void showTerm(uint8_t t) {
  */
 
 static void scrollUpBy(uint64_t n) {
+    if (terms[at].line == 0)
+        return;
+
+    if (n > terms[at].line)
+        terms[at].line = 0;
+    else
+        terms[at].line -= n;
+
+    // cur_page might be invalidated...
+    syncScreen();
 }
 
 static void scrollDownBy(uint64_t n) {
