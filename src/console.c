@@ -88,17 +88,16 @@ struct vterm {
 };
 
 static uint8_t* cur = VRAM;
-static uint8_t at = 256;
+static uint8_t at = 255;
 
 static struct vterm terms[TERM_COUNT];
 
-static inline uint8_t* newPage() {
-    uint64_t* p = malloc(LINES * 160);
+static inline void addPage(uint8_t term) {
+    terms[term].cur = malloc(LINES * 160);
+    terms[term].cur_page = pushListTail(terms[term].buf, terms[term].cur);
 
     for (int i = 0; i < LINES * 160 / 64; i++)
-        *p = 0x0700070007000700;
-
-    return (uint8_t*) p;
+        terms[term].cur[i] = 0x0700070007000700;
 }
 
 static inline void updateCursorPosition() {
@@ -225,16 +224,17 @@ static void clearScreen() {
 // I want to be able to "print" to log buffer even when not at logs, I think...  Yes.
 // So keep working through this.
 
-static inline void printcc(uint16_t term, uint8_t c, uint8_t cl) {
-    *(terms[term].cur++) = c;
-    *(terms[term].cur++) = cl;
+static inline void printcc(uint8_t term, uint8_t c, uint8_t cl) {
+    *(terms[term].cur) = c;
+    *(terms[term].cur + 1) = cl;
+    terms[term].cur += 2;
 }
 
-static inline uint64_t curPosInPage(uint16_t term) {
+static inline uint64_t curPosInPage(uint8_t term) {
     return terms[term].cur - (uint8_t*) nodeItem(terms[term].cur_page);
 }
 
-static inline void printCharColor(uint16_t term, uint8_t c, uint8_t color) {
+static inline void printCharColor(uint8_t term, uint8_t c, uint8_t color) {
     if (c == '\n') {
         uint64_t cpip = curPosInPage(term);
         for (uint64_t n = 160 - cpip % 160; n > 0; n -= 2)
@@ -243,10 +243,8 @@ static inline void printCharColor(uint16_t term, uint8_t c, uint8_t color) {
         printcc(term, c, color);
     }
 
-    if (curPosInPage(term) == LINES * 160 - 1) {
-        terms[term].cur = newPage();
-        terms[term].cur_page = pushListTail(terms[term].buf, terms[term].cur);
-    }
+    if (curPosInPage(term) == LINES * 160 - 1)
+        addPage(term);
 }
 
 void printColor(char* s, uint8_t c) {
@@ -299,9 +297,31 @@ static inline void scrollToBottom() {
     scrollDownBy((uint64_t) -1);
 }
 
-static void* last_log = 0;
+static void syncScreen(uint8_t t) {
+    if (terms[t].line % 2 == 0) {
+        com1_print("Copying to VRAM with 64-bit words...\n");
+        int i;
+        uint64_t* page = (uint64_t*) nodeItem(terms[t].cur_page);
+        com1_printf("cur: %h; page: %h\n", terms[t].cur, page);
+        for (i = 0; i < LINES / 2; i++) {
+            for (int j = 0; j < 160 * 2 / 64; j++)
+                ((uint64_t*) VRAM)[i * 160 * 2 / 64 + j] = page[(terms[t].line % LINES / 2 + i) * 160 * 2 / 64 + j];
+            if (terms[t].line + (i + 1) * 2 == LINES)
+                page = (uint64_t*) nodeItem(nextNode(terms[t].cur_page));
+        }
+    } else {
+        int i;
+        uint32_t* page = (uint32_t*) nodeItem(terms[t].cur_page);
+        for (i = 0; i < LINES; i++) {
+            for (int j = 0; j < 160 / 32; j++)
+                ((uint32_t*) VRAM)[i * 160 / 32 + j] = page[(terms[t].line % LINES + i) * 160 / 32 + j];
+            if (terms[t].line + i + 1 == LINES)
+                page = (uint32_t*) nodeItem(nextNode(terms[t].cur_page));
+        }
+    }
+}
 
-static inline void showTerm(uint16_t t) {
+static void showTerm(uint8_t t) {
     if (t == at)
         return;
 
@@ -313,31 +333,10 @@ static inline void showTerm(uint16_t t) {
     if (!terms[t].buf) {
         com1_print("Making buf page...\n");
         terms[t].buf = newList();
-        terms[t].cur = newPage();
-        terms[t].cur_page = pushListTail(terms[t].buf, terms[t].cur);
+        addPage(t);
     }
 
-    if (terms[t].line % 2 == 0) {
-        com1_print("Copying to VRAM with 64-bit words...\n");
-        int i;
-        uint64_t* page = (uint64_t*) nodeItem(terms[t].cur_page);
-        com1_printf("cur: %h; page: %h\n", terms[t].cur, page);
-        for (i = 0; i < LINES / 2; i++) {
-            for (int j = 0; j < 160 * 2 / 64; j++)
-                VRAM[i * 160 * 2 / 64 + j] = page[(terms[t].line % LINES / 2 + i) * 160 * 2 / 64 + j];
-            if (terms[t].line + (i + 1) * 2 == LINES)
-                page = (uint64_t*) nodeItem(nextNode(terms[t].cur_page));
-        }
-    } else {
-        int i;
-        uint32_t* page = (uint32_t*) nodeItem(terms[t].cur_page);
-        for (i = 0; i < LINES; i++) {
-            for (int j = 0; j < 160 / 32; j++)
-                VRAM[i * 160 / 32 + j] = page[(terms[t].line % LINES + i) * i * 160 / 32 + j];
-            if (terms[t].line + i + 1 == LINES)
-                page = (uint32_t*) nodeItem(nextNode(terms[t].cur_page));
-        }
-    }
+    syncScreen(t);
 
     if (t != LOGS && !nextNode(terms[t].cur_page))
         showCursor();
@@ -394,6 +393,7 @@ static void gotInput(struct input i) {
         if (!i.alt && !i.ctrl) {
             scrollToBottom();
             printc(i.key);
+            syncScreen(at);
             if (i.key == 'd')
                 log("d was typed\n");
             if (i.key == 'f')
