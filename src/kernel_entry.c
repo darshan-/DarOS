@@ -48,6 +48,7 @@ void __attribute__((section(".kernel_entry"))) kernel_entry() {
     init_heap(kernel_stack_top, mem_table[il].length - STACK_SIZE);
 
     init_interrupts();
+    init_com1();
     startTty();
 
     logf("We've got %u mem table entries:\n", *entry_count);

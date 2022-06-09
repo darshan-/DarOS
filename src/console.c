@@ -94,6 +94,7 @@ static struct vterm terms[TERM_COUNT];
 static inline void addPage(uint8_t term) {
     terms[term].cur = malloc(LINES * 160);
     terms[term].cur_page = pushListTail(terms[term].buf, terms[term].cur);
+    com1_printf("Added page with cur: %h and page: %h\n", terms[term].cur, nodeItem(terms[term].cur_page));
 
     for (int i = 0; i < LINES * 160 / 64; i++)
         terms[term].cur[i] = 0x0700070007000700;
@@ -104,7 +105,8 @@ static inline uint64_t curPositionInPage(uint8_t term) {
 }
 
 static inline void updateCursorPosition() {
-    uint64_t c = (uint64_t) (curPositionInPage(at));
+    uint64_t c = (uint64_t) (curPositionInPage(at)) / 2;
+    com1_printf("calculated c as: %u\n", c);
 
     outb(0x3D4, 0x0F);
     outb(0x3D4+1, (uint8_t) (c & 0xff));
@@ -113,11 +115,13 @@ static inline void updateCursorPosition() {
 }
 
 static inline void hideCursor() {
+    com1_print("hideCursor\n");
     outb(0x3D4, 0x0A);
     outb(0x3D5, 0x20);
 }
 
 static inline void showCursor() {
+    com1_print("showCursor\n");
     outb(0x3D4, 0x0A);
     outb(0x3D5, (inb(0x3D5) & 0xC0) | 13);
  
@@ -419,5 +423,5 @@ void startTty() {
     clearScreen();
     setStatusBar();
     printColor("Ready!\n", 0x0d);
-    showCursor();
+    //showCursor();
 };
