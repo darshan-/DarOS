@@ -92,8 +92,11 @@ static uint8_t at = 255;
 static struct vterm terms[TERM_COUNT];
 
 static inline void addPage(uint8_t term) {
-    terms[term].cur = malloc(LINES * 160);
-    void * np = pushListTail(terms[term].buf, terms[term].cur);
+    void* buf = malloc(LINES * 160);
+    if (!terms[term].cur)
+        terms[term].cur = buf;
+
+    void* np = pushListTail(terms[term].buf, terms[term].cur);
     if (!terms[term].cur_page)
         terms[term].cur_page = np;
 
@@ -254,13 +257,18 @@ static inline void printCharColor(uint8_t term, uint8_t c, uint8_t color) {
     }
 
     if (curPositionInPage(term) == LINES * 160) {
-        if (terms[term].line % LINES == 0)
+        com1_print("Let's advance by a line\n");
+        if (terms[term].line % LINES == 0) {
+            com1_print("Let's add a page\n");
             addPage(term);
+        }
 
         terms[term].line++;
 
-        if (terms[term].line % LINES == 0)
+        if (terms[term].line % LINES == 0) {
+            com1_print("Set cur_page to next page\n");
             terms[term].cur_page = nextNode(terms[term].cur_page);
+        }
     }        
 }
 
