@@ -430,11 +430,8 @@ static void scrollDownBy(uint64_t n) {
 }
 
 // TODO:
-//   ctrl-home to jump to top?
-//   ctrl-end to jump to bottom?
 //   (If I switch to page tables, ctrl-pgup to jump up 10 pages, ctrl-pgdn to jump down 10 pages?)
 //   ctrl-l to work how I want
-//   ctrl-left and ctrl-right to move between vterms?
 //
 //   How much would it be worth it to invalidate regions rather than the whole screen at once?
 //     - whole screen
@@ -469,6 +466,12 @@ static void gotInput(struct input i) {
 
     else if (i.key == KEY_END && !i.alt && i.ctrl)
         scrollToBottom();
+
+    else if (i.key == KEY_RIGHT && !i.alt && i.ctrl)
+        showTerm((at + 1) % 10);
+
+    else if (i.key == KEY_LEFT && !i.alt && i.ctrl)
+        showTerm((at + 9) % 10);
 
     else if (at > 0) {
         if (isPrintable(i.key) && !i.alt && !i.ctrl) {
