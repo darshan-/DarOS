@@ -344,7 +344,7 @@ static void showTerm(uint8_t t) {
 
     syncScreen();
 
-    if (t != LOGS && !nextNode(terms[t].cur_page))
+    if (t != LOGS && terms[at].cur_i / 160 - terms[t].line == LINES - 1)
         showCursor();
 }
 
