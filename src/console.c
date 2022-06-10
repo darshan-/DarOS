@@ -392,8 +392,8 @@ static void scrollDownBy(uint64_t n) {
     if (terms[at].cur_i / 160 < LINES || terms[at].cur_i / 160 - terms[at].line == LINES - 1 || n == 0)
         return;
 
-    if (n > terms[at].cur_i / 160 - LINES + 1)
-        n = terms[at].cur_i / 160 - LINES + 1;
+    if (n > terms[at].cur_i / 160 - LINES + 1 - terms[at].line)
+        n = terms[at].cur_i / 160 - LINES + 1 - terms[at].line;
 
     terms[at].line += n;
 
@@ -402,7 +402,7 @@ static void scrollDownBy(uint64_t n) {
 
     syncScreen();
 
-    if (at != LOGS && terms[at].cur_i / 160 - terms[at].line == LINES)
+    if (at != LOGS && terms[at].cur_i / 160 - terms[at].line == LINES - 1)
         showCursor();
 }
 
