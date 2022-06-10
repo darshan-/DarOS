@@ -78,16 +78,17 @@
 //
 // Okay, so `line' will be the line at the top of the screen, so that combined with `cur' will uniquely identify what page
 //   `page' is.
-//
-// Okay, but I guess I need the list_node?  So I need to expose that outside of the list implementation?  Well, I guess I can do
-//   like I did with ForEachNewListItem(), and expose it as an opaque continuation object.
+
 struct vterm {
-    uint8_t* cur_p;
-    uint64_t cur_i;
-    uint64_t line;
     struct list* buf;
     void* cur_page;
-    uint64_t offset; // Vertical offset to support ctrl-l
+
+    uint64_t line;     // 0-based line index of top line (how many lines are above screen)
+    uint64_t v_offset; // Vertical offset to support ctrl-l
+
+    uint64_t cur;      // Index of cursor
+    uint64_t anchor;   // Index of last non-editable character
+    uint64_t end;      // Index of last editable character
 };
 
 static uint8_t at = 255;
@@ -104,7 +105,7 @@ static inline void addPage(uint8_t term) {
 }
 
 static inline uint64_t curPositionInScreen(uint8_t term) {
-    return terms[term].cur_i - terms[term].line * 160;
+    return terms[term].cur - terms[term].line * 160;
 }
 
 static inline void updateCursorPosition() {
@@ -225,15 +226,20 @@ static void syncScreen() {
 }
 
 static inline void printcc(uint8_t term, uint8_t c, uint8_t cl) {
-    *(terms[term].cur_p++) = c;
-    *(terms[term].cur_p++) = cl;
+    uint8_t* p = listItem(terms[term].cur_page);
+    p += terms[term].cur % (LINES * 160);
 
-    terms[term].cur_i += 2;
+    *p++ = c;
+    *p = cl;
+
+    terms[term].cur += 2;
 }
 
 static inline void printCharColor(uint8_t term, uint8_t c, uint8_t color) {
     if (c == '\n') {
         uint64_t cpip = curPositionInScreen(term);
+        if (term == 1) com1_printf("cpip: %u\n", cpip);
+        //com1_printf("Newline getting %u empty chars\n", (160 - cpip % 160));
         for (uint64_t n = 160 - cpip % 160; n > 0; n -= 2)
             printcc(term, 0, color);
     } else {
@@ -241,10 +247,8 @@ static inline void printCharColor(uint8_t term, uint8_t c, uint8_t color) {
     }
 
     if (curPositionInScreen(term) == LINES * 160) {
-        if (terms[term].line % LINES == 0) {
+        if (terms[term].line % LINES == 0)
             addPage(term);
-            terms[term].cur_p = listItem(nextNode(terms[term].cur_page));
-        }
 
         terms[term].line++;
 
@@ -259,8 +263,7 @@ static inline void ensureTerm(uint8_t t) {
         terms[t].buf = newList();
         addPage(t);
         terms[t].cur_page = listHead(terms[t].buf);
-        terms[t].cur_p = listItem(terms[t].cur_page);
-        terms[t].cur_i = 0;
+        terms[t].cur = 0;
 
         if (t == LOGS_TERM) {
             printColorTo(t, "- Start of logs -\n", 0x0f);
@@ -343,7 +346,7 @@ static void showTerm(uint8_t t) {
 
     syncScreen();
 
-    if (t != LOGS && (terms[at].cur_i / 160 - terms[t].line == LINES - 1 || terms[t].line == 0))
+    if (t != LOGS && (terms[at].cur / 160 - terms[t].line == LINES - 1 || terms[t].line == 0))
         showCursor();
 }
 
@@ -393,16 +396,16 @@ static void scrollUpBy(uint64_t n) {
 }
 
 static void scrollDownBy(uint64_t n) {
-    if (terms[at].cur_i / 160 < LINES || terms[at].cur_i / 160 - terms[at].line == LINES - 1 || n == 0)
+    if (terms[at].cur / 160 < LINES || terms[at].cur / 160 - terms[at].line == LINES - 1 || n == 0)
         return;
 
-    if (n > terms[at].cur_i / 160 - LINES + 1 - terms[at].line)
-        n = terms[at].cur_i / 160 - LINES + 1 - terms[at].line;
+    if (n > terms[at].cur / 160 - LINES + 1 - terms[at].line)
+        n = terms[at].cur / 160 - LINES + 1 - terms[at].line;
 
     terms[at].line += n;
 
     // We assume we scroll by somewhere between 1 and LINES lines, only going forward one node, OR jump to bottom
-    if (terms[at].cur_i / 160 - terms[at].line == LINES - 1) {
+    if (terms[at].cur / 160 - terms[at].line == LINES - 1) {
         terms[at].cur_page = listTail(terms[at].buf);
         // Most of the time we don't cur to be the last, but second to last, when we're at the bottom...
         //   This is pretty ugly; I'm less and less a fan of the linked list approach.  Page table would be better?  (Fix malloc...)
@@ -414,7 +417,7 @@ static void scrollDownBy(uint64_t n) {
 
     syncScreen();
 
-    if (at != LOGS && terms[at].cur_i / 160 - terms[at].line == LINES - 1)
+    if (at != LOGS && terms[at].cur / 160 - terms[at].line == LINES - 1)
         showCursor();
 }
 
