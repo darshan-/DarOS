@@ -380,7 +380,7 @@ static void scrollUpBy(uint64_t n) {
     if (n > terms[at].line)
         n = terms[at].line;
 
-    if (terms[at].line % LINES == 0) // We assume we scroll by somewhere between 1 and LINES lines
+    if (n > terms[at].line % LINES) // We assume we scroll by somewhere between 1 and LINES lines; only going back one node
         terms[at].cur_page = prevNode(terms[at].cur_page);
 
     terms[at].line -= n;
@@ -397,7 +397,7 @@ static void scrollDownBy(uint64_t n) {
 
     terms[at].line += n;
 
-    if (terms[at].line % LINES == 0)
+    if (n > terms[at].line % LINES) // We assume we scroll by somewhere between 1 and LINES lines; only going forward one node
         terms[at].cur_page = nextNode(terms[at].cur_page);
 
     syncScreen();
