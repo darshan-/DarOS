@@ -73,8 +73,11 @@ void init_keyboard() {
 void keyScanned(uint8_t c) {
     uint8_t hob = c & 0x80;  // Break / release
 
+    // Some things (e.g. 0x1c: enter) are handled the same whether e0 was sent, so this is up here and we return early if we're done
     if (last_e0) {
         switch (c) {
+            map(0x35, si('/'));
+
             map(0x48, si(KEY_UP));
             map(0x50, si(KEY_DOWN));
 
@@ -85,6 +88,7 @@ void keyScanned(uint8_t c) {
         }
 
         switch (c) {
+        case 0x35:
         case 0x48:
         case 0x49:
         case 0x50:
