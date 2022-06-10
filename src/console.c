@@ -375,21 +375,35 @@ static void scrollUpBy(uint64_t n) {
     if (terms[at].line == 0 || n == 0) // Don't expect n to be zero, but the code can't handle it, and doing nothing is correct...
         return;
 
+    hideCursor();
+
     if (n > terms[at].line)
         n = terms[at].line;
 
-    terms[at].line -= n;
-
-    if (terms[at].line - n % LINES >= terms[at].line % LINES)
+    if (terms[at].line % LINES == 0) // We assume we scroll by somewhere between 1 and LINES lines
         terms[at].cur_page = prevNode(terms[at].cur_page);
+
+    terms[at].line -= n;
 
     syncScreen();
 }
 
 static void scrollDownBy(uint64_t n) {
+    if (terms[at].cur_i / 160 < LINES || terms[at].cur_i / 160 - terms[at].line == LINES - 1 || n == 0)
+        return;
 
-    // if (terms[at].line % LINES == 0)
-    //     terms[at].cur_page = nextNode(terms[at].cur_page);
+    if (n > terms[at].cur_i / 160 - LINES + 1)
+        n = terms[at].cur_i / 160 - LINES + 1;
+
+    terms[at].line += n;
+
+    if (terms[at].line % LINES == 0)
+        terms[at].cur_page = nextNode(terms[at].cur_page);
+
+    syncScreen();
+
+    if (at != LOGS && terms[at].cur_i / 160 - terms[at].line == LINES)
+        showCursor();
 }
 
 static void gotInput(struct input i) {
