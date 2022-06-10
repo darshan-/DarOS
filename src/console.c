@@ -215,14 +215,14 @@ static void setStatusBar() {
 
 static void syncScreen() {
     uint64_t* v = (uint64_t*) VRAM;
-    uint64_t* p = (uint64_t*) listItem(terms[at].cur_page) + (terms[at].line * 20);
+    uint64_t* p = (uint64_t*) listItem(terms[at].cur_page) + (terms[at].line % LINES * 20);
 
-    for (uint64_t i = 0; i < (LINES - terms[at].line) * 20; i++)
+    for (uint64_t i = 0; i < (LINES - terms[at].line % LINES) * 20; i++)
         *v++ = *p++;
 
     p = (uint64_t*) listItem(nextNode(terms[at].cur_page));
 
-    for (uint64_t i = 0; i < terms[at].line * 20; i++)
+    for (uint64_t i = 0; i < terms[at].line % LINES * 20; i++)
         *v++ = *p++;
 
     updateCursorPosition();
