@@ -87,6 +87,7 @@ struct vterm {
     uint64_t line;
     struct list* buf;
     void* cur_page;
+    uint64_t offset; // Vertical offset to support ctrl-l
 };
 
 static uint8_t at = 255;
@@ -207,9 +208,6 @@ static void setStatusBar() {
 // So I guess have the exported function call sync at the very end?  It complicates exported functions using other exported functions,
 //   but I can probably work something reasonable out.
 
-// I want to be able to "print" to log buffer even when not at logs, I think...  Yes.
-// So keep working through this.
-
 static void syncScreen() {
     const uint64_t pg_line = terms[at].line % LINES;
     uint64_t* v = (uint64_t*) VRAM;
@@ -304,11 +302,8 @@ void print(char* s) {
 
 void printc(char c) {
     no_ints();
-
     printCharColor(at, c, 0x07);
-
     syncScreen();
-
     ints_okay();
 }
 
@@ -322,12 +317,6 @@ void printf(char* fmt, ...) {
     // Tell keyboard we're in input mode; when newline is entered (or ctrl-c, ctrl-d, etc.?), it calls a
     //   different callback that we pass to it? (Which calls this callback?)
 //}
-
-// Have bottom line be a solid color background and have a clock and other status info?  (Or top line?)
-//   Easy enough if this file supports it (with cur, clearScreen, and advanceLine (and printColor, if at bottom).
-
-
-// For now maybe lets have no scrolling, just have a static buffer that holds a screenful of data (including color).
 
 static void scrollDownBy(uint64_t n);
 
