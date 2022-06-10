@@ -415,6 +415,12 @@ static void scrollDownBy(uint64_t n) {
         showCursor();
 }
 
+// TODO:
+//   ctrl-home to jump to top?
+//   ctrl-end to jump to bottom?
+//   (If I switch to page tables, ctrl-pgup to jump up 10 pages, ctrl-pgdn to jump down 10 pages?)
+//   ctrl-l to work how I want
+//   ctrl-left and ctrl-right to move between vterms?
 static void gotInput(struct input i) {
     no_ints();
     if (i.key == '1' && !i.alt && i.ctrl)

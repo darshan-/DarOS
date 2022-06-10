@@ -17,6 +17,7 @@ static uint8_t shift_down = 0;
 static uint8_t ctrl_down = 0;
 static uint8_t alt_down = 0;
 static uint8_t caps_lock_on = 0; // We really mean 0 as unchanged from what it initially was...
+static uint8_t last_e0 = 0;
 
 static struct list* inputCallbackList = (struct list*) 0;
 
@@ -71,6 +72,10 @@ void init_keyboard() {
 
 void keyScanned(uint8_t c) {
     uint8_t hob = c & 0x80;  // Break / release
+
+    if (last_e0)
+        c |= 0x80;
+
     switch (c) {
     case 0x9d: // LCtrl (Or RCtrl if e0 was before this)
     case 0xaa: // LShift
@@ -159,14 +164,33 @@ void keyScanned(uint8_t c) {
 
         shifty(0x39, ' ', ' ');
 
-        map(0x48, si(KEY_UP));
-        map(0x50, si(KEY_DOWN));
+        map(0x48 | 0x80, si(KEY_UP));
+        map(0x50 | 0x80, si(KEY_DOWN));
 
-        map(0x49, si(KEY_PG_UP));
-        map(0x51, si(KEY_PG_DOWN));
+        map(0x49 | 0x80, si(KEY_PG_UP));
+        map(0x51 | 0x80, si(KEY_PG_DOWN));
+
+        map(0x47, si('7'));
+        map(0x48, si('8'));
+        map(0x49, si('9'));
+        map(0x4a, si('-'));
+        map(0x4b, si('4'));
+        map(0x4c, si('5'));
+        map(0x4d, si('6'));
+        map(0x4e, si('+'));
+        map(0x4f, si('1'));
+        map(0x50, si('2'));
+        map(0x51, si('3'));
+        map(0x52, si('0'));
+        map(0x53, si('.'));
     default:
         break;
     }
+
+    if (c == 0xe0)
+        last_e0 = 1;
+    else
+        last_e0 = 0;
 }
 
 void registerKbdListener(void (*f)(struct input)) {
