@@ -267,7 +267,7 @@ static inline void printCharColor(uint8_t term, uint8_t c, uint8_t color) {
     }        
 }
 
-void printColorTo(uint8_t* t, char* s, uint8_t c) {
+void printColorTo(uint8_t t, char* s, uint8_t c) {
     no_ints();
 
     while (*s != 0)

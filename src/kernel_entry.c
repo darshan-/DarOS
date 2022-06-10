@@ -6,6 +6,7 @@
 #include "interrupt.h"
 #include "log.h"
 #include "malloc.h"
+#include "serial.h"
 #include "strings.h"
 
 struct mem_table_entry {
