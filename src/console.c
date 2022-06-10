@@ -335,6 +335,12 @@ static inline void scrollToBottom() {
     scrollDownBy((uint64_t) -1);
 }
 
+static void scrollUpBy(uint64_t n);
+
+static inline void scrollToTop() {
+    scrollUpBy((uint64_t) -1);
+}
+
 static void showTerm(uint8_t t) {
     if (t == at)
         return;
@@ -385,10 +391,14 @@ static void scrollUpBy(uint64_t n) {
     if (n > terms[at].line)
         n = terms[at].line;
 
-    if (n > terms[at].line % LINES) // We assume we scroll by somewhere between 1 and LINES lines; only going back one node
+    // We assume we scroll by somewhere between 1 and LINES lines, only going back one node, OR jumpt to top, which we handle later
+    if (n > terms[at].line % LINES)
         terms[at].cur_page = prevNode(terms[at].cur_page);
 
     terms[at].line -= n;
+
+    if (terms[at].line == 0) // True of the case when we jumped to the top, and harmless if we just happened to scroll to the top
+        terms[at].cur_page = listHead(terms[at].buf);
 
     syncScreen();
 }
@@ -432,6 +442,10 @@ static void scrollDownBy(uint64_t n) {
 //     - lines m - n?
 //     - positions m - n?
 
+static inline int isPrintable(uint8_t c) {
+    return ((c >= ' ' && c <= '~') || c == '\n');
+}
+
 static void gotInput(struct input i) {
     no_ints();
 
@@ -450,8 +464,14 @@ static void gotInput(struct input i) {
     else if (i.key == KEY_PG_UP && !i.alt && !i.ctrl)
         scrollUpBy(LINES);
 
+    else if (i.key == KEY_HOME && !i.alt && i.ctrl)
+        scrollToTop();
+
+    else if (i.key == KEY_END && !i.alt && i.ctrl)
+        scrollToBottom();
+
     else if (at > 0) {
-        if (!i.alt && !i.ctrl) {
+        if (isPrintable(i.key) && !i.alt && !i.ctrl) {
             scrollToBottom();
             printc(i.key);
             syncScreen();

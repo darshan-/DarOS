@@ -48,8 +48,9 @@ struct input {
 #define KEY_LEFT 25
 #define KEY_RIGHT 26
 
-#define KEY_ESCAPE 27
-#define KEY_DELETE 127
+#define KEY_ESC 27
+#define KEY_DEL 127
+#define KEY_INS 6
 
 #define KEY_TAB '\t'
 #define KEY_BACKSPACE '\b'

@@ -78,21 +78,37 @@ void keyScanned(uint8_t c) {
         switch (c) {
             map(0x35, si('/'));
 
+            map(0x47, si(KEY_HOME));
             map(0x48, si(KEY_UP));
-            map(0x50, si(KEY_DOWN));
-
             map(0x49, si(KEY_PG_UP));
+
+            map(0x4b, si(KEY_LEFT));
+            map(0x4d, si(KEY_RIGHT));
+
+            map(0x4f, si(KEY_END));
+            map(0x50, si(KEY_DOWN));
             map(0x51, si(KEY_PG_DOWN));
+            map(0x52, si(KEY_INS));
+            map(0x53, si(KEY_DEL));
         default:
             break;
         }
 
         switch (c) {
         case 0x35:
+
+        case 0x47:
         case 0x48:
         case 0x49:
+
+        case 0x4b:
+        case 0x4d:
+
+        case 0x4f:
         case 0x50:
         case 0x51:
+        case 0x52:
+        case 0x53:
             last_e0 = 0;
             return;
         }
