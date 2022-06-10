@@ -39,7 +39,8 @@
 #define STATUS_LINE LINE(LINES)
 #define VRAM_END LINE(LINES + 1)
 
-#define LOGS 0
+#define LOGS LOGS_TERM
+
 #define TERM_COUNT 7 // One of which is logs
 
 /*
@@ -200,23 +201,6 @@ static void clearScreen() {
     ints_okay();
 }
 
-// static inline void advanceLine() {
-//     if (!scrollUpBuf)
-//         scrollUpBuf = newList();
-
-//     uint8_t* line = malloc(160);
-//     for (int i = 0; i < 160; i++)
-//         line[i] = VRAM[i];
-//     pushListHead(scrollUpBuf, line);
-
-//     for (int i = 0; i < LINES - 1; i++)
-//         for (int j = 0; j < 160; j++)
-//             VRAM[i * 160 + j] = VRAM[(i + 1) * 160 + j];
-
-//     for (uint64_t* v = (uint64_t*) LAST_LINE; v < (uint64_t*) STATUS_LINE; v++)
-//         *v = 0x0700070007000700;
-// }
-
 // We want to only update screen when done with current update.
 // For a keypress we're only adding a character. But something might right multiple characters, multiple lines, or even multiple pages
 //   at once, we we don't want to do anything with the screen until the end of that call.
@@ -267,8 +251,22 @@ static inline void printCharColor(uint8_t term, uint8_t c, uint8_t color) {
     }        
 }
 
+static inline void ensureTerm(uint8_t t) {
+    no_ints();
+    if (!terms[t].buf) {
+        terms[t].buf = newList();
+        addPage(t);
+        terms[t].cur_page = listHead(terms[t].buf);
+        terms[t].cur_p = listItem(terms[t].cur_page);
+        terms[t].cur_i = 0;
+    }
+    ints_okay();
+}
+
 void printColorTo(uint8_t t, char* s, uint8_t c) {
     no_ints();
+
+    ensureTerm(t);
 
     while (*s != 0)
         printCharColor(t, *s++, c);
@@ -281,6 +279,10 @@ void printColor(char* s, uint8_t c) {
     printColorTo(at, s, c);
     syncScreen();
     ints_okay();
+}
+
+void printTo(uint8_t t, char* s) {
+    printColorTo(t, s, 0x07);
 }
 
 void print(char* s) {
@@ -329,17 +331,7 @@ static void showTerm(uint8_t t) {
     if (t == LOGS)
         hideCursor();
 
-    if (!terms[t].buf) {
-        terms[t].buf = newList();
-        addPage(t);
-        terms[t].cur_page = listHead(terms[t].buf);
-        terms[t].cur_p = listItem(terms[t].cur_page);
-        terms[t].cur_i = 0;
-
-        if (t == LOGS) {
-            // Write logs into buffer (after this, they'll be written as they happen?)
-        }
-    }
+    ensureTerm(t);
 
     syncScreen();
 

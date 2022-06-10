@@ -2,6 +2,7 @@
 
 #include "log.h"
 
+#include "console.h"
 #include "list.h"
 #include "strings.h"
 
@@ -15,6 +16,8 @@ void log(char* s) {
     // I could just do an int64_t and format when showing, but I think I like formatting now and just storing
     //   the string?
     pushListTail(logs, M_scopy(s));
+
+    printTo(LOGS_TERM, s);
 }
 
 void logf(char* fmt, ...) {
