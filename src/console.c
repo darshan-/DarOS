@@ -259,6 +259,11 @@ static inline void ensureTerm(uint8_t t) {
         terms[t].cur_page = listHead(terms[t].buf);
         terms[t].cur_p = listItem(terms[t].cur_page);
         terms[t].cur_i = 0;
+
+        if (t == LOGS_TERM)
+            printColorTo(t, "- Start of logs -\n", 0x0f);
+        else
+            printColorTo(t, "Ready!\n", 0x0d);
     }
     ints_okay();
 }
@@ -444,14 +449,12 @@ void startTty() {
     log("Starting tty\n");
 
     no_ints();
-    //printColor("Ready!\n", 0x0d);
     showTerm(1);
 
     init_keyboard();
     registerKbdListener(&gotInput);
-    clearScreen();
+    syncScreen();
     setStatusBar();
-    printColor("Ready!\n", 0x0d);
     showCursor();
     ints_okay();
 };
