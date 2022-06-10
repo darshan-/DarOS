@@ -41,7 +41,7 @@ run: out/boot.img
 run-bochs: out/bochs.img
 	rm -f out/bochs.img.lock
 	echo c >out/bochs.command
-	bochs -qf /dev/null -rc out/bochs.command 'memory: host=128, guest=256' 'boot: disk' 'ata0-master: type=disk, path="out/bochs.img", mode=flat, cylinders=4, heads=4, spt=61, sect_size=512, model="Generic 1234", biosdetect=auto, translation=auto' 'magic_break: enabled=1' 'clock: sync=realtime, time0=local, rtc_sync=1' 'vga: update_freq=30' 'romimage: options=fastboot'
+	bochs -qf /dev/null -rc out/bochs.command 'memory: host=128, guest=256' 'boot: disk' 'ata0-master: type=disk, path="out/bochs.img", mode=flat, cylinders=4, heads=4, spt=61, sect_size=512, model="Generic 1234", biosdetect=auto, translation=auto' 'magic_break: enabled=1' 'clock: sync=realtime, time0=local, rtc_sync=1' 'vga: update_freq=30' 'romimage: options=fastboot' 'com1: enabled=1, mode=file, dev=out/bochs-serial.txt'
 
 .PHONY: clean
 clean:
