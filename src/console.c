@@ -80,28 +80,30 @@
 //   `page' is.
 
 struct vterm {
-    struct list* buf;
-    void* cur_page;
+    uint8_t* buf[2048];
 
     uint64_t line;     // 0-based line index of top line (how many lines are above screen)
     uint64_t v_offset; // Vertical offset to support ctrl-l
 
-    uint64_t cur;      // Index of cursor
-    uint64_t anchor;   // Index of last non-editable character
-    uint64_t end;      // Index of last editable character
+    uint64_t cur;      // Index of cursor (edit point)
+    uint64_t anchor;   // Index after last non-editable character
+    uint64_t end;      // Index after last character
 };
 
 static uint8_t at = 255;
 
 static struct vterm terms[TERM_COUNT];
 
-static inline void addPage(uint8_t term) {
-    void* p = malloc(LINES * 160);
-    pushListTail(terms[term].buf, p);
+#define pageb(t, b) terms[t].buf[terms[t].b % (LINES * 160)]
+#define cur_page(t) terms[t].buf[terms[t].line % LINES]
+#define next_page(t) terms[t].buf[terms[t].line % LINES + 1]
 
-    uint64_t* q = (uint64_t*) p;
-    for (int i = 0; i < LINES * 160 / 8; i++)
-        *q++ = 0x0700070007000700ull;
+static inline void addPage(uint8_t term) {
+    uint64_t* p = malloc(LINES * 160);
+    pageb(term, end) = (uint8_t*) p;
+
+    for (int i = 0; i < LINES * 20; i++)
+        *p++ = 0x0700070007000700ull;
 }
 
 static inline uint64_t curPositionInScreen(uint8_t term) {
@@ -212,12 +214,12 @@ static void setStatusBar() {
 static void syncScreen() {
     const uint64_t pg_line = terms[at].line % LINES;
     uint64_t* v = (uint64_t*) VRAM;
-    uint64_t* p = (uint64_t*) listItem(terms[at].cur_page) + pg_line * 20;
+    uint64_t* p = (uint64_t*) cur_page(at) + pg_line * 20;
 
     for (uint64_t i = 0; i < (LINES - pg_line) * 20; i++)
         *v++ = *p++;
 
-    p = (uint64_t*) listItem(nextNode(terms[at].cur_page));
+    p = (uint64_t*) next_page(at);
 
     for (uint64_t i = 0; i < pg_line * 20; i++)
         *v++ = *p++;
@@ -241,7 +243,8 @@ static void syncScreen() {
 // }
 
 static inline void printcc(uint8_t term, uint8_t c, uint8_t cl) {
-    *((uint16_t*) listItem(terms[term].cur_page) + terms[term].cur % (LINES * 160) / 2) = (cl << 8) | c;
+    //*((uint16_t*) pageb(term, cur) + terms[term].cur % (LINES * 160) / 2) = (cl << 8) | c;
+    *((uint16_t*) cur_page(term) + terms[term].cur % (LINES * 160) / 2) = (cl << 8) | c;
     terms[term].cur += 2;
 }
 
@@ -259,19 +262,13 @@ static inline void printCharColor(uint8_t term, uint8_t c, uint8_t color) {
             addPage(term);
 
         terms[term].line++;
-
-        if (terms[term].line % LINES == 0)
-            terms[term].cur_page = nextNode(terms[term].cur_page);
     }        
 }
 
 static inline void ensureTerm(uint8_t t) {
     no_ints();
-    if (!terms[t].buf) {
-        terms[t].buf = newList();
+    if (!terms[t].buf[0]) {
         addPage(t);
-        terms[t].cur_page = listHead(terms[t].buf);
-        terms[t].cur = 0;
 
         if (t == LOGS_TERM) {
             printColorTo(t, "- Start of logs -\n", 0x0f);
@@ -391,14 +388,7 @@ static void scrollUpBy(uint64_t n) {
     if (n > terms[at].line)
         n = terms[at].line;
 
-    // We assume we scroll by somewhere between 1 and LINES lines, only going back one node, OR jumpt to top, which we handle later
-    if (n > terms[at].line % LINES)
-        terms[at].cur_page = prevNode(terms[at].cur_page);
-
     terms[at].line -= n;
-
-    if (terms[at].line == 0) // True of the case when we jumped to the top, and harmless if we just happened to scroll to the top
-        terms[at].cur_page = listHead(terms[at].buf);
 
     syncScreen();
 }
@@ -411,17 +401,6 @@ static void scrollDownBy(uint64_t n) {
         n = terms[at].cur / 160 - LINES + 1 - terms[at].line;
 
     terms[at].line += n;
-
-    // We assume we scroll by somewhere between 1 and LINES lines, only going forward one node, OR jump to bottom
-    if (terms[at].cur / 160 - terms[at].line == LINES - 1) {
-        terms[at].cur_page = listTail(terms[at].buf);
-        // Most of the time we don't cur to be the last, but second to last, when we're at the bottom...
-        //   This is pretty ugly; I'm less and less a fan of the linked list approach.  Page table would be better?  (Fix malloc...)
-        if (terms[at].line % LINES > 0)
-            terms[at].cur_page = prevNode(terms[at].cur_page);
-    } else if (n > terms[at].line % LINES) {
-        terms[at].cur_page = nextNode(terms[at].cur_page);
-    }
 
     syncScreen();
 
