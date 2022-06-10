@@ -225,21 +225,29 @@ static void syncScreen() {
     updateCursorPosition();
 }
 
+// static inline void printcc(uint8_t term, uint8_t c, uint8_t cl) {
+//     uint8_t* p;
+//     // Decide of cur is in cur_page or next page
+//     uint8_t* p = listItem(terms[term].cur_page);
+//     p += terms[term].cur % (LINES * 160);
+//     *p++ = c;
+//     *p = cl;
+//     //uint16_t* p = listItem(terms[term].cur_page);
+//     //p += terms[term].cur % (LINES * 160) / 2;
+
+//     //*p = (cl << 8) | c;
+
+//     terms[term].cur += 2;
+// }
+
 static inline void printcc(uint8_t term, uint8_t c, uint8_t cl) {
-    uint8_t* p = listItem(terms[term].cur_page);
-    p += terms[term].cur % (LINES * 160);
-
-    *p++ = c;
-    *p = cl;
-
+    *((uint16_t*) listItem(terms[term].cur_page) + terms[term].cur % (LINES * 160) / 2) = (cl << 8) | c;
     terms[term].cur += 2;
 }
 
 static inline void printCharColor(uint8_t term, uint8_t c, uint8_t color) {
     if (c == '\n') {
         uint64_t cpip = curPositionInScreen(term);
-        if (term == 1) com1_printf("cpip: %u\n", cpip);
-        //com1_printf("Newline getting %u empty chars\n", (160 - cpip % 160));
         for (uint64_t n = 160 - cpip % 160; n > 0; n -= 2)
             printcc(term, 0, color);
     } else {
