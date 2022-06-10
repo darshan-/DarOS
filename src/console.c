@@ -403,7 +403,7 @@ static void scrollDownBy(uint64_t n) {
         terms[at].cur_page = listTail(terms[at].buf);
         // Most of the time we don't cur to be the last, but second to last, when we're at the bottom...
         //   This is pretty ugly; I'm less and less a fan of the linked list approach.  Page table would be better?  (Fix malloc...)
-        if (n > terms[at].line % LINES)
+        if (terms[at].line % LINES > 0)
             terms[at].cur_page = prevNode(terms[at].cur_page);
     } else if (n > terms[at].line % LINES) {
         terms[at].cur_page = nextNode(terms[at].cur_page);
