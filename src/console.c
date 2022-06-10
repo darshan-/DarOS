@@ -210,14 +210,20 @@ static void setStatusBar() {
 // I want to be able to "print" to log buffer even when not at logs, I think...  Yes.
 // So keep working through this.
 
+    //for (int i = 0; i < characters_left_in_page
+    //uint64_t c1 = terms[at].cur_i % (LINES * 160);
+
 static void syncScreen() {
-    uint64_t* page = (uint64_t*) listItem(terms[at].cur_page);
-    for (int i = 0; i < LINES; i++) {
-        for (int j = 0; j < 160 / 8; j++)
-            ((uint64_t*) VRAM)[i * 160 / 8 + j] = page[(terms[at].line + i) % LINES * 160 / 8 + j];
-        if ((terms[at].line + i + 1) % LINES == 0)
-            page = (uint64_t*) listItem(nextNode(terms[at].cur_page));
-    }
+    uint64_t* v = (uint64_t*) VRAM;
+    uint64_t* p = (uint64_t*) listItem(terms[at].cur_page) + (terms[at].line * 20);
+
+    for (uint64_t i = 0; i < (LINES - terms[at].line) * 20; i++)
+        *v++ = *p++;
+
+    p = (uint64_t*) listItem(nextNode(terms[at].cur_page));
+
+    for (uint64_t i = 0; i < terms[at].line * 20; i++)
+        *v++ = *p++;
 
     updateCursorPosition();
 }
@@ -265,7 +271,7 @@ static inline void ensureTerm(uint8_t t) {
         } else {
             char* s = M_sprintf(" (#%u)\n", t);
             printColorTo(t, "Ready!", 0x0d);
-            printColorTo(t, s, 0x03);
+            printColorTo(t, s, 0x0b);
             free(s);
         }
     }
@@ -421,6 +427,12 @@ static void scrollDownBy(uint64_t n) {
 //   (If I switch to page tables, ctrl-pgup to jump up 10 pages, ctrl-pgdn to jump down 10 pages?)
 //   ctrl-l to work how I want
 //   ctrl-left and ctrl-right to move between vterms?
+//
+//   How much would it be worth it to invalidate regions rather than the whole screen at once?
+//     - whole screen
+//     - line n
+//     - lines m - n?
+//     - positions m - n?
 
 static void gotInput(struct input i) {
     no_ints();
