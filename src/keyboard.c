@@ -73,8 +73,26 @@ void init_keyboard() {
 void keyScanned(uint8_t c) {
     uint8_t hob = c & 0x80;  // Break / release
 
-    if (last_e0)
-        c |= 0x80;
+    if (last_e0) {
+        switch (c) {
+            map(0x48, si(KEY_UP));
+            map(0x50, si(KEY_DOWN));
+
+            map(0x49, si(KEY_PG_UP));
+            map(0x51, si(KEY_PG_DOWN));
+        default:
+            break;
+        }
+
+        switch (c) {
+        case 0x48:
+        case 0x49:
+        case 0x50:
+        case 0x51:
+            last_e0 = 0;
+            return;
+        }
+    }
 
     switch (c) {
     case 0x9d: // LCtrl (Or RCtrl if e0 was before this)
@@ -164,12 +182,7 @@ void keyScanned(uint8_t c) {
 
         shifty(0x39, ' ', ' ');
 
-        map(0x48 | 0x80, si(KEY_UP));
-        map(0x50 | 0x80, si(KEY_DOWN));
-
-        map(0x49 | 0x80, si(KEY_PG_UP));
-        map(0x51 | 0x80, si(KEY_PG_DOWN));
-
+        map(0x37, si('*'));
         map(0x47, si('7'));
         map(0x48, si('8'));
         map(0x49, si('9'));
