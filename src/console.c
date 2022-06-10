@@ -467,8 +467,8 @@ static void gotInput(struct input i) {
         //    number minus 1.  If we're at line 10, then we want to basically scroll down by 9.  But a bit
         //    differently, I think; and we'll want to double-check assumptions other functions are making, in
         //    case anyone's assuming we can't have a scrollback buffer while not being at the bottom.
-        else if ((i.key == 'l' || i.key == 'L') && !i.alt && i.ctrl) // How shall this interact with scrolling?
-            clearScreen();
+        // else if ((i.key == 'l' || i.key == 'L') && !i.alt && i.ctrl) // How shall this interact with scrolling?
+        //     clearScreen();
     }
     ints_okay();
 }
