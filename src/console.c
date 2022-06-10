@@ -81,7 +81,8 @@
 // Okay, but I guess I need the list_node?  So I need to expose that outside of the list implementation?  Well, I guess I can do
 //   like I did with ForEachNewListItem(), and expose it as an opaque continuation object.
 struct vterm {
-    uint8_t* cur;
+    uint8_t* cur_p;
+    uint64_t cur_i;
     uint64_t line;
     struct list* buf;
     void* cur_page;
@@ -101,11 +102,7 @@ static inline void addPage(uint8_t term) {
 }
 
 static inline uint64_t curPositionInScreen(uint8_t term) {
-    uint8_t* cp = (uint8_t*) listItem(terms[term].cur_page);
-    if (terms[term].cur >= cp && terms[term].cur <= cp + LINES * 160)
-        return terms[term].cur - (uint8_t*) listItem(terms[term].cur_page) - terms[term].line % LINES * 160;
-    else
-        return terms[term].cur - (uint8_t*) listItem(nextNode(terms[term].cur_page)) + (LINES - terms[term].line % LINES) * 160;
+    return terms[term].cur_i - terms[term].line * 160;
 }
 
 static inline void updateCursorPosition() {
@@ -242,8 +239,10 @@ static void syncScreen() {
 }
 
 static inline void printcc(uint8_t term, uint8_t c, uint8_t cl) {
-    *(terms[term].cur++) = c;
-    *(terms[term].cur++) = cl;
+    *(terms[term].cur_p++) = c;
+    *(terms[term].cur_p++) = cl;
+
+    terms[term].cur_i += 2;
 }
 
 static inline void printCharColor(uint8_t term, uint8_t c, uint8_t color) {
@@ -256,12 +255,9 @@ static inline void printCharColor(uint8_t term, uint8_t c, uint8_t color) {
     }
 
     if (curPositionInScreen(term) == LINES * 160) {
-        com1_print("Let's advance by a line\n");
         if (terms[term].line % LINES == 0) {
-            com1_print("Let's add a page\n");
             addPage(term);
-            terms[term].cur = listItem(nextNode(terms[term].cur_page));
-            com1_printf("cur is now: %h\n", terms[term].cur);
+            terms[term].cur_p = listItem(nextNode(terms[term].cur_page));
         }
 
         terms[term].line++;
@@ -337,7 +333,12 @@ static void showTerm(uint8_t t) {
         terms[t].buf = newList();
         addPage(t);
         terms[t].cur_page = listHead(terms[t].buf);
-        terms[t].cur = listItem(terms[t].cur_page);
+        terms[t].cur_p = listItem(terms[t].cur_page);
+        terms[t].cur_i = 0;
+
+        if (t == LOGS) {
+            // Write logs into buffer (after this, they'll be written as they happen?)
+        }
     }
 
     syncScreen();
