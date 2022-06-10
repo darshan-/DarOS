@@ -41,7 +41,7 @@
 
 #define LOGS LOGS_TERM
 
-#define TERM_COUNT 7 // One of which is logs
+#define TERM_COUNT 10 // One of which is logs
 
 /*
   Okay, I think I like the idea of each vterm being backed by one linked list of pages of memory, not a combination of the VRAM
@@ -192,14 +192,14 @@ static void setStatusBar() {
     registerPeriodicCallback((struct periodic_callback) {2, 1, updateMemUse});
 }
 
-static void clearScreen() {
-    no_ints();
+// static void clearScreen() {
+//     no_ints();
 
-    for (uint64_t* v = (uint64_t*) VRAM; v < (uint64_t*) STATUS_LINE; v++)
-        *v = 0x0700070007000700ull;
+//     for (uint64_t* v = (uint64_t*) VRAM; v < (uint64_t*) STATUS_LINE; v++)
+//         *v = 0x0700070007000700ull;
 
-    ints_okay();
-}
+//     ints_okay();
+// }
 
 // We want to only update screen when done with current update.
 // For a keypress we're only adding a character. But something might right multiple characters, multiple lines, or even multiple pages
@@ -344,7 +344,7 @@ static void showTerm(uint8_t t) {
 
     syncScreen();
 
-    if (t != LOGS && terms[at].cur_i / 160 - terms[t].line == LINES - 1 || terms[t].line == 0)
+    if (t != LOGS && (terms[at].cur_i / 160 - terms[t].line == LINES - 1 || terms[t].line == 0))
         showCursor();
 }
 
@@ -421,20 +421,12 @@ static void scrollDownBy(uint64_t n) {
 //   (If I switch to page tables, ctrl-pgup to jump up 10 pages, ctrl-pgdn to jump down 10 pages?)
 //   ctrl-l to work how I want
 //   ctrl-left and ctrl-right to move between vterms?
+
 static void gotInput(struct input i) {
     no_ints();
-    if (i.key == '1' && !i.alt && i.ctrl)
-        showTerm(1);
-    else if (i.key == '2' && !i.alt && i.ctrl)
-        showTerm(2);
-    else if (i.key == '3' && !i.alt && i.ctrl)
-        showTerm(3);
-    else if (i.key == '4' && !i.alt && i.ctrl)
-        showTerm(4);
-    else if (i.key == '5' && !i.alt && i.ctrl)
-        showTerm(5);
-    else if (i.key == '6' && !i.alt && i.ctrl)
-        showTerm(6);
+
+    if (i.key >= '0' && i.key <= '9' && !i.alt && i.ctrl)
+        showTerm(i.key - '0');
 
     else if (i.key == KEY_UP && !i.alt && !i.ctrl)
         scrollUpBy(1);
@@ -458,9 +450,6 @@ static void gotInput(struct input i) {
             if (i.key == 'f')
                 log("f was typed\n");
         }
-
-        else if (i.key == '0' && !i.alt && i.ctrl)
-            showTerm(0);
 
         // TODO: Nope, not clearScreen() anymore, since we have scrollback.
         //   We'll want to scroll, kind of, but differently from advanceLine() and scrollDown(), by our line
