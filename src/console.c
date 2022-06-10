@@ -260,10 +260,14 @@ static inline void ensureTerm(uint8_t t) {
         terms[t].cur_p = listItem(terms[t].cur_page);
         terms[t].cur_i = 0;
 
-        if (t == LOGS_TERM)
+        if (t == LOGS_TERM) {
             printColorTo(t, "- Start of logs -\n", 0x0f);
-        else
-            printColorTo(t, "Ready!\n", 0x0d);
+        } else {
+            char* s = M_sprintf(" (#%u)\n", t);
+            printColorTo(t, "Ready!", 0x0d);
+            printColorTo(t, s, 0x03);
+            free(s);
+        }
     }
     ints_okay();
 }
@@ -407,6 +411,16 @@ static void gotInput(struct input i) {
     no_ints();
     if (i.key == '1' && !i.alt && i.ctrl)
         showTerm(1);
+    else if (i.key == '2' && !i.alt && i.ctrl)
+        showTerm(2);
+    else if (i.key == '3' && !i.alt && i.ctrl)
+        showTerm(3);
+    else if (i.key == '4' && !i.alt && i.ctrl)
+        showTerm(4);
+    else if (i.key == '5' && !i.alt && i.ctrl)
+        showTerm(5);
+    else if (i.key == '6' && !i.alt && i.ctrl)
+        showTerm(6);
 
     else if (i.key == KEY_UP && !i.alt && !i.ctrl)
         scrollUpBy(1);
