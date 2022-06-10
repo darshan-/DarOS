@@ -39,6 +39,12 @@ void* listHead(struct list* l) {
     return l->head;
 }
 
+void* listTail(struct list* l) {
+    if (!l) return 0;
+
+    return l->tail;
+}
+
 void* nextNode(void* ln) {
     if (!ln) return 0;
 
