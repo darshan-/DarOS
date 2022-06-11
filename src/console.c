@@ -82,32 +82,34 @@
 struct vterm {
     uint8_t* buf[2048];
 
-    uint64_t line;     // 0-based line index of top line (how many lines are above screen)
-    uint64_t v_offset; // Vertical offset to support ctrl-l
-
-    uint64_t cur;      // Index of cursor (edit point)
-    uint64_t anchor;   // Index after last non-editable character
-    uint64_t end;      // Index after last character
+    uint64_t top;    // Index of top line in screen (how many characters are above screen)
+    uint64_t off;    // Offset to support ctrl-l
+    uint64_t cur;    // Index of cursor (edit point)
+    uint64_t anchor; // Index after last non-editable character
+    uint64_t end;    // Index after last character
 };
 
 static uint8_t at = 255;
 
 static struct vterm terms[TERM_COUNT];
 
-#define pageb(t, b) terms[t].buf[terms[t].b % (LINES * 160)]
-#define cur_page(t) terms[t].buf[terms[t].line % LINES]
-#define next_page(t) terms[t].buf[terms[t].line % LINES + 1]
+#define page_top(t) terms[t].buf[terms[t].top % (LINES * 160)]
+//#define page_after_top(t) terms[t].buf[terms[t].top % (LINES * 160) + 1]
+#define page_cur(t) terms[t].buf[terms[t].cur % (LINES * 160)]
 
 static inline void addPage(uint8_t term) {
     uint64_t* p = malloc(LINES * 160);
-    pageb(term, end) = (uint8_t*) p;
+    page_cur(term) = (uint8_t*) p;
+
+    if (term == 1)
+        com1_printf("Added term1 page @0x%h\n", p);
 
     for (int i = 0; i < LINES * 20; i++)
         *p++ = 0x0700070007000700ull;
 }
 
 static inline uint64_t curPositionInScreen(uint8_t term) {
-    return terms[term].cur - terms[term].line * 160;
+    return terms[term].cur - terms[term].top;
 }
 
 static inline void updateCursorPosition() {
@@ -120,6 +122,9 @@ static inline void updateCursorPosition() {
 }
 
 static inline void showCursor() {
+    if (curPositionInScreen(at) >= LINES * 160)
+        return;
+
     outb(0x3D4, 0x0A);
     outb(0x3D5, (inb(0x3D5) & 0xC0) | 13);
  
@@ -212,16 +217,22 @@ static void setStatusBar() {
 //   but I can probably work something reasonable out.
 
 static void syncScreen() {
-    const uint64_t pg_line = terms[at].line % LINES;
+    const uint64_t pos_in_pg = terms[at].top % (LINES * 160) / 8;
     uint64_t* v = (uint64_t*) VRAM;
-    uint64_t* p = (uint64_t*) cur_page(at) + pg_line * 20;
+    uint64_t* p = (uint64_t*) page_top(at) + pos_in_pg;
 
-    for (uint64_t i = 0; i < (LINES - pg_line) * 20; i++)
+    if (at == 1)
+        com1_printf("Copying from term1 page @0x%h\n", p);
+
+    com1_printf("pos_in_pg: %u\n", pos_in_pg);
+    uint64_t i;
+    for (i = 0; i < (LINES * 20) - pos_in_pg; i++)
         *v++ = *p++;
 
-    p = (uint64_t*) next_page(at);
+    //p = (uint64_t*) page_after_top(at);
+    p = (uint64_t*) page_cur(at);
 
-    for (uint64_t i = 0; i < pg_line * 20; i++)
+    for (; i < LINES * 20; i++)
         *v++ = *p++;
 
     updateCursorPosition();
@@ -243,8 +254,7 @@ static void syncScreen() {
 // }
 
 static inline void printcc(uint8_t term, uint8_t c, uint8_t cl) {
-    //*((uint16_t*) pageb(term, cur) + terms[term].cur % (LINES * 160) / 2) = (cl << 8) | c;
-    *((uint16_t*) cur_page(term) + terms[term].cur % (LINES * 160) / 2) = (cl << 8) | c;
+    *((uint16_t*) page_cur(term) + terms[term].cur % (LINES * 160) / 2) = (cl << 8) | c;
     terms[term].cur += 2;
 }
 
@@ -258,10 +268,10 @@ static inline void printCharColor(uint8_t term, uint8_t c, uint8_t color) {
     }
 
     if (curPositionInScreen(term) == LINES * 160) {
-        if (terms[term].line % LINES == 0)
+        if (terms[term].top % (LINES * 160) == 0)
             addPage(term);
 
-        terms[term].line++;
+        terms[term].top += 160;
     }        
 }
 
@@ -351,7 +361,10 @@ static void showTerm(uint8_t t) {
 
     syncScreen();
 
-    if (t != LOGS && (terms[at].cur / 160 - terms[t].line == LINES - 1 || terms[t].line == 0))
+    //if (t != LOGS && (terms[at].cur / 160 - terms[t].line == LINES - 1 || terms[t].top == 0))
+    //if (t != LOGS && terms[at].cur - terms[t].top < LINES * 160)
+    //if (t != LOGS && curPositionInScreen() < LINES * 160)
+    if (t != LOGS)
         showCursor();
 }
 
@@ -380,31 +393,40 @@ static void showTerm(uint8_t t) {
  */
 
 static void scrollUpBy(uint64_t n) {
-    if (terms[at].line == 0 || n == 0) // Don't expect n to be zero, but the code can't handle it, and doing nothing is correct...
+    if (terms[at].top == 0 || n == 0) // Don't expect n to be zero, but the code can't handle it, and doing nothing is correct...
         return;
 
     hideCursor();
 
-    if (n > terms[at].line)
-        n = terms[at].line;
+    if (n > terms[at].top / 160)
+        n = terms[at].top / 160;
 
-    terms[at].line -= n;
+    terms[at].top -= n * 160;
 
     syncScreen();
 }
 
 static void scrollDownBy(uint64_t n) {
-    if (terms[at].cur / 160 < LINES || terms[at].cur / 160 - terms[at].line == LINES - 1 || n == 0)
+    //if (terms[at].cur / 160 < LINES || terms[at].cur / 160 - terms[at].line == LINES - 1 || n == 0)
+    if (curPositionInScreen(at) < LINES * 160 || n == 0)
         return;
 
-    if (n > terms[at].cur / 160 - LINES + 1 - terms[at].line)
-        n = terms[at].cur / 160 - LINES + 1 - terms[at].line;
+    // curPositionInScreen(at) - (n * 160) = LINES * 160;
+    // curPositionInScreen(at) = (LINES * 160) + (n * 160);
+    // curPositionInScreen(at) = 160 * (LINES + n);
+    // curPositionInScreen(at) / 160 = LINES + n;
+    // n = curPositionInScreen(at) / 160 - LINES;
+    // if (n > terms[at].cur / 160 - LINES + 1 - terms[at].line)
+    //     n = terms[at].cur / 160 - LINES + 1 - terms[at].line;
 
-    terms[at].line += n;
+    if (n > curPositionInScreen(at) / 160 - LINES)
+        n = curPositionInScreen(at) / 160 - LINES;
+
+    terms[at].top += n * 160;
 
     syncScreen();
 
-    if (at != LOGS && terms[at].cur / 160 - terms[at].line == LINES - 1)
+    if (at != LOGS)
         showCursor();
 }
 
@@ -482,8 +504,9 @@ void startTty() {
 
     init_keyboard();
     registerKbdListener(&gotInput);
-    syncScreen();
+    //syncScreen();
     setStatusBar();
     showCursor();
     ints_okay();
+    __asm__ __volatile__("cli\nhlt");
 };
