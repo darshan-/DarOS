@@ -94,17 +94,11 @@ static uint8_t at = 255;
 static struct vterm terms[TERM_COUNT];
 
 #define page_top(t) terms[t].buf[terms[t].top / (LINES * 160)]
-//#define page_after_top(t) terms[t].buf[terms[t].top % (LINES * 160) + 1]
 #define page_cur(t) terms[t].buf[terms[t].cur / (LINES * 160)]
 
 static inline void addPage(uint8_t term) {
     uint64_t* p = malloc(LINES * 160);
     page_cur(term) = (uint8_t*) p;
-
-    if (term == 1) {
-        com1_printf("Added term1 page @0x%h\n", p);
-        com1_printf("page_cur(1) is now: 0x%h\n", page_cur(term));
-    }
 
     for (int i = 0; i < LINES * 20; i++)
         *p++ = 0x0700070007000700ull;
@@ -223,15 +217,10 @@ static void syncScreen() {
     uint64_t* v = (uint64_t*) VRAM;
     uint64_t* p = (uint64_t*) page_top(at) + pos_in_pg;
 
-    if (at == 1)
-        com1_printf("Copying from term1 page @0x%h\n", p);
-
-    com1_printf("pos_in_pg: %u\n", pos_in_pg);
     uint64_t i;
     for (i = 0; i < (LINES * 20) - pos_in_pg; i++)
         *v++ = *p++;
 
-    //p = (uint64_t*) page_after_top(at);
     p = (uint64_t*) page_cur(at);
 
     for (; i < LINES * 20; i++)
@@ -240,29 +229,8 @@ static void syncScreen() {
     updateCursorPosition();
 }
 
-// static inline void printcc(uint8_t term, uint8_t c, uint8_t cl) {
-//     uint8_t* p;
-//     // Decide of cur is in cur_page or next page
-//     uint8_t* p = listItem(terms[term].cur_page);
-//     p += terms[term].cur % (LINES * 160);
-//     *p++ = c;
-//     *p = cl;
-//     //uint16_t* p = listItem(terms[term].cur_page);
-//     //p += terms[term].cur % (LINES * 160) / 2;
-
-//     //*p = (cl << 8) | c;
-
-//     terms[term].cur += 2;
-// }
-
 static inline void printcc(uint8_t term, uint8_t c, uint8_t cl) {
-    if (term == 1) com1_printf("printcc: page_cur(1) is now: 0x%h\n", page_cur(term));
     *((uint16_t*) page_cur(term) + terms[term].cur % (LINES * 160) / 2) = (cl << 8) | c;
-    if (term == 1 && c > 0) {
-        char* s = "' '";
-        s[1] = c;
-        com1_printf("Wrote char %s to term1 (0x%h) @0x%h\n", s, page_cur(term), page_cur(term) + terms[term].cur % (LINES * 160) / 2);
-    }
     terms[term].cur += 2;
 }
 
@@ -369,9 +337,6 @@ static void showTerm(uint8_t t) {
 
     syncScreen();
 
-    //if (t != LOGS && (terms[at].cur / 160 - terms[t].line == LINES - 1 || terms[t].top == 0))
-    //if (t != LOGS && terms[at].cur - terms[t].top < LINES * 160)
-    //if (t != LOGS && curPositionInScreen() < LINES * 160)
     if (t != LOGS)
         showCursor();
 }
@@ -401,7 +366,7 @@ static void showTerm(uint8_t t) {
  */
 
 static void scrollUpBy(uint64_t n) {
-    if (terms[at].top == 0 || n == 0) // Don't expect n to be zero, but the code can't handle it, and doing nothing is correct...
+    if (terms[at].top == 0)
         return;
 
     hideCursor();
@@ -415,17 +380,8 @@ static void scrollUpBy(uint64_t n) {
 }
 
 static void scrollDownBy(uint64_t n) {
-    //if (terms[at].cur / 160 < LINES || terms[at].cur / 160 - terms[at].line == LINES - 1 || n == 0)
-    if (curPositionInScreen(at) < LINES * 160 || n == 0)
+    if (curPositionInScreen(at) < LINES * 160)
         return;
-
-    // curPositionInScreen(at) - (n * 160) = LINES * 160;
-    // curPositionInScreen(at) = (LINES * 160) + (n * 160);
-    // curPositionInScreen(at) = 160 * (LINES + n);
-    // curPositionInScreen(at) / 160 = LINES + n;
-    // n = curPositionInScreen(at) / 160 - LINES;
-    // if (n > terms[at].cur / 160 - LINES + 1 - terms[at].line)
-    //     n = terms[at].cur / 160 - LINES + 1 - terms[at].line;
 
     if (n > curPositionInScreen(at) / 160 - LINES)
         n = curPositionInScreen(at) / 160 - LINES;
@@ -508,12 +464,9 @@ void startTty() {
     log("Starting tty\n");
 
     no_ints();
-    showTerm(1);
-
     init_keyboard();
     registerKbdListener(&gotInput);
-    //syncScreen();
     setStatusBar();
-    showCursor();
+    showTerm(1);
     ints_okay();
 };
