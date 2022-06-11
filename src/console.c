@@ -11,27 +11,6 @@
 #include "rtc.h"
 #include "strings.h"
 
-/*
-  Hmm, it would be pretty easy to have a scrollback buffer...
-  When advancing a line, before copying the second line into the first, copy the first
-    to the end of the scrollback buffer.  Bind up and down arrows (or however you'd like
-    the UI to be) to a scroll function... well, advanceLine *would* be the scroll down
-    function, essentially.
-  Hmm, either that, or actually waste a little memory if it makes it easier, and have
-    *full* terminal buffer, not just scrollback buffer, and scrolling copies relevant
-    part in.  I like that, and it would make it easier to have multiple terminals --
-    which was the thought that spurred this thought -- I had the thought that I might
-    like a log terminal, to use like I use the serial console, but with color.  I'm not
-    sure, but I like the idea of flagging in red certain things, for example.  So multiple
-    terminals, each with a complete buffer in memory, and scrolling or switching buffers
-    is just a matter of what I copy into vram.
- */
-
-// I'd planned on 25 lines per buffer page, as it fits in 4096-byte malloc page, but clearing/copying with 64-bit words means we need
-//   an even number of lines, so 24 is easier.  And it turn out to be otherwise convenient to have visible lines the same as buffer
-//   pages, like checking if we're at the bottom by there being no next page.  Obviously things will get more complicated again if I
-//   eve want to remove the bottom status bar or add a top bar or anything.  But for now, lets go with just LINES for both things...
-
 #define VRAM ((uint8_t*) 0xb8000)
 #define LINES 24
 #define LINE(l) (VRAM + 160 * (l))
@@ -42,42 +21,6 @@
 #define LOGS LOGS_TERM
 
 #define TERM_COUNT 10 // One of which is logs
-
-/*
-  Okay, I think I like the idea of each vterm being backed by one linked list of pages of memory, not a combination of the VRAM
-    itself (or the array backing that up) and two linked lists of lines.  And we never write directly to screen, only to the backing
-    store, which we then sync to the display.
-
-  I probably want pages larger than 4K (about one screenful), so I'll want to improve malloc soon.
-
-  But for now we can, I think, clean up, simplify, and increase performance by using either a linked list of 4000-byte pages (25x160)
-    or an array of addresses of such pages.
-
-  Since for this, we don't have anything curses like, whether in terminal or logs, we only write to the bottom.  Instead of worrying
-    abou scrolling while writing, we only worry about finishing a page and starting a new one.  Then we scroll by adjusting the window
-    if necessary.
-
-  My hypothesis is that video memory is slower than normal RAM, so scrolling by reading and writing from/to vram is slower then what we
-    hopefully will see when we never read from video RAM, just do one screenful of writes.  (I guess for some writes we do just want to
-    add something to blank space on the screen, so that'll have to be worked out, but all in all, I think this will be cleaner code and
-    more effiecient.)
-
-  I do rather like the idea of an array of heads -- a page table.  So we can jump wherever we want easily.  Although I supposed a doubly
-    linked list is good enough too.  We either want to jump to the beginning (head) end (tail), next page (next) or preview page (prev).
-    We otherwise don't jump to any arbitrary location.  As long as I store head and tail of list, and prev and next in each node, it
-    seems it would work fine.  But for some reason the array seems nicer or easier somehow...  Maybe I just prefer subscripts and
-    arithmetic rather than using arrow operators on struct pointers?
-
-  I'd still be limited right now by max 4096 malloc, unless I had mulitple arrays or used a static fixed one.  Most dynamic option
-    currently then is that doubly linked list then, I guess.
- */
-
-// Oh, we *will* want to jump to an arbitrary page, if we go away and come back, unless we keep a pointer to a currently shown page,
-//   which I guess was the idea, which is why I had in mind we'll never *jump* to an arbitrary page.  So yeah, point is, keep another
-//   pointer in here, and scroll position.
-//
-// Okay, so `line' will be the line at the top of the screen, so that combined with `cur' will uniquely identify what page
-//   `page' is.
 
 struct vterm {
     uint8_t* buf[2048];
@@ -199,21 +142,6 @@ static void setStatusBar() {
     registerPeriodicCallback((struct periodic_callback) {2, 1, updateMemUse});
 }
 
-// static void clearScreen() {
-//     no_ints();
-
-//     for (uint64_t* v = (uint64_t*) VRAM; v < (uint64_t*) STATUS_LINE; v++)
-//         *v = 0x0700070007000700ull;
-
-//     ints_okay();
-// }
-
-// We want to only update screen when done with current update.
-// For a keypress we're only adding a character. But something might right multiple characters, multiple lines, or even multiple pages
-//   at once, we we don't want to do anything with the screen until the end of that call.
-// So I guess have the exported function call sync at the very end?  It complicates exported functions using other exported functions,
-//   but I can probably work something reasonable out.
-
 static void syncScreen() {
     const uint64_t pos_in_pg = terms[at].top % (LINES * 160) / 8;
     uint64_t* v = (uint64_t*) VRAM;
@@ -306,13 +234,6 @@ void printf(char* fmt, ...) {
     VARIADIC_PRINT(print);
 }
 
-//void readline(void (*lineread)(char*))) { // how would we pass it back without dynamic memory allocation?
-    // Set read start cursor location (which scrolls up with screen if input is over one line (with issue of
-    //    what to do if it's a whole screenful undecided for now)).
-    // Tell keyboard we're in input mode; when newline is entered (or ctrl-c, ctrl-d, etc.?), it calls a
-    //   different callback that we pass to it? (Which calls this callback?)
-//}
-
 static void scrollDownBy(uint64_t n);
 
 static inline void scrollToBottom() {
@@ -341,30 +262,6 @@ static void showTerm(uint8_t t) {
     if (t != LOGS)
         showCursor();
 }
-
-/*
-  I'm pretty confident that logs as terminal 2 is just a temporary hack, and the issues I have with it (starting
-  at the beginning every time seems wrong, but so is anything else; logs can be added while we're away, and keeping
-  track of which ones we've printed and which we haven't is hairy), I just think isn't worth it.  I think multiple
-  consoles/terminals sounds great, and a command to page through logs sounds great.  With multiple terminals, things
-  will only be written to them while we're there.  (Or, huh, is that a bad limitation too?  Do I really want an extra
-  level if indirection, so an app running on terminal 3 can write to terminal 3 while we're at terminal 1, and when
-  we go back to terminal 3, we see what was output while we were away?  Ultimately, yeah, I guess that's what we'd
-  want.  A buffer of some sort?  Instead of printing to the screen, it'd be printing to whatever terminal it's
-  running on, and that's copied to the terminal right away if we're there, otherwise it's copied in once we switch
-  back to it.  I guess writing to the terminal automatically scrolls us to bottom?  I think linux works that way; it
-  feels pretty intuitive.  So we can move away and come back and still be scrolled wherever, as long as nothing was
-  output, but if anything got written to the screen, we'll lose that position and be at the bottom.  I think as far
-  as incremental improvements, it's still okay and in the spirit of things to not ever-engineer this, and just keep
-  having fun and doing what makes sense and is interesting for now.)
- */
-
-/*
-  I think I want to do the ugly, easy thing for now, and just special case the main console and log console, and
-  not worry about process output stuff yet.  So a scrollback and scrollahead buffer for whichever console I'm on,
-  and store/restore those when moving from/to main console, but just recreate log one on demand.  It's the wrong
-  model, but I think the best/easiest/funnest thing short term.
- */
 
 static void scrollUpBy(uint64_t n) {
     if (terms[at].top == 0)
