@@ -174,6 +174,7 @@ void keyScanned(uint8_t c) {
         shifty(0x1a, '[', '{');
         shifty(0x1b, ']', '}');
 
+        map(0x0e, si('\b'));
         map(0x1c, si('\n'));
 
         capsy(0x1e, 'a', 'A');

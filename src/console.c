@@ -38,6 +38,7 @@ static struct vterm terms[TERM_COUNT];
 
 #define page_for(t, i) terms[t].buf[(i) / (LINES * 160)]
 #define page_after(t, i) page_for(t, i + LINES * 160)
+#define page_before(t, i) page_for(t, i - LINES * 160)
 #define page_top(t) page_for(t, terms[t].top)
 #define page_cur(t) page_for(t, terms[t].cur)
 
@@ -187,7 +188,20 @@ static inline void backspace() {
     if (terms[at].anchor == terms[at].cur)
         return;
 
-    
+    uint8_t* p;
+    if (terms[at].cur % (LINES * 160) == 0)
+        p = page_before(at, terms[at].cur);
+    else
+        p = page_cur(at);
+
+    *((uint16_t*) p + terms[at].cur % (LINES * 160) / 2 - 1) = 0x0700;
+    terms[at].cur -= 2;
+
+    syncScreen();
+}
+
+// ctrl-u
+static inline void clearInput() {
 }
 
 static inline void printCharColor(uint8_t term, uint8_t c, uint8_t color) {
@@ -357,6 +371,8 @@ static void gotInput(struct input i) {
                 log("d was typed\n");
             if (i.key == 'f')
                 log("f was typed\n");
+        } else if (i.key == '\b' && !i.alt && !i.ctrl) {
+            backspace();
         }
 
         // TODO: Nope, not clearScreen() anymore, since we have scrollback.
