@@ -383,8 +383,8 @@ static void scrollDownBy(uint64_t n) {
     if (curPositionInScreen(at) < LINES * 160)
         return;
 
-    if (n > curPositionInScreen(at) / 160 - LINES)
-        n = curPositionInScreen(at) / 160 - LINES;
+    if (n > curPositionInScreen(at) / 160 - LINES + 1)
+        n = curPositionInScreen(at) / 160 - LINES + 1;
 
     terms[at].top += n * 160;
 
