@@ -243,12 +243,11 @@ static inline void printCharColor(uint8_t term, uint8_t c, uint8_t color) {
         printcc(term, c, color);
     }
 
-    if (curPositionInScreen(term) == LINES * 160) {
-        if (terms[term].top % (LINES * 160) == 0)
-            addPage(term);
+    if (terms[term].cur % (LINES * 160) == 0)
+        addPage(term);
 
+    if (curPositionInScreen(term) == LINES * 160)
         terms[term].top += 160;
-    }        
 }
 
 static inline void ensureTerm(uint8_t t) {
