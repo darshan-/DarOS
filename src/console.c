@@ -350,8 +350,15 @@ static void scrollDownBy(uint64_t n) {
 //     - lines m - n?
 //     - positions m - n?
 
+static void prompt() {
+    if (terms[at].cur % 160 != 0)
+        print("\n");
+
+    printColor("$ ", 0x05);
+}
+
 static inline int isPrintable(uint8_t c) {
-    return ((c >= ' ' && c <= '~') || c == '\n');
+    return c >= ' ' && c <= '~';
 }
 
 static void gotInput(struct input i) {
@@ -395,6 +402,8 @@ static void gotInput(struct input i) {
                 log("f was typed\n");
         } else if (i.key == '\b' && !i.alt && !i.ctrl) {
             backspace();
+        } else if (i.key == '\n' && !i.alt && !i.ctrl) {
+            prompt();
         }
 
         // TODO: Nope, not clearScreen() anymore, since we have scrollback.
@@ -416,5 +425,6 @@ void startTty() {
     registerKbdListener(&gotInput);
     setStatusBar();
     showTerm(1);
+    prompt();
     ints_okay();
 };
