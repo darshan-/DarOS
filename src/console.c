@@ -213,7 +213,10 @@ static inline void backspace() {
     else
         p = page_cur(at);
 
-    *((uint16_t*) p + terms[at].cur % (LINES * 160) / 2 - 1) = 0x0700;
+    if (terms[at].cur % 160 == 0 && terms[at].top != 0)
+        terms[at].top -= 160;
+
+    *((uint16_t*) p + (terms[at].cur - 2) % (LINES * 160) / 2) = 0x0700;
     terms[at].cur -= 2;
 
     syncScreen();
