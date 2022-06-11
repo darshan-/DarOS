@@ -142,6 +142,23 @@ static void setStatusBar() {
     registerPeriodicCallback((struct periodic_callback) {2, 1, updateMemUse});
 }
 
+static inline void ensureTerm(uint8_t t) {
+    no_ints();
+    if (!terms[t].buf[0]) {
+        addPage(t);
+
+        if (t == LOGS_TERM) {
+            printColorTo(t, "- Start of logs -\n", 0x0f);
+        } else {
+            char* s = M_sprintf(" (#%u)\n", t);
+            printColorTo(t, "Ready!", 0x0d);
+            printColorTo(t, s, 0x0b);
+            free(s);
+        }
+    }
+    ints_okay();
+}
+
 static void syncScreen() {
     const uint64_t pos_in_pg = terms[at].top % (LINES * 160) / 8;
     uint64_t* v = (uint64_t*) VRAM;
@@ -180,23 +197,6 @@ static inline void printCharColor(uint8_t term, uint8_t c, uint8_t color) {
         terms[term].top += 160;
 }
 
-static inline void ensureTerm(uint8_t t) {
-    no_ints();
-    if (!terms[t].buf[0]) {
-        addPage(t);
-
-        if (t == LOGS_TERM) {
-            printColorTo(t, "- Start of logs -\n", 0x0f);
-        } else {
-            char* s = M_sprintf(" (#%u)\n", t);
-            printColorTo(t, "Ready!", 0x0d);
-            printColorTo(t, s, 0x0b);
-            free(s);
-        }
-    }
-    ints_okay();
-}
-
 void printColorTo(uint8_t t, char* s, uint8_t c) {
     no_ints();
 
@@ -204,6 +204,8 @@ void printColorTo(uint8_t t, char* s, uint8_t c) {
 
     while (*s != 0)
         printCharColor(t, *s++, c);
+
+    terms[t].anchor = terms[t].cur;
 
     ints_okay();
 }
@@ -226,6 +228,7 @@ void print(char* s) {
 void printc(char c) {
     no_ints();
     printCharColor(at, c, 0x07);
+    terms[at].anchor = terms[at].cur;
     syncScreen();
     ints_okay();
 }
@@ -339,7 +342,7 @@ static void gotInput(struct input i) {
     else if (at > 0) {
         if (isPrintable(i.key) && !i.alt && !i.ctrl) {
             scrollToBottom();
-            printc(i.key);
+            printCharColor(at, i.key, 0x07);
             syncScreen();
             if (i.key == 'd')
                 log("d was typed\n");
