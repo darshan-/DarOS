@@ -36,10 +36,10 @@ static uint8_t at = 255;
 
 static struct vterm terms[TERM_COUNT];
 
-#define page_for(t, f) terms[t].buf[terms[t].f / (LINES * 160)]
-#define page_after(t, f) terms[t].buf[terms[t].f / (LINES * 160) + 1]
-#define page_top(t) page_for(t, top)
-#define page_cur(t) page_for(t, cur)
+#define page_for(t, i) terms[t].buf[(i) / (LINES * 160)]
+#define page_after(t, i) page_for(t, i + LINES * 160)
+#define page_top(t) page_for(t, terms[t].top)
+#define page_cur(t) page_for(t, terms[t].cur)
 
 static inline void addPage(uint8_t term) {
     uint64_t* p = malloc(LINES * 160);
@@ -168,7 +168,7 @@ static void syncScreen() {
     for (i = 0; i < (LINES * 20) - pos_in_pg; i++)
         *v++ = *p++;
 
-    p = (uint64_t*) page_after(at, top);
+    p = (uint64_t*) page_after(at, terms[at].top);
 
     for (; i < LINES * 20; i++)
         *v++ = *p++;
@@ -179,6 +179,15 @@ static void syncScreen() {
 static inline void printcc(uint8_t term, uint8_t c, uint8_t cl) {
     *((uint16_t*) page_cur(term) + terms[term].cur % (LINES * 160) / 2) = (cl << 8) | c;
     terms[term].cur += 2;
+}
+
+// This *may* make sense to apply to non-active terminals, or even to handle a \b in a string for printing.
+// But for now, I'm not sure if that's the case; let's just handle explicit backspace key pressed at console.
+static inline void backspace() {
+    if (terms[at].anchor == terms[at].cur)
+        return;
+
+    
 }
 
 static inline void printCharColor(uint8_t term, uint8_t c, uint8_t color) {
