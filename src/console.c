@@ -93,8 +93,10 @@ static uint8_t at = 255;
 
 static struct vterm terms[TERM_COUNT];
 
-#define page_top(t) terms[t].buf[terms[t].top / (LINES * 160)]
-#define page_cur(t) terms[t].buf[terms[t].cur / (LINES * 160)]
+#define page_for(t, f) terms[t].buf[terms[t].f / (LINES * 160)]
+#define page_after(t, f) terms[t].buf[terms[t].f / (LINES * 160) + 1]
+#define page_top(t) page_for(t, top)
+#define page_cur(t) page_for(t, cur)
 
 static inline void addPage(uint8_t term) {
     uint64_t* p = malloc(LINES * 160);
@@ -221,7 +223,7 @@ static void syncScreen() {
     for (i = 0; i < (LINES * 20) - pos_in_pg; i++)
         *v++ = *p++;
 
-    p = (uint64_t*) page_cur(at);
+    p = (uint64_t*) page_after(at, top);
 
     for (; i < LINES * 20; i++)
         *v++ = *p++;
