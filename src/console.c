@@ -93,16 +93,18 @@ static uint8_t at = 255;
 
 static struct vterm terms[TERM_COUNT];
 
-#define page_top(t) terms[t].buf[terms[t].top % (LINES * 160)]
+#define page_top(t) terms[t].buf[terms[t].top / (LINES * 160)]
 //#define page_after_top(t) terms[t].buf[terms[t].top % (LINES * 160) + 1]
-#define page_cur(t) terms[t].buf[terms[t].cur % (LINES * 160)]
+#define page_cur(t) terms[t].buf[terms[t].cur / (LINES * 160)]
 
 static inline void addPage(uint8_t term) {
     uint64_t* p = malloc(LINES * 160);
     page_cur(term) = (uint8_t*) p;
 
-    if (term == 1)
+    if (term == 1) {
         com1_printf("Added term1 page @0x%h\n", p);
+        com1_printf("page_cur(1) is now: 0x%h\n", page_cur(term));
+    }
 
     for (int i = 0; i < LINES * 20; i++)
         *p++ = 0x0700070007000700ull;
@@ -254,7 +256,13 @@ static void syncScreen() {
 // }
 
 static inline void printcc(uint8_t term, uint8_t c, uint8_t cl) {
+    if (term == 1) com1_printf("printcc: page_cur(1) is now: 0x%h\n", page_cur(term));
     *((uint16_t*) page_cur(term) + terms[term].cur % (LINES * 160) / 2) = (cl << 8) | c;
+    if (term == 1 && c > 0) {
+        char* s = "' '";
+        s[1] = c;
+        com1_printf("Wrote char %s to term1 (0x%h) @0x%h\n", s, page_cur(term), page_cur(term) + terms[term].cur % (LINES * 160) / 2);
+    }
     terms[term].cur += 2;
 }
 
@@ -508,5 +516,4 @@ void startTty() {
     setStatusBar();
     showCursor();
     ints_okay();
-    __asm__ __volatile__("cli\nhlt");
 };
