@@ -40,7 +40,7 @@ uint64_t memUsed() {
                 p++;
     }
 
-    return p * 128;
+    return p * BLK_SZ;
 }
 
 // Returns number of bytes in the heap (not counting map)
@@ -82,43 +82,18 @@ void free(void *p) {
     if (p < (void*) heap || p > (void*) heap + (map_size * (64 / MAP_ENTRY_SZ) - 1) * BLK_SZ)
         return;
 
-    uint64_t b = (uint64_t) p;
-    b -= (uint64_t) heap;
-
+    uint64_t b = (uint64_t) p - (uint64_t) heap;
     uint64_t o = (b % MAP_FACTOR) / BLK_SZ * MAP_ENTRY_SZ;
     b /= MAP_FACTOR;
 
-    uint64_t entry = map[b];
-    entry >>= o;
-    uint64_t free_mask = ~(0b11ull << o);
-    uint64_t code = entry & 0b11;
+    for (uint64_t mask = 0b11ull << o;; b++, mask = 0b11ull) {
+        for (; mask && (map[b] & mask) == BPART; mask <<= 2)
+            map[b] &= ~mask;
 
-    // TODO?  We *could* check that p is a starting block by making sure the block before is marked as either
-    //  free or end of region.  I don't know if freeing a non-start block is a common error it would be helpful
-    //  to guard against.  Oh, or, for that matter, p should be a multiple of 128...  We're not even checking
-    //  that p is a block start address.  So, same deal: we can be more robust by checkign those things, but
-    //  I don't know if it's worth guarding against.  But it could catch a bug every now and then, and it would
-    //  be easy to do do...  So maybe?
-
-    if (code == BFREE) {
-        log("------------------------------Ooooooooooooooooooops!  Page is already free...\n");
-        return;
-    }
-
-    no_ints();
-    while (code == BPART) {
-        map[b] &= free_mask;
-        entry >>= 2;
-        free_mask = ~((~free_mask) << 2);
-        code = entry & 0b11;
-    }
-
-    map[b] &= free_mask;
-    ints_okay();
-
-    if (code != BEND) {
-        log("------------------------------Ooooooooooooooooooops!  Contiguous region didn't end with BEND, and we don't yet support multi-entry regions, so this shouldn't happen...\n");
-        return;
+        if ((map[b] & mask) == BEND) {
+            map[b] &= ~mask;
+            break;
+        }
     }
 }
 

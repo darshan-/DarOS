@@ -226,7 +226,6 @@ static inline void backspace() {
     syncScreen();
 }
 
-// ctrl-u
 static inline void clearInput() {
     if (terms[at].anchor == terms[at].cur)
         return;
@@ -248,11 +247,15 @@ static inline void clearInput() {
     if (terms[at].anchor != terms[at].cur) {
         uint64_t n = terms[at].cur - terms[at].anchor;
         uint16_t* q = (uint16_t*) p + (terms[at].anchor % (LINES * 160) / 2);
+
         for (uint64_t i = 0; i < n; i++)
             *q++ = 0x0700;
+
         uint64_t top_diff = (terms[at].cur / 160 - terms[at].anchor / 160) * 160;
+
         if (top_diff > terms[at].top)
             top_diff = terms[at].top;
+
         terms[at].top -= top_diff;
         terms[at].cur -= n;
     }
