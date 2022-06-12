@@ -10,9 +10,9 @@
 #define BLK_SZ 128
 #define MAP_ENTRY_SZ 2
 #define MAP_FACTOR (64 / MAP_ENTRY_SZ * BLK_SZ)
-#define BFREE 0b00
-#define BPART 0b11
-#define BEND  0b10
+#define BFREE 0b00ull
+#define BPART 0b11ull
+#define BEND  0b10ull
 
 static uint64_t map_size; // Size in quadwords
 static uint64_t* map = (uint64_t*) 0;
@@ -86,11 +86,11 @@ void free(void *p) {
     uint64_t o = (b % MAP_FACTOR) / BLK_SZ * MAP_ENTRY_SZ;
     b /= MAP_FACTOR;
 
-    for (uint64_t mask = 0b11ull << o;; b++, mask = 0b11ull) {
-        for (; mask && (map[b] & mask) == BPART; mask <<= 2)
+    for (uint64_t mask = 0b11ull << o;; b++, mask = 0b11ull, o = 0) {
+        for (; mask && (map[b] & mask) == BPART << o; mask <<= 2, o += 2)
             map[b] &= ~mask;
 
-        if ((map[b] & mask) == BEND) {
+        if ((map[b] & mask) == BEND << o) {
             map[b] &= ~mask;
             break;
         }
