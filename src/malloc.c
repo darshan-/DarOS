@@ -28,7 +28,7 @@ void init_heap(uint64_t* start, uint64_t size) {
     heap = map + map_size;
 }
 
-uint64_t memUsed() {
+uint64_t heapUsed() {
     uint64_t p = 0;
     for (uint64_t i = 0; i < map_size; i++) {
         uint64_t entry = map[i];

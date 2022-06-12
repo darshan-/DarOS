@@ -95,7 +95,7 @@ static void writeStatusBar(char* s, uint8_t loc) {
 #define MAX_MEMLEN 24
 void updateMemUse() {
     char* s;
-    uint64_t m = memUsed();
+    uint64_t m = heapUsed();
     char* unit = "bytes";
 
     if (m >= 1024) {
@@ -441,21 +441,6 @@ static void gotInput(struct input i) {
             scrollToBottom();
             printCharColor(at, i.key, 0x07);
             syncScreen();
-            static void* p = 0;
-            if (i.key == 'd') {
-                mTest();
-                if (!p)
-                    p = malloc(9999999+2);
-                mTest();
-            }
-            if (i.key == 'f' && p) {
-                free(p);
-                p = 0;
-                mTest();
-            }
-            //     log("d was typed\n");
-            // if (i.key == 'f')
-            //     log("f was typed\n");
         } else if (i.key == '\b' && !i.alt && !i.ctrl) {
             backspace();
         } else if (i.key == '\n' && !i.alt && !i.ctrl) {
