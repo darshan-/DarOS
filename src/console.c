@@ -241,9 +241,9 @@ static inline void clearInput() {
         for (int i = 0; i < LINES * 20; i++)
             *((uint64_t*) p++) = 0x0700070007000700ull;
 
-        // Do top first, as it's based on current value of cur...
-        //terms[at].top -= ?;
-        terms[at].cur -= terms[at].cur % (LINES * 160);
+        uint64_t cur_diff = terms[at].cur % (LINES * 160);
+        terms[at].top -= cur_diff / 160;;
+        terms[at].cur -= cur_diff;
 
         p = page_before(at, terms[at].cur);
     }
