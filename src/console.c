@@ -231,29 +231,29 @@ static inline void clearInput() {
     if (terms[at].anchor == terms[at].cur)
         return;
 
-    uint8_t* p;
+    uint64_t page_index = terms[at].cur / (LINES * 160);
     if (terms[at].cur % (LINES * 160) == 0)
-        p = page_before(at, terms[at].cur);
-    else
-        p = cur_page(at);
+        page_index--;
 
-    while (p != anchor_page(at)) {
+    uint8_t* p;
+    for (p = terms[at].buf[page_index]; p != anchor_page(at); p = terms[at].buf[page_index--]) {
         for (int i = 0; i < LINES * 20; i++)
             *((uint64_t*) p++) = 0x0700070007000700ull;
 
         uint64_t cur_diff = terms[at].cur % (LINES * 160);
         terms[at].top -= cur_diff / 160 * 160; // Looks funny, but seems the correct and obvious way to get whole number of lines
         terms[at].cur -= cur_diff;
-
-        p = page_before(at, terms[at].cur);
     }
 
     if (terms[at].anchor != terms[at].cur) {
         uint64_t n = terms[at].cur - terms[at].anchor;
         uint16_t* q = (uint16_t*) p + (terms[at].anchor % (LINES * 160) / 2);
-        for (int i = 0; i < n; i++)
+        for (uint64_t i = 0; i < n; i++)
             *q++ = 0x0700;
-        terms[at].top -= (terms[at].cur / 160 - terms[at].anchor / 160) * 160;
+        uint64_t top_diff = (terms[at].cur / 160 - terms[at].anchor / 160) * 160;
+        if (top_diff > terms[at].top)
+            top_diff = terms[at].top;
+        terms[at].top -= top_diff;
         terms[at].cur -= n;
     }
 
