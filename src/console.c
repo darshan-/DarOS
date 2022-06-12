@@ -376,7 +376,15 @@ static void scrollDownBy(uint64_t n) {
 
 // TODO:
 //   (If I switch to page tables, ctrl-pgup to jump up 10 pages, ctrl-pgdn to jump down 10 pages?)
-//   ctrl-l to work how I want
+//
+//   ctrl-l
+//
+//  All of these depend on being able to edit somewhere within input field before end of field, I think:
+//   ctrl-a / home
+//   ctrl-e / end
+//   ctrl-k
+//   del
+//   left arrow, right arrow
 //
 //   How much would it be worth it to invalidate regions rather than the whole screen at once?
 //     - whole screen
