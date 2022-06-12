@@ -32,7 +32,7 @@ void mTest() {
     // dumpEntries(8);
     // printf("mem use: %u\n", memUsed());
     //com1_print("Well, that's what that was!\n");
-    logf("memUsed after malloc: %u\n", memUsed());
+    com1_printf("memUsed after malloc: %u\n", memUsed());
     free(p3);
     free(p2);
     free(p1);
@@ -41,7 +41,7 @@ void mTest() {
     free(p6);
     free(p7);
     free(p8);
-    logf("memUsed after free: %u\n", memUsed());
+    com1_printf("memUsed after free: %u\n", memUsed());
     // com1_print("Entries after free():\n");
     // dumpEntries(8);
 }
