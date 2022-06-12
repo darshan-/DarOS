@@ -112,6 +112,9 @@ void free(void *p) {
     uint64_t o = (b % MAP_FACTOR) / BLK_SZ * MAP_ENTRY_SZ;
     b /= MAP_FACTOR;
 
+    // If we were only ever changing a whole qword at time I think we'd be fine without turning of interrupts, but since each entry
+    //   is only a couple bits, someone else may also want to change another part of a given qword at the same time.
+    no_ints();
     for (uint64_t mask = 0b11ull << o;; b++, mask = 0b11ull, o = 0) {
         for (; mask && (map[b] & mask) == BPART << o; mask <<= 2, o += 2)
             map[b] &= ~mask;
@@ -121,6 +124,7 @@ void free(void *p) {
             break;
         }
     }
+    ints_okay();
 }
 
 void* realloc(void* p, int newSize) {
