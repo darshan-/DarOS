@@ -27,6 +27,7 @@ void mTest() {
     void* p5 = malloc(2048);
     void* p6 = malloc(4096);
     void* p7 = malloc(4096);
+    void* p8 = malloc(40960);
     // com1_print("Entries after malloc():\n");
     // dumpEntries(8);
     // printf("mem use: %u\n", memUsed());
@@ -39,6 +40,7 @@ void mTest() {
     free(p4);
     free(p6);
     free(p7);
+    free(p8);
     logf("memUsed after free: %u\n", memUsed());
     // com1_print("Entries after free():\n");
     // dumpEntries(8);

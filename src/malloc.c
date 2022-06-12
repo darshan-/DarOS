@@ -58,20 +58,22 @@ void* malloc(uint64_t nBytes) {
     for (uint64_t i = 0; i < needed && mask != -1ull; i++)
         mask = (mask << 2) + 0b11;
 
+    uint64_t need = needed;
+    void* ret = 0;
+
     no_ints();
     for (uint64_t i = 0; i < map_size; i++) {
-    not_found:
-        uint64_t need = needed;
-        void* ret = 0;
-
         for (need = needed; need > 64 / MAP_ENTRY_SZ; i++) {
-            if (map[i])
+            if (map[i]) {
+                com1_print("Found map qword that isn't zero, jumping to not_found\n");
                 goto not_found;
+            }
 
             if (!ret)
                 ret = (void*) (uint64_t) heap + (i * 64 / MAP_ENTRY_SZ) * BLK_SZ;
 
             need -= 64 / MAP_ENTRY_SZ;
+            com1_print("malloc 123\n");
         }
 
         mask = 0;
@@ -85,15 +87,18 @@ void* malloc(uint64_t nBytes) {
                 map[i] |= mask;
                 ret = (void*) (uint64_t) heap + (i * (64 / MAP_ENTRY_SZ) + j) * BLK_SZ;
 
-                if (needed > 64 / MAP_ENTRY_SZ) {
-                    // TODO: mask with -1 previous map entries to claim them before returning ret
-                }
+                for (; needed > 64 / MAP_ENTRY_SZ; needed -= 64 / MAP_ENTRY_SZ, i--)
+                    map[i-1] = -1ull;
                 ints_okay();
                 return ret;
             } else if (needed > 64 / MAP_ENTRY_SZ) {
                 goto not_found;
             }
         }
+
+    not_found:
+        need = needed;
+        ret = 0;
     }
 
     ints_okay();
