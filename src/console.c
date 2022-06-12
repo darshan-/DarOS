@@ -242,7 +242,7 @@ static inline void clearInput() {
             *((uint64_t*) p++) = 0x0700070007000700ull;
 
         uint64_t cur_diff = terms[at].cur % (LINES * 160);
-        terms[at].top -= cur_diff / 160;;
+        terms[at].top -= cur_diff / 160 * 160; // Looks funny, but seems the correct and obvious way to get whole number of lines
         terms[at].cur -= cur_diff;
 
         p = page_before(at, terms[at].cur);
@@ -253,8 +253,8 @@ static inline void clearInput() {
         uint16_t* q = (uint16_t*) p + (terms[at].anchor % (LINES * 160) / 2);
         for (int i = 0; i < n; i++)
             *q++ = 0x0700;
+        terms[at].top -= (terms[at].cur / 160 - terms[at].anchor / 160) * 160;
         terms[at].cur -= n;
-        // TODO: Adjust top
     }
 
     syncScreen();
