@@ -237,7 +237,7 @@ static inline void clearInput() {
     else
         p = cur_page(at);
 
-    while (anchor_page(at) != p) {
+    while (p != anchor_page(at)) {
         for (int i = 0; i < LINES * 20; i++)
             *((uint64_t*) p++) = 0x0700070007000700ull;
 
@@ -249,7 +249,12 @@ static inline void clearInput() {
     }
 
     if (terms[at].anchor != terms[at].cur) {
-        // Clear from anchor
+        uint64_t n = terms[at].cur - terms[at].anchor;
+        uint16_t* q = (uint16_t*) p + (terms[at].anchor % (LINES * 160) / 2);
+        for (int i = 0; i < n; i++)
+            *q++ = 0x0700;
+        terms[at].cur -= n;
+        // TODO: Adjust top
     }
 
     syncScreen();
@@ -433,6 +438,8 @@ static void gotInput(struct input i) {
             backspace();
         } else if (i.key == '\n' && !i.alt && !i.ctrl) {
             prompt();
+        } else if (i.key == 'u' && !i.alt && i.ctrl) {
+            clearInput();
         }
 
         // TODO: Nope, not clearScreen() anymore, since we have scrollback.
