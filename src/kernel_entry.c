@@ -17,6 +17,33 @@ struct mem_table_entry {
 
 #define STACK_SIZE (64 * 1024)
 
+void mTest() {
+    // com1_print("Entries before malloc():\n");
+    // dumpEntries(8);
+    void* p1 = malloc(1);
+    void* p2 = malloc(1024);
+    void* p3 = malloc(512);
+    void* p4 = malloc(2048);
+    void* p5 = malloc(2048);
+    void* p6 = malloc(4096);
+    void* p7 = malloc(4096);
+    // com1_print("Entries after malloc():\n");
+    // dumpEntries(8);
+    // printf("mem use: %u\n", memUsed());
+    //com1_print("Well, that's what that was!\n");
+    logf("memUsed after malloc: %u\n", memUsed());
+    free(p3);
+    free(p2);
+    free(p1);
+    free(p5);
+    free(p4);
+    free(p6);
+    free(p7);
+    logf("memUsed after free: %u\n", memUsed());
+    // com1_print("Entries after free():\n");
+    // dumpEntries(8);
+}
+
 void __attribute__((section(".kernel_entry"))) kernel_entry() {
     uint32_t* entry_count = (uint32_t*) 0x4000;
     uint64_t largest = 0;
@@ -63,6 +90,7 @@ void __attribute__((section(".kernel_entry"))) kernel_entry() {
     parse_acpi_tables();
     init_hpet();
 
+    mTest();
     log("Kernel initialized; going to waitloop.\n");
     waitloop();
 }

@@ -442,9 +442,10 @@ static void gotInput(struct input i) {
             printCharColor(at, i.key, 0x07);
             syncScreen();
             if (i.key == 'd')
-                log("d was typed\n");
-            if (i.key == 'f')
-                log("f was typed\n");
+                mTest();
+            //     log("d was typed\n");
+            // if (i.key == 'f')
+            //     log("f was typed\n");
         } else if (i.key == '\b' && !i.alt && !i.ctrl) {
             backspace();
         } else if (i.key == '\n' && !i.alt && !i.ctrl) {

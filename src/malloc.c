@@ -49,32 +49,52 @@ uint64_t heapSize() {
 }
 
 void* malloc(uint64_t nBytes) {
-    if (heap == 0) return 0;
-    if (nBytes > MAP_FACTOR) return 0;  // For now; later will support more than one qword per alloc
+    if (heap == 0)
+        return 0;
 
     uint64_t needed = (nBytes / BLK_SZ) + !!(nBytes % BLK_SZ);
     uint64_t mask = 0;
 
-    for (uint64_t i = 0; i < needed; i++)
+    for (uint64_t i = 0; i < needed && mask != -1ull; i++)
         mask = (mask << 2) + 0b11;
 
+    void* ret = 0;
+    no_ints();
     for (uint64_t i = 0; i < map_size; i++) {
-        uint64_t m = mask;
-        for (uint64_t j = 0; j < 64 / MAP_ENTRY_SZ - (needed - 1); j++, m <<= 2) {
-            no_ints();
-            if (!(map[i] & m)) {
-                m ^= 1ull << ((needed - 1 + j) * 2);
+        uint64_t need;
+        for (need = needed; need > 64 / MAP_ENTRY_SZ; i++) {
+            if (map[i]) {
+                need = needed;
+                ret = 0;
+                continue;
+            }
 
-                map[i] |= m;
-                void* ret = (void*) (uint64_t) heap + (i * (64 / MAP_ENTRY_SZ) + j) * BLK_SZ;
+            if (!ret)
+                ret = map[i];
+
+            need -= 64 / MAP_ENTRY_SZ;
+        }
+
+        mask = 0;
+        for (uint64_t j = 0; j < need; j++)
+            mask = (mask << 2) + 0b11;
+
+        for (uint64_t j = 0; j < 64 / MAP_ENTRY_SZ - (need - 1); j++, mask <<= 2) {
+            if (!(map[i] & mask)) {
+                mask ^= 1ull << ((need - 1 + j) * 2);
+
+                map[i] |= mask;
+                ret = (void*) (uint64_t) heap + (i * (64 / MAP_ENTRY_SZ) + j) * BLK_SZ;
 
                 ints_okay();
                 return ret;
+            } else if (needed > 64 / MAP_ENTRY_SZ) {
+                
             }
-            ints_okay();
         }
     }
 
+    ints_okay();
     return 0;
 }
 
