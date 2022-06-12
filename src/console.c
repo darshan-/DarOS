@@ -39,12 +39,13 @@ static struct vterm terms[TERM_COUNT];
 #define page_for(t, i) terms[t].buf[(i) / (LINES * 160)]
 #define page_after(t, i) page_for(t, i + LINES * 160)
 #define page_before(t, i) page_for(t, i - LINES * 160)
-#define page_top(t) page_for(t, terms[t].top)
-#define page_cur(t) page_for(t, terms[t].cur)
+#define top_page(t) page_for(t, terms[t].top)
+#define cur_page(t) page_for(t, terms[t].cur)
+#define anchor_page(t) page_for(t, terms[t].anchor)
 
 static inline void addPage(uint8_t term) {
     uint64_t* p = malloc(LINES * 160);
-    page_cur(term) = (uint8_t*) p;
+    cur_page(term) = (uint8_t*) p;
 
     for (int i = 0; i < LINES * 20; i++)
         *p++ = 0x0700070007000700ull;
@@ -163,7 +164,7 @@ static inline void ensureTerm(uint8_t t) {
 static void syncScreen() {
     const uint64_t pos_in_pg = terms[at].top % (LINES * 160) / 8;
     uint64_t* v = (uint64_t*) VRAM;
-    uint64_t* p = (uint64_t*) page_top(at) + pos_in_pg;
+    uint64_t* p = (uint64_t*) top_page(at) + pos_in_pg;
 
     uint64_t i;
     for (i = 0; i < (LINES * 20) - pos_in_pg; i++)
@@ -178,7 +179,7 @@ static void syncScreen() {
 }
 
 static inline void printcc(uint8_t term, uint8_t c, uint8_t cl) {
-    *((uint16_t*) page_cur(term) + terms[term].cur % (LINES * 160) / 2) = (cl << 8) | c;
+    *((uint16_t*) cur_page(term) + terms[term].cur % (LINES * 160) / 2) = (cl << 8) | c;
     terms[term].cur += 2;
 }
 
@@ -211,7 +212,7 @@ static inline void backspace() {
     if (terms[at].cur % (LINES * 160) == 0)
         p = page_before(at, terms[at].cur);
     else
-        p = page_cur(at);
+        p = cur_page(at);
 
     if (terms[at].cur % 160 == 0 && terms[at].top != 0)
         terms[at].top -= 160;
@@ -224,6 +225,28 @@ static inline void backspace() {
 
 // ctrl-u
 static inline void clearInput() {
+    if (terms[at].anchor == terms[at].cur)
+        return;
+
+    uint8_t* p;
+    if (terms[at].cur % (LINES * 160) == 0)
+        p = page_before(at, terms[at].cur);
+    else
+        p = cur_page(at);
+
+    // Hmm, if anchor is in page p, clear from anchor to end of p, and adjust top as necessary.
+    // Otherwise clear all of p and go again?  Recursively?
+
+    if (anchor_page(at) != p) {
+        // Clear entirety of p and set top and cur appropriately
+        // Call clearInput? (Can't be recursive if inline, right?)
+        // OR, maybe better and cleaner, do while rather than if for this condition, and then
+        //   rather than else, just check if anchor is cur yet.  I think that works?
+    } else {
+        // Clear from anchor
+    }
+
+    syncScreen();
 }
 
 static inline void printCharColor(uint8_t term, uint8_t c, uint8_t color) {
@@ -354,7 +377,7 @@ static void prompt() {
     if (terms[at].cur % 160 != 0)
         print("\n");
 
-    printColor("$ ", 0x05);
+    printColor("> ", 0x05);
 }
 
 static inline int isPrintable(uint8_t c) {
