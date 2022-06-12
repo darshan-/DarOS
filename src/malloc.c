@@ -58,19 +58,18 @@ void* malloc(uint64_t nBytes) {
     for (uint64_t i = 0; i < needed && mask != -1ull; i++)
         mask = (mask << 2) + 0b11;
 
-    void* ret = 0;
     no_ints();
     for (uint64_t i = 0; i < map_size; i++) {
-        uint64_t need;
+    not_found:
+        uint64_t need = needed;
+        void* ret = 0;
+
         for (need = needed; need > 64 / MAP_ENTRY_SZ; i++) {
-            if (map[i]) {
-                need = needed;
-                ret = 0;
-                continue;
-            }
+            if (map[i])
+                goto not_found;
 
             if (!ret)
-                ret = map[i];
+                ret = (void*) (uint64_t) heap + (i * 64 / MAP_ENTRY_SZ) * BLK_SZ;
 
             need -= 64 / MAP_ENTRY_SZ;
         }
@@ -86,10 +85,13 @@ void* malloc(uint64_t nBytes) {
                 map[i] |= mask;
                 ret = (void*) (uint64_t) heap + (i * (64 / MAP_ENTRY_SZ) + j) * BLK_SZ;
 
+                if (needed > 64 / MAP_ENTRY_SZ) {
+                    // TODO: mask with -1 previous map entries to claim them before returning ret
+                }
                 ints_okay();
                 return ret;
             } else if (needed > 64 / MAP_ENTRY_SZ) {
-                
+                goto not_found;
             }
         }
     }
