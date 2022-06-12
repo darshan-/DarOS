@@ -44,6 +44,9 @@ static struct vterm terms[TERM_COUNT];
 #define anchor_page(t) page_for(t, terms[t].anchor)
 
 static inline void addPage(uint8_t term) {
+    if (cur_page(term)) // May exist (backspace, etc.), so don't malloc unnecessarily or leak that page
+        return;
+
     uint64_t* p = malloc(LINES * 160);
     cur_page(term) = (uint8_t*) p;
 
@@ -234,15 +237,18 @@ static inline void clearInput() {
     else
         p = cur_page(at);
 
-    // Hmm, if anchor is in page p, clear from anchor to end of p, and adjust top as necessary.
-    // Otherwise clear all of p and go again?  Recursively?
+    while (anchor_page(at) != p) {
+        for (int i = 0; i < LINES * 20; i++)
+            *((uint64_t*) p++) = 0x0700070007000700ull;
 
-    if (anchor_page(at) != p) {
-        // Clear entirety of p and set top and cur appropriately
-        // Call clearInput? (Can't be recursive if inline, right?)
-        // OR, maybe better and cleaner, do while rather than if for this condition, and then
-        //   rather than else, just check if anchor is cur yet.  I think that works?
-    } else {
+        // Do top first, as it's based on current value of cur...
+        //terms[at].top -= ?;
+        terms[at].cur -= terms[at].cur % (LINES * 160);
+
+        p = page_before(at, terms[at].cur);
+    }
+
+    if (terms[at].anchor != terms[at].cur) {
         // Clear from anchor
     }
 
