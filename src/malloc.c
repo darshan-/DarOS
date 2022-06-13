@@ -141,8 +141,22 @@ void free(void *p) {
 }
 
 static uint64_t blockCount(void* p) {
-    // TODO
-    return 0;
+    uint64_t n = (uint64_t) p - (uint64_t) heap;
+    uint64_t o = (n % MAP_FACTOR) / BLK_SZ * MAP_ENTRY_SZ;
+    n /= MAP_FACTOR;
+
+    uint64_t count = 0;
+    for (uint64_t mask = 0b11ull << o;; n++, mask = 0b11ull, o = 0) {
+        for (; mask && (map[n] & mask) == BPART << o; mask <<= 2, o += 2)
+            count++;
+
+        if ((map[n] & mask) == BEND << o) {
+            count++;
+            break;
+        }
+    }
+
+    return count;
 }
 
 static void* dorealloc(void* p, int newSize, int zero) {
