@@ -36,7 +36,8 @@ static inline void qwordToHex(uint64_t q, char* s) {
 }
 
 char* M_sprintf(char* fmt, ...);
-char* M_vsprintf(char* fmt, va_list ap);
+char* sprintf(char* buf, uint64_t buf_len, char* fmt, ...);
+char* M_vsprintf(char* s, uint64_t s_cap, char* fmt, va_list ap);
 uint64_t strlen(char* s);
 char* M_sappend(char* s, char* t);
 char* M_scopy(char* s);
@@ -46,7 +47,7 @@ uint64_t dstoui(char* s);
 #define VARIADIC_PRINT(p) \
     va_list ap; \
     va_start(ap, fmt); \
-    char* s = M_vsprintf(fmt, ap); \
+    char* s = M_vsprintf(0, 0, fmt, ap);         \
     va_end(ap); \
     p(s); \
     free(s)

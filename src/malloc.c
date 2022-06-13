@@ -54,7 +54,7 @@ void* malloc(uint64_t nBytes) {
     if (heap == 0)
         return 0;
 
-    uint64_t needed = blocks_per(nBytes, BLK_SZ)
+    uint64_t needed = blocks_per(nBytes, BLK_SZ);
     uint64_t mask = 0;
 
     for (uint64_t i = 0; i < needed && mask != -1ull; i++)
@@ -142,6 +142,7 @@ void free(void *p) {
 
 static uint64_t blockCount(void* p) {
     // TODO
+    return 0;
 }
 
 static void* dorealloc(void* p, int newSize, int zero) {
@@ -156,8 +157,11 @@ static void* dorealloc(void* p, int newSize, int zero) {
     // 2. If newSize is less than or equal to old size, we can skip copying, and just mark the last bock as END and free the rest
     //    of the blocks, then return p.
 
-    pbc = blockCount(p);
-    nbc = blocks_per(newSize, BLK_SZ);
+    uint64_t pbc = blockCount(p);
+    uint64_t nbc = blocks_per(newSize, BLK_SZ);
+
+    char s[256];
+    com1_print(sprintf(s, 256, "dorealloc pbc: %u, nbc: %u\n", pbc, nbc));
 
     if (nbc == pbc)
         return p;
@@ -175,19 +179,19 @@ static void* dorealloc(void* p, int newSize, int zero) {
         o %= (64 / MAP_ENTRY_SZ);
 
         no_ints();
-        // Hmm, I know the entry bit-pair is already BPART, so I don't have to turn a bit on, only turn the relevant one off to turn it
-        //  into BEND...
-        map[n] &= ~((~BEND) << o);
-        map[n] |= BEND << o;
+        map[n] &= ~(1 << o);
 
         o += MAP_ENTRY_SZ;
         if (!o)
             n += 1;
 
-        for () {
-            // Set to BFREE until we find BEND, and set that to free too, then we're done with the loop
-            // (Can we call free with an appropriate value to get this done?)
-        }
+        char s[256];
+        com1_printf(sprintf(s, 256, "dorealloc n: %u, o: %u\n", n, o));
+        //free();
+        // for () {
+        //     // Set to BFREE until we find BEND, and set that to free too, then we're done with the loop
+        //     // (Can we call free with an appropriate value to get this done?)
+        // }
 
         return p;
     }

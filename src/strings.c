@@ -16,14 +16,28 @@ static inline char* append(char* s, char* t) {
 char* M_sprintf(char* fmt, ...) {
     va_list ap;
     va_start(ap, fmt);
-    char* s = M_vsprintf(fmt, ap);
+    char* s = M_vsprintf(0, 0, fmt, ap);
     va_end(ap);
     return s;
 }
 
-char* M_vsprintf(char* fmt, va_list ap) {
-    int scap = 128;
-    char* s = malloc(scap);
+// It's really inconvenient having no output at all, or futzing around with the ...ToHex stuff, when working on malloc.  I'd always
+//   meant to have a fixed-size buffer option, and it's time.
+char* sprintf(char* buf, uint64_t buf_len, char* fmt, ...) {
+    va_list ap;
+    va_start(ap, fmt);
+    char* s = M_vsprintf(buf, buf_len, fmt, ap);
+    va_end(ap);
+    return s;
+}
+
+char* M_vsprintf(char* s, uint64_t s_cap, char* fmt, va_list ap) {
+    int dyn = 0;
+    if (!s) {
+        dyn = 1;
+        s_cap = 128;
+        s = malloc(s_cap);
+    }
     char c, *t, padc;
     int i = 0; // Index into s where we will place next character
     int padw = 0;
@@ -31,9 +45,13 @@ char* M_vsprintf(char* fmt, va_list ap) {
     buf[20] = 0;
 
     for (char* p = fmt; *p; p++) {
-        if (scap - i < 2) {
-            scap *= 2;
-            s = realloc(s, scap);
+        if ((int64_t) s_cap - i < 4) { // We'll add at most 3 characters here, plus '\0' at end
+            if (dyn) {
+                s_cap *= 2;
+                s = realloc(s, s_cap);
+            } else {
+                break;
+            }
         }
 
         if (padw == 0) {
@@ -124,10 +142,15 @@ char* M_vsprintf(char* fmt, va_list ap) {
         }
 
         // Okay, no append for s; here is the one place we lengthen it other than the top.
-        int needed = i + strlen(t) + padw + 1;
-        if (scap < needed) {
-            scap = needed;
-            s = realloc(s, scap);
+        uint64_t needed = i + strlen(t) + padw + 1;
+        if (s_cap < needed) {
+            if (dyn) {
+                s_cap = needed;
+                s = realloc(s, s_cap);
+            } else {
+                // We *could* do something more careful here, to make most of space left, but doesn't feel worth it.
+                break;
+            }
         }
 
         for (int j = 0; j < padw; j++)
