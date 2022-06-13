@@ -140,100 +140,78 @@ void free(void *p) {
     ints_okay();
 }
 
-static uint64_t blockCount(void* p) {
+static void* dorealloc(void* p, uint64_t newSize, int zero) {
+    if (heap == 0)
+        return 0;
+
+    // Can I do this in one walk of the map of p?
+    // Start walking just like free, and when we get to end, or when we reach the end corresponding to newSize, decide what to do?
+
+    uint64_t nbc = blocks_per(newSize, BLK_SZ);
     uint64_t n = (uint64_t) p - (uint64_t) heap;
     uint64_t o = (n % MAP_FACTOR) / BLK_SZ * MAP_ENTRY_SZ;
     n /= MAP_FACTOR;
 
     uint64_t count = 0;
+    uint8_t freeing = 0;
+    no_ints();
     for (uint64_t mask = 0b11ull << o;; n++, mask = 0b11ull, o = 0) {
-        for (; mask && (map[n] & mask) == BPART << o; mask <<= 2, o += 2)
+        for (; mask && (map[n] & mask) == BPART << o; mask <<= 2, o += 2) {
             count++;
+
+            if (freeing) {
+                map[n] &= ~mask;
+            } else if (count == nbc) {
+                uint64_t n = (uint64_t) p - (uint64_t) heap;
+                uint64_t o = (n % MAP_FACTOR) / BLK_SZ * MAP_ENTRY_SZ;
+                n /= MAP_FACTOR;
+
+                o += (count - nbc) * MAP_ENTRY_SZ;
+                n += o / (64 / MAP_ENTRY_SZ);
+                o %= (64 / MAP_ENTRY_SZ);
+
+                no_ints();
+                map[n] &= ~(1 << o);
+
+                o += MAP_ENTRY_SZ;
+                if (!o)
+                    n += 1;
+            }
+        }
 
         if ((map[n] & mask) == BEND << o) {
             count++;
+
+            if (freeing) {
+                map[n] &= ~mask;
+            } else if (count != nbc) {
+                uint64_t* q = malloc(newSize);
+
+                uint64_t i;
+                for (i = 0; i < count * BLK_SZ / 8; i++)
+                    q[i] = ((uint64_t*) p)[i];
+                if (zero)
+                    for (; i < newSize / 8; i++)
+                        q[i] = 0;
+
+                free(p);
+                p = q;
+            }
+
             break;
         }
     }
 
-    return count;
+    ints_okay();
+    return p;
 }
 
-static void* dorealloc(void* p, int newSize, int zero) {
-    if (heap == 0)
-        return 0;
-
-    // TODO:
-    // I'm not 100% sure this is worth it, but it seems worth considering;
-    //
-    // 0. Walk old p to determine allocation size.
-    // 1. If newSize and old size are both 1 block or less, simply return p.
-    // 2. If newSize is less than or equal to old size, we can skip copying, and just mark the last bock as END and free the rest
-    //    of the blocks, then return p.
-
-    uint64_t pbc = blockCount(p);
-    uint64_t nbc = blocks_per(newSize, BLK_SZ);
-
-    char s[256];
-    com1_print(sprintf(s, 256, "dorealloc pbc: %u, nbc: %u\n", pbc, nbc));
-
-    if (nbc == pbc)
-        return p;
-
-    if (nbc < pbc) {
-        // Hmm, can I have a private malloc that normal malloc calls, that optionally gives it the address to malloc at?
-        // So normal malloc calls it with 0, so it searches for an appropriate place, but we pass in p, so it doesn't have to search,
-        //   just marks map for us.  I guess the inefficiency is potentially marking a lot of BPARTs that are already BPART.
-        uint64_t n = (uint64_t) p - (uint64_t) heap;
-        uint64_t o = (n % MAP_FACTOR) / BLK_SZ * MAP_ENTRY_SZ;
-        n /= MAP_FACTOR;
-
-        o += (pbc - nbc) * MAP_ENTRY_SZ;
-        n += o / (64 / MAP_ENTRY_SZ);
-        o %= (64 / MAP_ENTRY_SZ);
-
-        no_ints();
-        map[n] &= ~(1 << o);
-
-        o += MAP_ENTRY_SZ;
-        if (!o)
-            n += 1;
-
-        char s[256];
-        com1_printf(sprintf(s, 256, "dorealloc n: %u, o: %u\n", n, o));
-        //free();
-        // for () {
-        //     // Set to BFREE until we find BEND, and set that to free too, then we're done with the loop
-        //     // (Can we call free with an appropriate value to get this done?)
-        // }
-
-        return p;
-    }
-
-    uint64_t* q1 = (uint64_t*) p;
-    uint64_t* q2 = malloc(newSize);
-    uint8_t* b1 = (uint8_t*) p;
-    uint8_t* b2 = (uint8_t*) q2;
-
-    // TODO: With map, we now know how many blocks p is, so don't copy past end of it.
-    //   And don't call mallocz above, but if newSize is larger than oldSize, fill new space with zeros if zero.
-
-    int i, j;
-    for (i = 0; i < newSize / 8; i++)
-        q2[i] = q1[i];
-    for (j = i*8; j < i + newSize % 8; j++)
-        b2[j] = b1[j];
-
-    free(p);
-    return q2;
-}
-
-void* realloc(void* p, int newSize) {
+void* realloc(void* p, uint64_t newSize) {
     return dorealloc(p, newSize, 0);
 }
 
 // Only valid for regions that were allocated with allocz (and haven't used realloc (without the z)).  It doesn't matter for regions
 //   of a full block or more, but caller generally shouldn't know or care about BLK_SZ, and should stick to this guideline.
-void* reallocz(void* p, int newSize) {
+void* reallocz(void* p, uint64_t newSize) {
     return dorealloc(p, newSize, 1);
 }
