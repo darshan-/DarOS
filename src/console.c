@@ -23,7 +23,8 @@
 #define TERM_COUNT 10 // One of which is logs
 
 struct vterm {
-    uint8_t* buf[2048];
+    uint8_t** buf;
+    uint64_t cap;
 
     uint64_t top;    // Index of top line in screen (how many characters are above screen)
     uint64_t off;    // Offset to support ctrl-l
@@ -36,6 +37,7 @@ static uint8_t at = 255;
 
 static struct vterm terms[TERM_COUNT];
 
+#define page_index_for(t, i) terms[t].i / (LINES * 160)
 #define page_for(t, i) terms[t].buf[(i) / (LINES * 160)]
 #define page_after(t, i) page_for(t, i + LINES * 160)
 #define page_before(t, i) page_for(t, i - LINES * 160)
@@ -43,19 +45,32 @@ static struct vterm terms[TERM_COUNT];
 #define cur_page(t) page_for(t, terms[t].cur)
 #define anchor_page(t) page_for(t, terms[t].anchor)
 
-static inline void addPage(uint8_t term) {
-    if (cur_page(term)) // May exist (backspace, etc.), so don't malloc unnecessarily or leak that page
+static inline void addPage(uint8_t t) {
+    if (cur_page(t)) // May exist (backspace, etc.), so don't malloc unnecessarily or leak that page
         return;
 
+    if (terms[t].cap < page_index_for(t, cur) + 2) {
+        terms[t].cap *= 2;
+        com1_printf("reallocating buf for term %u to new cap %u\n", t, terms[t].cap);
+        terms[t].buf = reallocz(terms[t].buf, terms[t].cap * sizeof(uint8_t*));
+        com1_printf("finished realloc\n");
+        print("*");
+    }
+
+    com1_printf("1\n");
     uint64_t* p = malloc(LINES * 160);
-    cur_page(term) = (uint8_t*) p;
+    com1_printf("2\n");
+    cur_page(t) = (uint8_t*) p;
+    com1_printf("3\n");
 
     for (int i = 0; i < LINES * 20; i++)
         *p++ = 0x0700070007000700ull;
+
+    com1_printf("4\n");
 }
 
-static inline uint64_t curPositionInScreen(uint8_t term) {
-    return terms[term].cur - terms[term].top;
+static inline uint64_t curPositionInScreen(uint8_t t) {
+    return terms[t].cur - terms[t].top;
 }
 
 static inline void updateCursorPosition() {
@@ -149,6 +164,12 @@ static void setStatusBar() {
 
 static inline void ensureTerm(uint8_t t) {
     no_ints();
+    if (!terms[t].buf) {
+        terms[t].cap = 16;
+        com1_printf("allocating buf for term %u with cap %u\n", t, terms[t].cap);
+        terms[t].buf = mallocz(terms[t].cap * sizeof(uint8_t*));
+    }
+
     if (!terms[t].buf[0]) {
         addPage(t);
 
@@ -181,9 +202,9 @@ static void syncScreen() {
     updateCursorPosition();
 }
 
-static inline void printcc(uint8_t term, uint8_t c, uint8_t cl) {
-    *((uint16_t*) cur_page(term) + terms[term].cur % (LINES * 160) / 2) = (cl << 8) | c;
-    terms[term].cur += 2;
+static inline void printcc(uint8_t t, uint8_t c, uint8_t cl) {
+    *((uint16_t*) cur_page(t) + terms[t].cur % (LINES * 160) / 2) = (cl << 8) | c;
+    terms[t].cur += 2;
 }
 
 
@@ -230,7 +251,8 @@ static inline void clearInput() {
     if (terms[at].anchor == terms[at].cur)
         return;
 
-    uint64_t page_index = terms[at].cur / (LINES * 160);
+    //uint64_t page_index = terms[at].cur / (LINES * 160);
+    uint64_t page_index = page_index_for(at, cur);
     if (terms[at].cur % (LINES * 160) == 0)
         page_index--;
 
@@ -263,20 +285,20 @@ static inline void clearInput() {
     syncScreen();
 }
 
-static inline void printCharColor(uint8_t term, uint8_t c, uint8_t color) {
+static inline void printCharColor(uint8_t t, uint8_t c, uint8_t color) {
     if (c == '\n') {
-        uint64_t cpip = curPositionInScreen(term);
+        uint64_t cpip = curPositionInScreen(t);
         for (uint64_t n = 160 - cpip % 160; n > 0; n -= 2)
-            printcc(term, 0, color);
+            printcc(t, 0, color);
     } else {
-        printcc(term, c, color);
+        printcc(t, c, color);
     }
 
-    if (terms[term].cur % (LINES * 160) == 0)
-        addPage(term);
+    if (terms[t].cur % (LINES * 160) == 0)
+        addPage(t);
 
-    if (curPositionInScreen(term) == LINES * 160)
-        terms[term].top += 160;
+    if (curPositionInScreen(t) == LINES * 160)
+        terms[t].top += 160;
 }
 
 void printColorTo(uint8_t t, char* s, uint8_t c) {

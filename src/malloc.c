@@ -104,6 +104,17 @@ void* malloc(uint64_t nBytes) {
     return 0;
 }
 
+void* mallocz(uint64_t nBytes) {
+    uint64_t* p = malloc(nBytes);
+    if (!p)
+        return 0;
+
+    for (uint64_t i = 0; i < nBytes / 8 + !!(nBytes % 8); i++)
+        p[i] = 0;
+
+    return p;
+}
+
 void free(void *p) {
     if (p < (void*) heap || p > (void*) heap + (map_size * (64 / MAP_ENTRY_SZ) - 1) * BLK_SZ)
         return;
@@ -127,15 +138,40 @@ void free(void *p) {
     ints_okay();
 }
 
-void* realloc(void* p, int newSize) {
-    if (heap == 0) return 0;
+static uint64_t blockCount(void* p) {
+}
+
+// Nope, actually there's no good way to zero out "new part" -- caller might consider themself to have, say, a 16-byte region, so
+//   and there's no way with current setup for us to know when the caller's perspective is having less than a block.  We can't zero out
+//   the correct area without knowing more than we can know without changing things in ways I don't want to, at least not now, maybe ever.
+static void* dorealloc(void* p, int newSize, int zero) {
+    if (heap == 0)
+        return 0;
+
+    // TODO:
+    // I'm not 100% sure this is worth it, but it seems worth considering;
+    //
+    // 0. Walk old p to determine allocation size.
+    // 1. If newSize and old size are both 1 block or less, simply return p.
+    // 2. If newSize is less than or equal to old size, we can skip copying, and just mark the last bock as END and free the rest
+    //    of the blocks, then return p.
+
+    pbc = blockCount(p);
+    if (pbc == 1 && newSize <= BLK_SZ) {
+        if (zero) {
+            // Zero out new part of that block of newSize
+        }
+        return p;
+    }
 
     uint64_t* q1 = (uint64_t*) p;
+    //uint64_t* q2 = zero ? mallocz(newSize) : malloc(newSize); // Inefficent but easy and good enough for now to zero whole thing
     uint64_t* q2 = malloc(newSize);
     uint8_t* b1 = (uint8_t*) p;
     uint8_t* b2 = (uint8_t*) q2;
 
-    // TODO, with map, we now know how many blocks p is, so don't copy past end of it
+    // TODO: With map, we now know how many blocks p is, so don't copy past end of it.
+    //   And don't call mallocz above, but if newSize is larger than oldSize, fill new space with zeros if zero.
 
     int i, j;
     for (i = 0; i < newSize / 8; i++)
@@ -145,4 +181,12 @@ void* realloc(void* p, int newSize) {
 
     free(p);
     return q2;
+}
+
+void* realloc(void* p, int newSize) {
+    return dorealloc(p, newSize, 0);
+}
+
+void* reallocz(void* p, int newSize) {
+    return dorealloc(p, newSize, 1);
 }
