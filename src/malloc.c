@@ -118,7 +118,7 @@ void* mallocz(uint64_t nBytes) {
 }
 
 void free(void *p) {
-    if (p < (void*) heap || p > (void*) heap + (map_size * (64 / MAP_ENTRY_SZ) - 1) * BLK_SZ)
+    if (heap == 0 || p < (void*) heap || p > (void*) heap + (map_size * (64 / MAP_ENTRY_SZ) - 1) * BLK_SZ)
         return;
 
     uint64_t n = (uint64_t) p - (uint64_t) heap;
@@ -141,11 +141,8 @@ void free(void *p) {
 }
 
 static void* dorealloc(void* p, uint64_t newSize, int zero) {
-    if (heap == 0)
+    if (heap == 0 || p < (void*) heap || p > (void*) heap + (map_size * (64 / MAP_ENTRY_SZ) - 1) * BLK_SZ)
         return 0;
-
-    // Can I do this in one walk of the map of p?
-    // Start walking just like free, and when we get to end, or when we reach the end corresponding to newSize, decide what to do?
 
     uint64_t nbc = blocks_per(newSize, BLK_SZ);
     uint64_t n = (uint64_t) p - (uint64_t) heap;
