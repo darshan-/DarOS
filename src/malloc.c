@@ -141,9 +141,6 @@ void free(void *p) {
 static uint64_t blockCount(void* p) {
 }
 
-// Nope, actually there's no good way to zero out "new part" -- caller might consider themself to have, say, a 16-byte region, so
-//   and there's no way with current setup for us to know when the caller's perspective is having less than a block.  We can't zero out
-//   the correct area without knowing more than we can know without changing things in ways I don't want to, at least not now, maybe ever.
 static void* dorealloc(void* p, int newSize, int zero) {
     if (heap == 0)
         return 0;
@@ -157,15 +154,20 @@ static void* dorealloc(void* p, int newSize, int zero) {
     //    of the blocks, then return p.
 
     pbc = blockCount(p);
-    if (pbc == 1 && newSize <= BLK_SZ) {
-        if (zero) {
-            // Zero out new part of that block of newSize
-        }
+    // if (pbc == 1 && newSize <= BLK_SZ)
+    //     return p;
+
+    // if (newSize / BLK_SZ + !!(newSize % BLK_SZ) <= pbc) {
+    // }
+
+    if (newSize / BLK_SZ + !!(newSize % BLK_SZ) == pbc)
         return p;
+
+    if (newSize / BLK_SZ + !!(newSize % BLK_SZ) < pbc) {
+        // Mark last block of new size as end, and any after that through old end as free, then return p
     }
 
     uint64_t* q1 = (uint64_t*) p;
-    //uint64_t* q2 = zero ? mallocz(newSize) : malloc(newSize); // Inefficent but easy and good enough for now to zero whole thing
     uint64_t* q2 = malloc(newSize);
     uint8_t* b1 = (uint8_t*) p;
     uint8_t* b2 = (uint8_t*) q2;
@@ -187,6 +189,8 @@ void* realloc(void* p, int newSize) {
     return dorealloc(p, newSize, 0);
 }
 
+// Only valid for regions that were allocated with allocz (and haven't used realloc (without the z)).  It doesn't matter for regions
+//   of a full block or more, but caller generally shouldn't know or care about BLK_SZ, and should stick to this guideline.
 void* reallocz(void* p, int newSize) {
     return dorealloc(p, newSize, 1);
 }
