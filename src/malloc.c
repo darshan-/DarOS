@@ -14,6 +14,8 @@
 #define BPART 0b11ull
 #define BEND  0b10ull
 
+#define blocks_per(region_sz, block_sz) ((region_sz / block_sz) + !!(region_sz % block_sz))
+
 static uint64_t map_size; // Size in quadwords
 static uint64_t* map = (uint64_t*) 0;
 static uint64_t* heap = (uint64_t*) 0;
@@ -52,7 +54,7 @@ void* malloc(uint64_t nBytes) {
     if (heap == 0)
         return 0;
 
-    uint64_t needed = (nBytes / BLK_SZ) + !!(nBytes % BLK_SZ);
+    uint64_t needed = blocks_per(nBytes, BLK_SZ)
     uint64_t mask = 0;
 
     for (uint64_t i = 0; i < needed && mask != -1ull; i++)
@@ -109,7 +111,7 @@ void* mallocz(uint64_t nBytes) {
     if (!p)
         return 0;
 
-    for (uint64_t i = 0; i < nBytes / 8 + !!(nBytes % 8); i++)
+    for (uint64_t i = 0; i < blocks_per(nBytes, 8); i++)
         p[i] = 0;
 
     return p;
@@ -119,19 +121,19 @@ void free(void *p) {
     if (p < (void*) heap || p > (void*) heap + (map_size * (64 / MAP_ENTRY_SZ) - 1) * BLK_SZ)
         return;
 
-    uint64_t b = (uint64_t) p - (uint64_t) heap;
-    uint64_t o = (b % MAP_FACTOR) / BLK_SZ * MAP_ENTRY_SZ;
-    b /= MAP_FACTOR;
+    uint64_t n = (uint64_t) p - (uint64_t) heap;
+    uint64_t o = (n % MAP_FACTOR) / BLK_SZ * MAP_ENTRY_SZ;
+    n /= MAP_FACTOR;
 
     // If we were only ever changing a whole qword at time I think we'd be fine without turning of interrupts, but since each entry
     //   is only a couple bits, someone else may also want to change another part of a given qword at the same time.
     no_ints();
-    for (uint64_t mask = 0b11ull << o;; b++, mask = 0b11ull, o = 0) {
-        for (; mask && (map[b] & mask) == BPART << o; mask <<= 2, o += 2)
-            map[b] &= ~mask;
+    for (uint64_t mask = 0b11ull << o;; n++, mask = 0b11ull, o = 0) {
+        for (; mask && (map[n] & mask) == BPART << o; mask <<= 2, o += 2)
+            map[n] &= ~mask;
 
-        if ((map[b] & mask) == BEND << o) {
-            map[b] &= ~mask;
+        if ((map[n] & mask) == BEND << o) {
+            map[n] &= ~mask;
             break;
         }
     }
@@ -139,6 +141,7 @@ void free(void *p) {
 }
 
 static uint64_t blockCount(void* p) {
+    // TODO
 }
 
 static void* dorealloc(void* p, int newSize, int zero) {
@@ -154,17 +157,39 @@ static void* dorealloc(void* p, int newSize, int zero) {
     //    of the blocks, then return p.
 
     pbc = blockCount(p);
-    // if (pbc == 1 && newSize <= BLK_SZ)
-    //     return p;
+    nbc = blocks_per(newSize, BLK_SZ);
 
-    // if (newSize / BLK_SZ + !!(newSize % BLK_SZ) <= pbc) {
-    // }
-
-    if (newSize / BLK_SZ + !!(newSize % BLK_SZ) == pbc)
+    if (nbc == pbc)
         return p;
 
-    if (newSize / BLK_SZ + !!(newSize % BLK_SZ) < pbc) {
-        // Mark last block of new size as end, and any after that through old end as free, then return p
+    if (nbc < pbc) {
+        // Hmm, can I have a private malloc that normal malloc calls, that optionally gives it the address to malloc at?
+        // So normal malloc calls it with 0, so it searches for an appropriate place, but we pass in p, so it doesn't have to search,
+        //   just marks map for us.  I guess the inefficiency is potentially marking a lot of BPARTs that are already BPART.
+        uint64_t n = (uint64_t) p - (uint64_t) heap;
+        uint64_t o = (n % MAP_FACTOR) / BLK_SZ * MAP_ENTRY_SZ;
+        n /= MAP_FACTOR;
+
+        o += (pbc - nbc) * MAP_ENTRY_SZ;
+        n += o / (64 / MAP_ENTRY_SZ);
+        o %= (64 / MAP_ENTRY_SZ);
+
+        no_ints();
+        // Hmm, I know the entry bit-pair is already BPART, so I don't have to turn a bit on, only turn the relevant one off to turn it
+        //  into BEND...
+        map[n] &= ~((~BEND) << o);
+        map[n] |= BEND << o;
+
+        o += MAP_ENTRY_SZ;
+        if (!o)
+            n += 1;
+
+        for () {
+            // Set to BFREE until we find BEND, and set that to free too, then we're done with the loop
+            // (Can we call free with an appropriate value to get this done?)
+        }
+
+        return p;
     }
 
     uint64_t* q1 = (uint64_t*) p;
