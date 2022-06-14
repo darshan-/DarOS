@@ -63,6 +63,16 @@ void mTest() {
     com1_printf("Heap used after shrinking realloc: %u\n", heapUsed());
 
     // TODO: Test mallocz and reallocz
+    uint64_t* z1 = mallocz(1024);
+    for (int i = 0; i < 1024 / 8; i++)
+        if (z1[i] != 0)
+            com1_print("non-zero content in region returned from mallocz!\n");
+    z1 = reallocz(z1, 1);
+    z1 = reallocz(z1, 4096);
+    for (int i = 0; i < 4096 / 8; i++)
+        if (z1[i] != 0)
+            com1_print("non-zero content in region returned from mallocz!\n");
+    free(z1);
 
     free(p3);
     free(p2);

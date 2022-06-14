@@ -54,19 +54,13 @@ static inline void addPage(uint8_t t) {
         com1_printf("reallocating buf for term %u to new cap %u\n", t, terms[t].cap);
         terms[t].buf = reallocz(terms[t].buf, terms[t].cap * sizeof(uint8_t*));
         com1_printf("finished realloc\n");
-        print("*");
     }
 
-    com1_printf("1\n");
     uint64_t* p = malloc(LINES * 160);
-    com1_printf("2\n");
     cur_page(t) = (uint8_t*) p;
-    com1_printf("3\n");
 
     for (int i = 0; i < LINES * 20; i++)
         *p++ = 0x0700070007000700ull;
-
-    com1_printf("4\n");
 }
 
 static inline uint64_t curPositionInScreen(uint8_t t) {
@@ -162,6 +156,32 @@ static void setStatusBar() {
     registerPeriodicCallback((struct periodic_callback) {2, 1, updateMemUse});
 }
 
+static void syncScreen() {
+    const uint64_t pos_in_pg = terms[at].top % (LINES * 160) / 8;
+    uint64_t* v = (uint64_t*) VRAM;
+    uint64_t* p = (uint64_t*) top_page(at) + pos_in_pg;
+
+    uint64_t i;
+    for (i = 0; i < (LINES * 20) - pos_in_pg; i++)
+        *v++ = *p++;
+
+    p = (uint64_t*) page_after(at, terms[at].top);
+
+    for (; i < LINES * 20; i++)
+        *v++ = *p++;
+
+    updateCursorPosition();
+}
+
+static void prompt(uint8_t t) {
+    if (terms[t].cur % 160 != 0)
+        printTo(t, "\n");
+
+    printColorTo(t, "\3 > ", 0x05);
+    if (t == at)
+        syncScreen();
+}
+
 static inline void ensureTerm(uint8_t t) {
     no_ints();
     if (!terms[t].buf) {
@@ -180,26 +200,10 @@ static inline void ensureTerm(uint8_t t) {
             printColorTo(t, "Ready!", 0x0d);
             printColorTo(t, s, 0x0b);
             free(s);
+            prompt(t);
         }
     }
     ints_okay();
-}
-
-static void syncScreen() {
-    const uint64_t pos_in_pg = terms[at].top % (LINES * 160) / 8;
-    uint64_t* v = (uint64_t*) VRAM;
-    uint64_t* p = (uint64_t*) top_page(at) + pos_in_pg;
-
-    uint64_t i;
-    for (i = 0; i < (LINES * 20) - pos_in_pg; i++)
-        *v++ = *p++;
-
-    p = (uint64_t*) page_after(at, terms[at].top);
-
-    for (; i < LINES * 20; i++)
-        *v++ = *p++;
-
-    updateCursorPosition();
 }
 
 static inline void printcc(uint8_t t, uint8_t c, uint8_t cl) {
@@ -417,13 +421,6 @@ static void scrollDownBy(uint64_t n) {
 //     - lines m - n?
 //     - positions m - n?
 
-static void prompt() {
-    if (terms[at].cur % 160 != 0)
-        print("\n");
-
-    printColor("> ", 0x05);
-}
-
 static inline int isPrintable(uint8_t c) {
     return c >= ' ' && c <= '~';
 }
@@ -463,13 +460,23 @@ static void gotInput(struct input i) {
             scrollToBottom();
             printCharColor(at, i.key, 0x07);
             syncScreen();
+            static char* rose = 0;
             if (i.key == 'm')
                 mTest();
+            if (i.key == 'a' && !rose)
+                rose = malloc(4096);
+            else if (i.key == 'f' && rose) {
+                free(rose);
+                rose = 0;
+            }
         } else if (i.key == '\b' && !i.alt && !i.ctrl) {
+            scrollToBottom();
             backspace();
         } else if (i.key == '\n' && !i.alt && !i.ctrl) {
-            prompt();
+            scrollToBottom();
+            prompt(at);
         } else if (i.key == 'u' && !i.alt && i.ctrl) {
+            scrollToBottom();
             clearInput();
         }
 
@@ -492,6 +499,5 @@ void startTty() {
     registerKbdListener(&gotInput);
     setStatusBar();
     showTerm(1);
-    prompt();
     ints_okay();
 };
