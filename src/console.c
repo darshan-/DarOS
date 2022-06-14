@@ -424,31 +424,31 @@ static inline int isPrintable(uint8_t c) {
 static void gotInput(struct input i) {
     no_ints();
 
-    if (i.key >= '0' && i.key <= '9' && !i.alt && i.ctrl)
+    if (i.key >= '0' && i.key <= '9' && !i.alt && i.ctrl && !i.shift)
         showTerm(i.key - '0');
 
-    else if (i.key == KEY_UP && !i.alt && !i.ctrl)
+    else if (i.key == KEY_UP && !i.alt && !i.ctrl && (i.shift || at == 0))
         scrollUpBy(1);
 
-    else if (i.key == KEY_DOWN && !i.alt && !i.ctrl)
+    else if (i.key == KEY_DOWN && !i.alt && !i.ctrl && (i.shift || at == 0))
         scrollDownBy(1);
 
-    else if (i.key == KEY_PG_DOWN && !i.alt && !i.ctrl)
+    else if (i.key == KEY_PG_DOWN && !i.alt && !i.ctrl && (i.shift || at == 0))
         scrollDownBy(LINES);
 
-    else if (i.key == KEY_PG_UP && !i.alt && !i.ctrl)
+    else if (i.key == KEY_PG_UP && !i.alt && !i.ctrl && (i.shift || at == 0))
         scrollUpBy(LINES);
 
-    else if (i.key == KEY_HOME && !i.alt && i.ctrl)
+    else if (i.key == KEY_HOME && !i.alt && !i.ctrl && (i.shift || at == 0))
         scrollToTop();
 
-    else if (i.key == KEY_END && !i.alt && i.ctrl)
+    else if (i.key == KEY_END && !i.alt && !i.ctrl && (i.shift || at == 0))
         scrollToBottom();
 
-    else if (i.key == KEY_RIGHT && !i.alt && i.ctrl)
+    else if (i.key == KEY_RIGHT && !i.alt && i.ctrl && !i.shift)
         showTerm((at + 1) % 10);
 
-    else if (i.key == KEY_LEFT && !i.alt && i.ctrl)
+    else if (i.key == KEY_LEFT && !i.alt && i.ctrl && !i.shift)
         showTerm((at + 9) % 10);
 
     else if (at > 0) {
@@ -456,13 +456,13 @@ static void gotInput(struct input i) {
             scrollToBottom();
             printCharColor(at, i.key, 0x07);
             syncScreen();
-        } else if (i.key == '\b' && !i.alt && !i.ctrl) {
+        } else if (i.key == '\b' && !i.alt && !i.ctrl && !i.shift) {
             scrollToBottom();
             backspace();
-        } else if (i.key == '\n' && !i.alt && !i.ctrl) {
+        } else if (i.key == '\n' && !i.alt && !i.ctrl && !i.shift) {
             scrollToBottom();
             prompt(at);
-        } else if (i.key == 'u' && !i.alt && i.ctrl) {
+        } else if (i.key == 'u' && !i.alt && i.ctrl && !i.shift) {
             scrollToBottom();
             clearInput();
         }
