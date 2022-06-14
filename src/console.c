@@ -463,6 +463,8 @@ static void gotInput(struct input i) {
             scrollToBottom();
             printCharColor(at, i.key, 0x07);
             syncScreen();
+            if (i.key == 'm')
+                mTest();
         } else if (i.key == '\b' && !i.alt && !i.ctrl) {
             backspace();
         } else if (i.key == '\n' && !i.alt && !i.ctrl) {

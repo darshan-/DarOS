@@ -153,34 +153,52 @@ static void* dorealloc(void* p, uint64_t newSize, int zero) {
     uint8_t freeing = 0;
     no_ints();
     for (uint64_t mask = 0b11ull << o;; n++, mask = 0b11ull, o = 0) {
-        for (; mask && (map[n] & mask) == BPART << o; mask <<= 2, o += 2) {
+        for (; mask && (map[n] & mask) == BPART << o; mask <<= MAP_ENTRY_SZ, o += MAP_ENTRY_SZ) {
             count++;
 
             if (freeing) {
+                // com1_print("      dorealloc trying to set old BPART to BFREE\n");
+                // char s[256];
+                // com1_printf(sprintf(s, 256, "      map[n]: 0x%h\n", &(map[n])));
+                // com1_printf(sprintf(s, 256, "  old map[n]: 0x%h\n", map[n]));
                 map[n] &= ~mask;
+                // com1_printf(sprintf(s, 256, "  new map[n]: 0x%h\n", map[n]));
             } else if (count == nbc) {
-                uint64_t n = (uint64_t) p - (uint64_t) heap;
-                uint64_t o = (n % MAP_FACTOR) / BLK_SZ * MAP_ENTRY_SZ;
-                n /= MAP_FACTOR;
+                // com1_print("Okay, dorealloc has shrinking realloc\n");
 
-                o += (count - nbc) * MAP_ENTRY_SZ;
-                n += o / (64 / MAP_ENTRY_SZ);
-                o %= (64 / MAP_ENTRY_SZ);
+                freeing = 1;
 
-                no_ints();
-                map[n] &= ~(1 << o);
+                // uint64_t n = (uint64_t) p - (uint64_t) heap;
+                // uint64_t o = (n % MAP_FACTOR) / BLK_SZ * MAP_ENTRY_SZ;
+                // n /= MAP_FACTOR;
 
-                o += MAP_ENTRY_SZ;
-                if (!o)
-                    n += 1;
+                // o += (count - nbc) * MAP_ENTRY_SZ;
+                // n += o / (64 / MAP_ENTRY_SZ);
+                // o %= (64 / MAP_ENTRY_SZ);
+
+                // com1_print("      dorealloc trying to set old BPART to BEND\n");
+                // char s[256];
+                // com1_printf(sprintf(s, 256, "      map[n]: 0x%h\n", &(map[n])));
+                // com1_printf(sprintf(s, 256, "  old map[n]: 0x%h\n", map[n]));
+                map[n] &= ~(1ull << o);
+                // com1_printf(sprintf(s, 256, "  new map[n]: 0x%h\n", map[n]));
+
+                // o = (o + MAP_ENTRY_SZ) % (64 / MAP_ENTRY_SZ);
+                // if (!o)
+                //     n += 1;
             }
         }
 
-        if ((map[n] & mask) == BEND << o) {
+        if (mask && (map[n] & mask) == BEND << o) {
             count++;
 
             if (freeing) {
+                // com1_print("      dorealloc trying to set old BEND to BFREE\n");
+                // char s[256];
+                // com1_printf(sprintf(s, 256, "      map[n]: 0x%h\n", &(map[n])));
+                // com1_printf(sprintf(s, 256, "  old map[n]: 0x%h\n", map[n]));
                 map[n] &= ~mask;
+                // com1_printf(sprintf(s, 256, "  new map[n]: 0x%h\n", map[n]));
             } else if (count != nbc) {
                 uint64_t* q = malloc(newSize);
 
