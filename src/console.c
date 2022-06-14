@@ -115,7 +115,6 @@ void updateMemUse() {
     if (strlen(s) > MAX_MEMLEN)
         s[MAX_MEMLEN] = 0;
 
-    // Zero-pad so things don't look bad if an interrupt happens after clearing but before writing.
     if (strlen(s) < MAX_MEMLEN) {
         char* f = M_sprintf("%%p %us", MAX_MEMLEN);
         char* t = M_sprintf(f, s);

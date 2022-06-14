@@ -45,7 +45,7 @@ uint64_t heapUsed() {
     return p * BLK_SZ;
 }
 
-// Returns number of bytes in the heap (not counting map)
+// Number of bytes in the actual heap (not counting map of heap as part of heap)
 uint64_t heapSize() {
     return map_size * MAP_FACTOR;
 }
@@ -195,8 +195,9 @@ void* realloc(void* p, uint64_t newSize) {
     return dorealloc(p, newSize, 0);
 }
 
-// Only valid for regions that were allocated with allocz (and haven't used realloc (without the z)).  It doesn't matter for regions
-//   of a full block or more, but caller generally shouldn't know or care about BLK_SZ, and should stick to this guideline.
+// Only valid for regions that were allocated with allocz (and haven't used realloc (without the z)).  (It doesn't matter for regions
+//   that are a whole number multiple of block size, but caller generally shouldn't know or care about BLK_SZ, and should stick to
+//   this guideline.  And it doesn't matter for shrinking regions, but that's because it's equivalent to realloc in that case...)
 void* reallocz(void* p, uint64_t newSize) {
     return dorealloc(p, newSize, 1);
 }
