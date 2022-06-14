@@ -157,35 +157,10 @@ static void* dorealloc(void* p, uint64_t newSize, int zero) {
             count++;
 
             if (freeing) {
-                // com1_print("      dorealloc trying to set old BPART to BFREE\n");
-                // char s[256];
-                // com1_printf(sprintf(s, 256, "      map[n]: 0x%h\n", &(map[n])));
-                // com1_printf(sprintf(s, 256, "  old map[n]: 0x%h\n", map[n]));
                 map[n] &= ~mask;
-                // com1_printf(sprintf(s, 256, "  new map[n]: 0x%h\n", map[n]));
             } else if (count == nbc) {
-                // com1_print("Okay, dorealloc has shrinking realloc\n");
-
                 freeing = 1;
-
-                // uint64_t n = (uint64_t) p - (uint64_t) heap;
-                // uint64_t o = (n % MAP_FACTOR) / BLK_SZ * MAP_ENTRY_SZ;
-                // n /= MAP_FACTOR;
-
-                // o += (count - nbc) * MAP_ENTRY_SZ;
-                // n += o / (64 / MAP_ENTRY_SZ);
-                // o %= (64 / MAP_ENTRY_SZ);
-
-                // com1_print("      dorealloc trying to set old BPART to BEND\n");
-                // char s[256];
-                // com1_printf(sprintf(s, 256, "      map[n]: 0x%h\n", &(map[n])));
-                // com1_printf(sprintf(s, 256, "  old map[n]: 0x%h\n", map[n]));
                 map[n] &= ~(1ull << o);
-                // com1_printf(sprintf(s, 256, "  new map[n]: 0x%h\n", map[n]));
-
-                // o = (o + MAP_ENTRY_SZ) % (64 / MAP_ENTRY_SZ);
-                // if (!o)
-                //     n += 1;
             }
         }
 
@@ -193,12 +168,7 @@ static void* dorealloc(void* p, uint64_t newSize, int zero) {
             count++;
 
             if (freeing) {
-                // com1_print("      dorealloc trying to set old BEND to BFREE\n");
-                // char s[256];
-                // com1_printf(sprintf(s, 256, "      map[n]: 0x%h\n", &(map[n])));
-                // com1_printf(sprintf(s, 256, "  old map[n]: 0x%h\n", map[n]));
                 map[n] &= ~mask;
-                // com1_printf(sprintf(s, 256, "  new map[n]: 0x%h\n", map[n]));
             } else if (count != nbc) {
                 uint64_t* q = malloc(newSize);
 
