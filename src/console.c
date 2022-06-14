@@ -51,9 +51,7 @@ static inline void addPage(uint8_t t) {
 
     if (terms[t].cap < page_index_for(t, cur) + 2) {
         terms[t].cap *= 2;
-        com1_printf("reallocating buf for term %u to new cap %u\n", t, terms[t].cap);
         terms[t].buf = reallocz(terms[t].buf, terms[t].cap * sizeof(uint8_t*));
-        com1_printf("finished realloc\n");
     }
 
     uint64_t* p = malloc(LINES * 160);
@@ -186,7 +184,6 @@ static inline void ensureTerm(uint8_t t) {
     no_ints();
     if (!terms[t].buf) {
         terms[t].cap = 16;
-        com1_printf("allocating buf for term %u with cap %u\n", t, terms[t].cap);
         terms[t].buf = mallocz(terms[t].cap * sizeof(uint8_t*));
     }
 
@@ -460,15 +457,6 @@ static void gotInput(struct input i) {
             scrollToBottom();
             printCharColor(at, i.key, 0x07);
             syncScreen();
-            static char* rose = 0;
-            if (i.key == 'm')
-                mTest();
-            if (i.key == 'a' && !rose)
-                rose = malloc(4096);
-            else if (i.key == 'f' && rose) {
-                free(rose);
-                rose = 0;
-            }
         } else if (i.key == '\b' && !i.alt && !i.ctrl) {
             scrollToBottom();
             backspace();
