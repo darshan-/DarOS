@@ -47,8 +47,8 @@ static struct vterm terms[TERM_COUNT];
 #define end_page(t) page_for(t, terms[t].end)
 #define anchor_page(t) page_for(t, terms[t].anchor)
 #define byte_at(t, i) page_for(t, i)[(i) % (LINES * 160)]
-#define word_at(t, i) ((uint16_t*) page_for(t, i))[(i) % (LINES * 160) / 2]
-#define qword_at(t, i) ((uint64_t*) page_for(t, i))[(i) % (LINES * 160) / 8]
+#define word_at(t, i) (((uint16_t*) page_for(t, i))[(i) % (LINES * 160) / 2])
+#define qword_at(t, i) (((uint64_t*) page_for(t, i))[(i) % (LINES * 160) / 8])
 
 static inline void addPage(uint8_t t) {
     if (end_page(t)) // May exist already (e.g., due to backspace decreasing end), so don't malloc unnecessarily or leak that page
@@ -196,9 +196,21 @@ static inline void ensureTerm(uint8_t t) {
 }
 
 static inline void printcc(uint8_t t, uint8_t c, uint8_t cl) {
-    if (terms[t].cur == terms[t].end) {
-        word_at(t, terms[t].end) = (cl << 8) | c;
-    } else {
+    if (terms[t].cur < terms[t].end)
+        for (uint64_t i = terms[t].end; i > terms[t].cur; i -= 2)
+            word_at(t, i) = word_at(t, i - 2);
+
+    word_at(t, terms[t].cur) = (cl << 8) | c;
+
+    // if (terms[t].cur == terms[t].end) {
+    //     word_at(t, terms[t].end) = (cl << 8) | c;
+    // } else {
+    //     //for (uint64_t i; terms[t].cur + i < terms[t].end; i++) {
+    //     for (uint64_t i = terms[t].end; i > terms[t].cur; i--) {
+    //         word_at(t, terms[t].end - i * 2) = word_at(t, terms[t].end - (i + 1) * 2)
+    //     }
+        //for (uint64_t i; &word_at(t, terms[t].cur + i / 2) != &word_at(t, terms[t].end)
+        //for (uint16_t* p = word_at(t, terms[t].cur); &p != &word_at(t, terms[t].end; p = word_at(t, terms[t].cur))
         // The annoying part is: end might be on a later page, not just later in the same page...
         // For so many things, the code would be cleaner and easier if the buffer weren't paged, and we no longer have 4K malloc
         //   limit...  I guess it's worth pausing to consider: *would* there ever be noticeable lag to realloc a large buffer?  I
@@ -223,8 +235,6 @@ static inline void printcc(uint8_t t, uint8_t c, uint8_t cl) {
         //
         // uint8_t* p = (uint16_t*) end_page(t) + terms[t].end % (LINES * 160) / 2;
         // for (uint64_t i = terms[t].end - terms[t].cur; i > 2; i -= 2)
-            
-    }
 
     terms[t].cur += 2;
     terms[t].end += 2;
@@ -270,6 +280,14 @@ static inline void backspace() {
     terms[at].end -= 2;
 
     syncScreen();
+}
+
+static inline void cursorLeft() {
+    if (terms[at].anchor == terms[at].cur)
+        return;
+
+    terms[at].cur -= 2;
+    updateCursorPosition();
 }
 
 static inline void clearInput() {
@@ -477,6 +495,9 @@ static void gotInput(struct input i) {
 
     else if (i.key == KEY_LEFT && !i.alt && i.ctrl && !i.shift)
         showTerm((at + 9) % 10);
+
+    else if (i.key == KEY_LEFT && !i.alt && !i.ctrl && !i.shift)
+        cursorLeft();
 
     else if (at > 0) {
         if (isPrintable(i.key) && !i.alt && !i.ctrl) {
