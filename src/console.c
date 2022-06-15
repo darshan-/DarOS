@@ -202,44 +202,9 @@ static inline void printcc(uint8_t t, uint8_t c, uint8_t cl) {
 
     word_at(t, terms[t].cur) = (cl << 8) | c;
 
-    // if (terms[t].cur == terms[t].end) {
-    //     word_at(t, terms[t].end) = (cl << 8) | c;
-    // } else {
-    //     //for (uint64_t i; terms[t].cur + i < terms[t].end; i++) {
-    //     for (uint64_t i = terms[t].end; i > terms[t].cur; i--) {
-    //         word_at(t, terms[t].end - i * 2) = word_at(t, terms[t].end - (i + 1) * 2)
-    //     }
-        //for (uint64_t i; &word_at(t, terms[t].cur + i / 2) != &word_at(t, terms[t].end)
-        //for (uint16_t* p = word_at(t, terms[t].cur); &p != &word_at(t, terms[t].end; p = word_at(t, terms[t].cur))
-        // The annoying part is: end might be on a later page, not just later in the same page...
-        // For so many things, the code would be cleaner and easier if the buffer weren't paged, and we no longer have 4K malloc
-        //   limit...  I guess it's worth pausing to consider: *would* there ever be noticeable lag to realloc a large buffer?  I
-        //   just have a big distaste for that, assuming with large pages you'd start to get a slowdown, and feeling like this paged
-        //   approach is the "correct" one.  More complex but consistently fast, rather than simple and usually fast, but slowing down
-        //   as the buffer gets large.
-        // So we're at 4K per page.  1000 pages is about 4M.  When it's time to double, we allocate an 8M region and copy 4M of data...
-        //   That's pretty fast these days?  But it still feels wrong?
-        // Haha, you know what feels right?  OS-level memory paging, so that we can *treat* a backing store of arbitrary length,
-        //   composed of an arbitrary number of physical memory pages, as a single contiguous region, keeping this code simpler and
-        //   easier, and letting the CPU work out what physical memory addres to actaully use for a given location in my region.  Well,
-        //   except... Can realloc keep the first pages in place and map new pages after?  That seems sketch.  I don't think I want
-        //   malloc and my OS-level paging to be friends like that.  Do *I*, then do what I'd wanted the CPU to do?  Have an extra
-        //   level of indirection, so every memory reference gets mapped to a given page, so non-contiguous pages at a lower level can
-        //   be treated as a large contiguous region at a higher level?
-        // Hmm, well, wait... The plan had always been to treat buf as a two-dimensional array, so we translate an overall offset to
-        //   a page and a page offset.  The idea was that that would be essentially what we're talking about.
-        // I'm so fucking tired.
-        // Macro or inline function to translate term and offset to address.  Then right the code with different syntax but same
-        //   semantics as a large one-dimensional array.
-        // Right?
-        //
-        // uint8_t* p = (uint16_t*) end_page(t) + terms[t].end % (LINES * 160) / 2;
-        // for (uint64_t i = terms[t].end - terms[t].cur; i > 2; i -= 2)
-
     terms[t].cur += 2;
     terms[t].end += 2;
 }
-
 
 /*
   Okay, I think the issue I noticed when backspacing across lines was because the code assumes in several places that cur is at the
@@ -265,17 +230,14 @@ static inline void backspace() {
     if (terms[at].anchor == terms[at].cur)
         return;
 
-    // TODO: Handle backspace appropriately if cursor is not at end...
-    uint8_t* p;
-    if (terms[at].cur % (LINES * 160) == 0)
-        p = page_before(at, terms[at].cur);
-    else
-        p = cur_page(at);
+    for (uint64_t i = terms[at].cur; i < terms[at].end; i += 2)
+        word_at(at, i - 2) = word_at(at, i);
+
+    word_at(at, terms[at].end - 2) = 0x0700;
 
     if (terms[at].cur % 160 == 0 && terms[at].top != 0)
         terms[at].top -= 160;
 
-    *((uint16_t*) p + (terms[at].cur - 2) % (LINES * 160) / 2) = 0x0700;
     terms[at].cur -= 2;
     terms[at].end -= 2;
 
