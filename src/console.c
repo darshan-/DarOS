@@ -197,7 +197,7 @@ static inline void ensureTerm(uint8_t t) {
 
 static inline void printcc(uint8_t t, uint8_t c, uint8_t cl) {
     if (terms[t].cur == terms[t].end) {
-        *((uint16_t*) end_page(t) + terms[t].end % (LINES * 160) / 2) = (cl << 8) | c;
+        word_at(t, terms[t].end) = (cl << 8) | c;
     } else {
         // The annoying part is: end might be on a later page, not just later in the same page...
         // For so many things, the code would be cleaner and easier if the buffer weren't paged, and we no longer have 4K malloc
