@@ -47,10 +47,8 @@ static struct vterm terms[TERM_COUNT];
 #define end_page(t) page_for(t, terms[t].end)
 #define anchor_page(t) page_for(t, terms[t].anchor)
 #define byte_at(t, i) page_for(t, i)[(i) % (LINES * 160)]
-#define word_at(t, i) ((uint16_t*) page_for(t, i))[(i) % (LINES * 160 / 2)]
-#define qword_at(t, i) ((uint64_t*) page_for(t, i))[(i) % (LINES * 160 / 8)]
-// #define word_at(t, i) ((uint16_t) byte_at(t, i))
-// #define qword_at(t, i) ((uint64_t) byte_at(t, i))
+#define word_at(t, i) ((uint16_t*) page_for(t, i))[(i) % (LINES * 160) / 2]
+#define qword_at(t, i) ((uint64_t*) page_for(t, i))[(i) % (LINES * 160) / 8]
 
 static inline void addPage(uint8_t t) {
     if (end_page(t)) // May exist (backspace, etc.), so don't malloc unnecessarily or leak that page
@@ -162,7 +160,7 @@ static void setStatusBar() {
 
 static void syncScreen() {
     for (uint64_t i = 0; i < LINES * 20; i++)
-        VRAM64[i] = qword_at(at, terms[at].top + i);
+        VRAM64[i] = qword_at(at, terms[at].top + i * 8);
 
     updateCursorPosition();
 }
