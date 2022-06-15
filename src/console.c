@@ -59,11 +59,9 @@ static inline void addPage(uint8_t t) {
         terms[t].buf = reallocz(terms[t].buf, terms[t].cap * sizeof(uint8_t*));
     }
 
-    uint64_t* p = malloc(LINES * 160);
-    end_page(t) = (uint8_t*) p;
-
+    end_page(t) = malloc(LINES * 160);
     for (int i = 0; i < LINES * 20; i++)
-        *p++ = 0x0700070007000700ull;
+        ((uint64_t*) end_page(t))[i] = 0x0700070007000700ull;
 }
 
 static inline uint64_t curPositionInScreen(uint8_t t) {
