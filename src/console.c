@@ -164,6 +164,7 @@ static void syncScreen() {
 }
 
 static void prompt(uint8_t t) {
+    terms[at].cur = terms[at].end;
     if (terms[t].cur % 160 != 0)
         printTo(t, "\n");
 
@@ -249,6 +250,30 @@ static inline void cursorLeft() {
         return;
 
     terms[at].cur -= 2;
+    updateCursorPosition();
+}
+
+static inline void cursorRight() {
+    if (terms[at].cur == terms[at].end)
+        return;
+
+    terms[at].cur += 2;
+    updateCursorPosition();
+}
+
+static inline void cursorHome() {
+    if (terms[at].anchor == terms[at].cur)
+        return;
+
+    terms[at].cur = terms[at].anchor;
+    updateCursorPosition();
+}
+
+static inline void cursorEnd() {
+    if (terms[at].cur == terms[at].end)
+        return;
+
+    terms[at].cur = terms[at].end;
     updateCursorPosition();
 }
 
@@ -460,6 +485,15 @@ static void gotInput(struct input i) {
 
     else if (i.key == KEY_LEFT && !i.alt && !i.ctrl && !i.shift)
         cursorLeft();
+
+    else if (i.key == KEY_RIGHT && !i.alt && !i.ctrl && !i.shift)
+        cursorRight();
+
+    else if (i.key == KEY_HOME && !i.alt && !i.ctrl && !i.shift)
+        cursorHome();
+
+    else if (i.key == KEY_END && !i.alt && !i.ctrl && !i.shift)
+        cursorEnd();
 
     else if (at > 0) {
         if (isPrintable(i.key) && !i.alt && !i.ctrl) {
