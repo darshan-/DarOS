@@ -12,6 +12,7 @@
 #include "strings.h"
 
 #define VRAM ((uint8_t*) 0xb8000)
+#define VRAM64 ((uint64_t*) VRAM)
 #define LINES 24
 #define LINE(l) (VRAM + 160 * (l))
 #define LAST_LINE LINE(LINES - 1)
@@ -43,19 +44,25 @@ static struct vterm terms[TERM_COUNT];
 #define page_before(t, i) page_for(t, i - LINES * 160)
 #define top_page(t) page_for(t, terms[t].top)
 #define cur_page(t) page_for(t, terms[t].cur)
+#define end_page(t) page_for(t, terms[t].end)
 #define anchor_page(t) page_for(t, terms[t].anchor)
+#define byte_at(t, i) page_for(t, i)[(i) % (LINES * 160)]
+#define word_at(t, i) ((uint16_t*) page_for(t, i))[(i) % (LINES * 160 / 2)]
+#define qword_at(t, i) ((uint64_t*) page_for(t, i))[(i) % (LINES * 160 / 8)]
+// #define word_at(t, i) ((uint16_t) byte_at(t, i))
+// #define qword_at(t, i) ((uint64_t) byte_at(t, i))
 
 static inline void addPage(uint8_t t) {
-    if (cur_page(t)) // May exist (backspace, etc.), so don't malloc unnecessarily or leak that page
+    if (end_page(t)) // May exist (backspace, etc.), so don't malloc unnecessarily or leak that page
         return;
 
-    if (terms[t].cap < page_index_for(t, cur) + 2) {
+    if (terms[t].cap < page_index_for(t, end) + 2) {
         terms[t].cap *= 2;
         terms[t].buf = reallocz(terms[t].buf, terms[t].cap * sizeof(uint8_t*));
     }
 
     uint64_t* p = malloc(LINES * 160);
-    cur_page(t) = (uint8_t*) p;
+    end_page(t) = (uint8_t*) p;
 
     for (int i = 0; i < LINES * 20; i++)
         *p++ = 0x0700070007000700ull;
@@ -154,18 +161,8 @@ static void setStatusBar() {
 }
 
 static void syncScreen() {
-    const uint64_t pos_in_pg = terms[at].top % (LINES * 160) / 8;
-    uint64_t* v = (uint64_t*) VRAM;
-    uint64_t* p = (uint64_t*) top_page(at) + pos_in_pg;
-
-    uint64_t i;
-    for (i = 0; i < (LINES * 20) - pos_in_pg; i++)
-        *v++ = *p++;
-
-    p = (uint64_t*) page_after(at, terms[at].top);
-
-    for (; i < LINES * 20; i++)
-        *v++ = *p++;
+    for (uint64_t i = 0; i < LINES * 20; i++)
+        VRAM64[i] = qword_at(at, terms[at].top + i);
 
     updateCursorPosition();
 }
@@ -203,8 +200,38 @@ static inline void ensureTerm(uint8_t t) {
 }
 
 static inline void printcc(uint8_t t, uint8_t c, uint8_t cl) {
-    *((uint16_t*) cur_page(t) + terms[t].cur % (LINES * 160) / 2) = (cl << 8) | c;
+    if (terms[t].cur == terms[t].end) {
+        *((uint16_t*) end_page(t) + terms[t].end % (LINES * 160) / 2) = (cl << 8) | c;
+    } else {
+        // The annoying part is: end might be on a later page, not just later in the same page...
+        // For so many things, the code would be cleaner and easier if the buffer weren't paged, and we no longer have 4K malloc
+        //   limit...  I guess it's worth pausing to consider: *would* there ever be noticeable lag to realloc a large buffer?  I
+        //   just have a big distaste for that, assuming with large pages you'd start to get a slowdown, and feeling like this paged
+        //   approach is the "correct" one.  More complex but consistently fast, rather than simple and usually fast, but slowing down
+        //   as the buffer gets large.
+        // So we're at 4K per page.  1000 pages is about 4M.  When it's time to double, we allocate an 8M region and copy 4M of data...
+        //   That's pretty fast these days?  But it still feels wrong?
+        // Haha, you know what feels right?  OS-level memory paging, so that we can *treat* a backing store of arbitrary length,
+        //   composed of an arbitrary number of physical memory pages, as a single contiguous region, keeping this code simpler and
+        //   easier, and letting the CPU work out what physical memory addres to actaully use for a given location in my region.  Well,
+        //   except... Can realloc keep the first pages in place and map new pages after?  That seems sketch.  I don't think I want
+        //   malloc and my OS-level paging to be friends like that.  Do *I*, then do what I'd wanted the CPU to do?  Have an extra
+        //   level of indirection, so every memory reference gets mapped to a given page, so non-contiguous pages at a lower level can
+        //   be treated as a large contiguous region at a higher level?
+        // Hmm, well, wait... The plan had always been to treat buf as a two-dimensional array, so we translate an overall offset to
+        //   a page and a page offset.  The idea was that that would be essentially what we're talking about.
+        // I'm so fucking tired.
+        // Macro or inline function to translate term and offset to address.  Then right the code with different syntax but same
+        //   semantics as a large one-dimensional array.
+        // Right?
+        //
+        // uint8_t* p = (uint16_t*) end_page(t) + terms[t].end % (LINES * 160) / 2;
+        // for (uint64_t i = terms[t].end - terms[t].cur; i > 2; i -= 2)
+            
+    }
+
     terms[t].cur += 2;
+    terms[t].end += 2;
 }
 
 
@@ -232,6 +259,7 @@ static inline void backspace() {
     if (terms[at].anchor == terms[at].cur)
         return;
 
+    // TODO: Handle backspace appropriately if cursor is not at end...
     uint8_t* p;
     if (terms[at].cur % (LINES * 160) == 0)
         p = page_before(at, terms[at].cur);
@@ -243,6 +271,7 @@ static inline void backspace() {
 
     *((uint16_t*) p + (terms[at].cur - 2) % (LINES * 160) / 2) = 0x0700;
     terms[at].cur -= 2;
+    terms[at].end -= 2;
 
     syncScreen();
 }
@@ -264,6 +293,7 @@ static inline void clearInput() {
         uint64_t cur_diff = terms[at].cur % (LINES * 160);
         terms[at].top -= cur_diff / 160 * 160; // Looks funny, but seems the correct and obvious way to get whole number of lines
         terms[at].cur -= cur_diff;
+        terms[at].end -= cur_diff;
     }
 
     if (terms[at].anchor != terms[at].cur) {
@@ -280,6 +310,7 @@ static inline void clearInput() {
 
         terms[at].top -= top_diff;
         terms[at].cur -= n;
+        terms[at].end -= n;
     }
 
     syncScreen();
@@ -294,7 +325,7 @@ static inline void printCharColor(uint8_t t, uint8_t c, uint8_t color) {
         printcc(t, c, color);
     }
 
-    if (terms[t].cur % (LINES * 160) == 0)
+    if (terms[t].end % (LINES * 160) == 0)
         addPage(t);
 
     if (curPositionInScreen(t) == LINES * 160)
