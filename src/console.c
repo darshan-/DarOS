@@ -281,7 +281,9 @@ static inline void clearInput() {
     if (terms[at].anchor == terms[at].cur)
         return;
 
-    //uint64_t page_index = terms[at].cur / (LINES * 160);
+    // if cur is end, clear from anchor to end, then set cur and end to anchor (easier now with word_at)
+    // otherwise we need to copy from region spanning from cur to end to be at anchor, and clear from end of that to old end.
+
     uint64_t page_index = page_index_for(at, cur);
     if (terms[at].cur % (LINES * 160) == 0)
         page_index--;
@@ -480,21 +482,6 @@ static void gotInput(struct input i) {
     else if (i.key == KEY_RIGHT && !i.alt && i.ctrl && !i.shift)
         showTerm((at + 1) % 10);
 
-    else if (i.key == KEY_LEFT && !i.alt && i.ctrl && !i.shift)
-        showTerm((at + 9) % 10);
-
-    else if (i.key == KEY_LEFT && !i.alt && !i.ctrl && !i.shift)
-        cursorLeft();
-
-    else if (i.key == KEY_RIGHT && !i.alt && !i.ctrl && !i.shift)
-        cursorRight();
-
-    else if (i.key == KEY_HOME && !i.alt && !i.ctrl && !i.shift)
-        cursorHome();
-
-    else if (i.key == KEY_END && !i.alt && !i.ctrl && !i.shift)
-        cursorEnd();
-
     else if (at > 0) {
         if (isPrintable(i.key) && !i.alt && !i.ctrl) {
             scrollToBottom();
@@ -509,6 +496,32 @@ static void gotInput(struct input i) {
         } else if (i.key == 'u' && !i.alt && i.ctrl && !i.shift) {
             scrollToBottom();
             clearInput();
+        }
+
+        else if (i.key == KEY_LEFT && !i.alt && i.ctrl && !i.shift)
+            showTerm((at + 9) % 10);
+
+        else if (i.key == KEY_LEFT && !i.alt && !i.ctrl && !i.shift)
+            cursorLeft();
+
+        else if (i.key == KEY_RIGHT && !i.alt && !i.ctrl && !i.shift)
+            cursorRight();
+
+        else if (i.key == KEY_HOME && !i.alt && !i.ctrl && !i.shift)
+            cursorHome();
+
+        else if (i.key == 'a' && !i.alt && i.ctrl && !i.shift)
+            cursorHome();
+
+        else if (i.key == KEY_END && !i.alt && !i.ctrl && !i.shift)
+            cursorEnd();
+
+        else if (i.key == 'e' && !i.alt && i.ctrl && !i.shift)
+            cursorEnd();
+
+        else if (i.key == 'h' && !i.alt && i.ctrl && !i.shift) {
+            scrollToBottom();
+            backspace();
         }
 
         // TODO: Nope, not clearScreen() anymore, since we have scrollback.
