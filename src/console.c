@@ -51,7 +51,7 @@ static struct vterm terms[TERM_COUNT];
 #define qword_at(t, i) ((uint64_t*) page_for(t, i))[(i) % (LINES * 160) / 8]
 
 static inline void addPage(uint8_t t) {
-    if (end_page(t)) // May exist (backspace, etc.), so don't malloc unnecessarily or leak that page
+    if (end_page(t)) // May exist already (e.g., due to backspace decreasing end), so don't malloc unnecessarily or leak that page
         return;
 
     if (terms[t].cap < page_index_for(t, end) + 2) {
@@ -102,8 +102,7 @@ static void writeStatusBar(char* s, uint8_t loc) {
     ints_okay();
 }
 
-#define MAX_MEMLEN 24
-void updateMemUse() {
+void updateHeapUse() {
     char* s;
     uint64_t m = heapUsed();
     char* unit = "bytes";
@@ -115,11 +114,12 @@ void updateMemUse() {
 
     s = M_sprintf("Heap used: %u %s", m, unit);  // TODO: Round rather than floor and/or decimal point, etc.?
 
-    if (strlen(s) > MAX_MEMLEN)
-        s[MAX_MEMLEN] = 0;
+    const uint64_t max_len = 24;
+    if (strlen(s) > max_len)
+        s[max_len] = 0;
 
-    if (strlen(s) < MAX_MEMLEN) {
-        char* f = M_sprintf("%%p %us", MAX_MEMLEN);
+    if (strlen(s) < max_len) {
+        char* f = M_sprintf("%%p %us", max_len);
         char* t = M_sprintf(f, s);
         free(f);
         free(s);
@@ -150,10 +150,10 @@ static void setStatusBar() {
 
     writeStatusBar("PurpOS", 37);
 
-    updateMemUse(); // Clock will update very soon, but mem won't for 2 seconds
+    updateHeapUse(); // Clock will update very soon, but heap use won't for 2 seconds
 
     registerPeriodicCallback((struct periodic_callback) {60, 1, updateClock});
-    registerPeriodicCallback((struct periodic_callback) {2, 1, updateMemUse});
+    registerPeriodicCallback((struct periodic_callback) {2, 1, updateHeapUse});
 }
 
 static void syncScreen() {
