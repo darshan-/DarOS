@@ -69,6 +69,13 @@ static inline void addPage(uint8_t t) {
         ((uint64_t*) end_page(t))[i] = 0x0700070007000700ull;
 }
 
+// This feels like a hacky and ugly approach, but worth at least trying in my super sleep-deprived state.
+static inline void addExtraPage(uint8_t t) {
+    terms[at].end += LINES * 160;
+    addPage(t);
+    terms[at].end -= LINES * 160;
+}
+
 static inline uint64_t top(uint8_t t) {
     uint64_t v;
 
@@ -186,7 +193,57 @@ static void syncScreen() {
     updateCursorPosition();
 }
 
+static void scrollDownBy(uint64_t n) {
+    if (terms[at].v_scroll == 0)
+        return;
+
+    if (n < terms[at].v_scroll)
+        terms[at].v_scroll -= n;
+    else
+        terms[at].v_scroll = 0;
+
+    syncScreen();
+
+    if (at != LOGS)
+        showCursor();
+}
+
+static inline void scrollToBottom() {
+    scrollDownBy((uint64_t) -1);
+}
+
+static void scrollUpBy(uint64_t n) {
+    if (top(at) == 0)
+        return;
+
+    uint64_t max_scroll = top(at) / 160;
+    if (n > max_scroll)
+        n = max_scroll;
+
+    terms[at].v_scroll += n;
+
+    syncScreen();
+}
+
+static inline void scrollToTop() {
+    scrollUpBy((uint64_t) -1);
+}
+
+static inline void clear() {
+    scrollToBottom();
+
+    if (line_for(at, cur) - top(at) == 0)
+        return;
+
+    addExtraPage(at);
+
+    terms[at].v_clear = line_for(at, cur) - top(at);
+
+    syncScreen();
+}
+
 static void prompt(uint8_t t) {
+    scrollToBottom();
     terms[at].cur = terms[at].end;
     if (terms[t].cur % 160 != 0)
         printTo(t, "\n");
@@ -251,6 +308,8 @@ static inline void printcc(uint8_t t, uint8_t c, uint8_t cl) {
 // This *may* make sense to apply to non-active terminals, or even to handle a '\b' in a string for printing.
 // But for now, I'm not sure if that's the case; let's just handle explicit backspace key pressed at console.
 static inline void backspace() {
+    scrollToBottom();
+
     if (terms[at].cur == terms[at].anchor)
         return;
 
@@ -266,6 +325,8 @@ static inline void backspace() {
 }
 
 static inline void delete() {
+    scrollToBottom();
+
     if (terms[at].cur == terms[at].end)
         return;
 
@@ -280,6 +341,8 @@ static inline void delete() {
 }
 
 static inline void cursorLeft() {
+    scrollToBottom();
+
     if (terms[at].anchor == terms[at].cur)
         return;
 
@@ -288,6 +351,8 @@ static inline void cursorLeft() {
 }
 
 static inline void cursorRight() {
+    scrollToBottom();
+
     if (terms[at].cur == terms[at].end)
         return;
 
@@ -296,6 +361,8 @@ static inline void cursorRight() {
 }
 
 static inline void cursorHome() {
+    scrollToBottom();
+
     if (terms[at].anchor == terms[at].cur)
         return;
 
@@ -304,6 +371,8 @@ static inline void cursorHome() {
 }
 
 static inline void cursorEnd() {
+    scrollToBottom();
+
     if (terms[at].cur == terms[at].end)
         return;
 
@@ -312,6 +381,8 @@ static inline void cursorEnd() {
 }
 
 static inline void clearInput() {
+    scrollToBottom();
+
     if (terms[at].anchor == terms[at].cur)
         return;
 
@@ -324,16 +395,6 @@ static inline void clearInput() {
 
     terms[at].cur -= cur_diff;
     terms[at].end -= cur_diff;
-
-    // TODO: Set top.  Ignoring ctrl-l offset for now, we can work it out just based on cur, right?  So that... Hmm, well, ignoring the
-    //   case of more than a screenful of input, the basic idea for now is to have end on the bottom row, unless we're on the first page,
-    //   in which case top is just 0.  If we have more than screenful of input, then we'll want cursor to always be on the screen and end
-    //   can go past bottom.  Probabably that's how we'd do it, too: anchor top to top until we can't do that anymore while keeping end on
-    //   the screen, then anchor end to bottom until we can't do that anymore while keeing cursor on the screen, then anchor cursor to top.
-    //   It's like a funny little ping-pong ball.
-
-    // Which, hmm, that means, if it's cheap to compute, we may not want to bother keeping track of top?  I'll have to think further,
-    //  considering both how expensive it is to compute and where and how it's used.  But seems worth a bit of thought.
 
     syncScreen();
 }
@@ -390,42 +451,6 @@ void printf(char* fmt, ...) {
     VARIADIC_PRINT(print);
 }
 
-static void scrollDownBy(uint64_t n) {
-    if (terms[at].v_scroll == 0)
-        return;
-
-    if (n < terms[at].v_scroll)
-        terms[at].v_scroll -= n;
-    else
-        terms[at].v_scroll = 0;
-
-    syncScreen();
-
-    if (at != LOGS)
-        showCursor();
-}
-
-static inline void scrollToBottom() {
-    scrollDownBy((uint64_t) -1);
-}
-
-static void scrollUpBy(uint64_t n) {
-    if (top(at) == 0)
-        return;
-
-    uint64_t max_scroll = top(at) / 160;
-    if (n > max_scroll)
-        n = max_scroll;
-
-    terms[at].v_scroll += n;
-
-    syncScreen();
-}
-
-static inline void scrollToTop() {
-    scrollUpBy((uint64_t) -1);
-}
-
 static void showTerm(uint8_t t) {
     if (t == at)
         return;
@@ -450,7 +475,6 @@ static void showTerm(uint8_t t) {
 //
 //  All of these depend on being able to edit somewhere within input field before end of field, I think:
 //   ctrl-k
-//   del
 //
 //   How much would it be worth it to invalidate regions rather than the whole screen at once?
 //     - whole screen
@@ -494,19 +518,19 @@ static void gotInput(struct input i) {
             scrollToBottom();
             printCharColor(at, i.key, 0x07);
             syncScreen();
-        } else if (i.key == '\b' && !i.alt && !i.ctrl && !i.shift) {
-            scrollToBottom();
-            backspace();
-        } else if (i.key == '\n' && !i.alt && !i.ctrl && !i.shift) {
-            scrollToBottom();
-            prompt(at);
-        } else if (i.key == 'u' && !i.alt && i.ctrl && !i.shift) {
-            scrollToBottom();
-            clearInput();
-        } else if (i.key == KEY_DEL && !i.alt && !i.ctrl && !i.shift) {
-            scrollToBottom();
-            delete();
         }
+
+        else if (i.key == '\b' && !i.alt && !i.ctrl && !i.shift)
+            backspace();
+
+        else if (i.key == '\n' && !i.alt && !i.ctrl && !i.shift)
+            prompt(at);
+
+        else if (i.key == 'u' && !i.alt && i.ctrl && !i.shift)
+            clearInput();
+
+        else if (i.key == KEY_DEL && !i.alt && !i.ctrl && !i.shift)
+            delete();
 
         else if (i.key == KEY_LEFT && !i.alt && i.ctrl && !i.shift)
             showTerm((at + 9) % 10);
@@ -529,10 +553,11 @@ static void gotInput(struct input i) {
         else if (i.key == 'e' && !i.alt && i.ctrl && !i.shift)
             cursorEnd();
 
-        else if (i.key == 'h' && !i.alt && i.ctrl && !i.shift) {
-            scrollToBottom();
+        else if (i.key == 'h' && !i.alt && i.ctrl && !i.shift)
             backspace();
-        }
+
+        else if (i.key == 'l' && !i.alt && i.ctrl && !i.shift)
+            clear();
 
         // TODO: Nope, not clearScreen() anymore, since we have scrollback.
         //   We'll want to scroll, kind of, but differently from advanceLine() and scrollDown(), by our line
