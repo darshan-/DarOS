@@ -23,26 +23,31 @@
 
 #define TERM_COUNT 10 // One of which is logs
 
+// Okay, new tentative approach to scrolling, eventual ctrl-l, top:
+// We calculate top on the fly, based on cur and end.  These uniquely determine exactly how many lines to have above screen and where
+//   the cursor is.  Then we apply v_clear, then v_scroll, to dermine how to actually map the viewport.
+
 struct vterm {
     uint8_t** buf;
     uint64_t cap;
 
-    uint64_t top;    // Index of top line in screen (how many characters are above screen)
-    uint64_t off;    // Offset to support ctrl-l
-    uint64_t cur;    // Index of cursor (edit point)
     uint64_t anchor; // Index after last non-editable character
+    uint64_t cur;    // Index of cursor (edit point)
     uint64_t end;    // Index after last character
+
+    uint64_t v_scroll; // Vertical offset from scrolling
+    uint64_t v_clear;  // Vertical offset from ctrl-l / clear
 };
 
 static uint8_t at = 255;
 
 static struct vterm terms[TERM_COUNT];
 
-#define page_index_for(t, i) terms[t].i / (LINES * 160)
-#define page_for(t, i) terms[t].buf[(i) / (LINES * 160)]
-#define page_after(t, i) page_for(t, i + LINES * 160)
-#define page_before(t, i) page_for(t, i - LINES * 160)
-#define top_page(t) page_for(t, terms[t].top)
+#define line_for(t, i) (terms[t].i / 160)
+#define page_index_for(t, i) (terms[t].i / (LINES * 160))
+#define page_for(t, i) (terms[t].buf[(i) / (LINES * 160)])
+#define page_after(t, i) page_for(t, (i) + LINES * 160)
+#define page_before(t, i) page_for(t, (i) - LINES * 160)
 #define cur_page(t) page_for(t, terms[t].cur)
 #define end_page(t) page_for(t, terms[t].end)
 #define anchor_page(t) page_for(t, terms[t].anchor)
@@ -64,13 +69,37 @@ static inline void addPage(uint8_t t) {
         ((uint64_t*) end_page(t))[i] = 0x0700070007000700ull;
 }
 
+static inline uint64_t top(uint8_t t) {
+    if (terms[t].end < (uint64_t) LINES * 160)
+        return 0;
+
+    if (terms[t].end - terms[t].cur < LINES * 160)
+        return (line_for(t, end) - LINES + 1) * 160;
+
+    return line_for(t, cur);
+}
+
+static inline uint64_t offset_top(uint8_t t) {
+    return top(t) + (terms[t].v_clear - terms[t].v_scroll) * 160;
+}
+
 static inline uint64_t curPositionInScreen(uint8_t t) {
-    return terms[t].cur - terms[t].top;
+    return terms[t].cur - top(t);
+}
+
+static inline void hideCursor() {
+    outb(0x3D4, 0x0A);
+    outb(0x3D5, 0x20);
 }
 
 static inline void updateCursorPosition() {
-    uint64_t c = curPositionInScreen(at) / 2;
+    uint64_t c = curPositionInScreen(at);
+    if (c >= LINES * 160) {
+        hideCursor();
+        return;
+    }
 
+    c /= 2;
     outb(0x3D4, 0x0F);
     outb(0x3D5, (uint8_t) (c & 0xff));
     outb(0x3D4, 0x0E);
@@ -86,11 +115,6 @@ static inline void showCursor() {
  
     outb(0x3D4, 0x0B);
     outb(0x3D5, (inb(0x3D5) & 0xE0) | 15);
-}
-
-static inline void hideCursor() {
-    outb(0x3D4, 0x0A);
-    outb(0x3D5, 0x20);
 }
 
 static void writeStatusBar(char* s, uint8_t loc) {
@@ -158,7 +182,7 @@ static void setStatusBar() {
 
 static void syncScreen() {
     for (uint64_t i = 0; i < LINES * 20; i++)
-        VRAM64[i] = qword_at(at, terms[at].top + i * 8);
+        VRAM64[i] = qword_at(at, offset_top(at) + i * 8);
 
     updateCursorPosition();
 }
@@ -236,9 +260,6 @@ static inline void backspace() {
 
     word_at(at, terms[at].end - 2) = 0x0700;
 
-    if (terms[at].cur % 160 == 0 && terms[at].top != 0)
-        terms[at].top -= 160;
-
     terms[at].cur -= 2;
     terms[at].end -= 2;
 
@@ -281,15 +302,6 @@ static inline void clearInput() {
     if (terms[at].anchor == terms[at].cur)
         return;
 
-    // if cur is end, clear from anchor to end, then set cur and end to anchor (easier now with word_at)
-    // otherwise we need to copy from region spanning from cur to end to be at anchor, and clear from end of that to old end.
-
-    // So what we have is as many copies as characters from anchor to cur, or more, if cur to end is greater than that.
-    // An initial for loop might copy...  Well, let's try to say it in C:
-
-    // FROM: Copy from cur + i until cur + i == end, then copy 0x0700
-    //   TO: Copy to anchor + i until anchor +i == end
-
     uint64_t cur_diff = terms[at].cur - terms[at].anchor;
     uint64_t i;
     for (i = 0; terms[at].cur + i < terms[at].end; i += 2)
@@ -307,13 +319,15 @@ static inline void clearInput() {
     //   the screen, then anchor end to bottom until we can't do that anymore while keeing cursor on the screen, then anchor cursor to top.
     //   It's like a funny little ping-pong ball.
 
+    // Which, hmm, that means, if it's cheap to compute, we may not want to bother keeping track of top?  I'll have to think further,
+    //  considering both how expensive it is to compute and where and how it's used.  But seems worth a bit of thought.
+
     syncScreen();
 }
 
 static inline void printCharColor(uint8_t t, uint8_t c, uint8_t color) {
     if (c == '\n') {
-        uint64_t cpip = curPositionInScreen(t);
-        for (uint64_t n = 160 - cpip % 160; n > 0; n -= 2)
+        for (uint64_t n = 160 - terms[t].cur % 160; n > 0; n -= 2)
             printcc(t, 0, color);
     } else {
         printcc(t, c, color);
@@ -321,9 +335,6 @@ static inline void printCharColor(uint8_t t, uint8_t c, uint8_t color) {
 
     if (terms[t].end % (LINES * 160) == 0)
         addPage(t);
-
-    if (curPositionInScreen(t) == LINES * 160)
-        terms[t].top += 160;
 }
 
 void printColorTo(uint8_t t, char* s, uint8_t c) {
@@ -366,13 +377,37 @@ void printf(char* fmt, ...) {
     VARIADIC_PRINT(print);
 }
 
-static void scrollDownBy(uint64_t n);
+static void scrollDownBy(uint64_t n) {
+    if (terms[at].v_scroll == 0)
+        return;
+
+    if (n < terms[at].v_scroll)
+        terms[at].v_scroll -= n;
+    else
+        terms[at].v_scroll = 0;
+
+    syncScreen();
+
+    if (at != LOGS)
+        showCursor();
+}
 
 static inline void scrollToBottom() {
     scrollDownBy((uint64_t) -1);
 }
 
-static void scrollUpBy(uint64_t n);
+static void scrollUpBy(uint64_t n) {
+    if (top(at) == 0)
+        return;
+
+    uint64_t max_scroll = top(at) / 160;
+    if (n > max_scroll)
+        n = max_scroll;
+
+    terms[at].v_scroll += n;
+
+    syncScreen();
+}
 
 static inline void scrollToTop() {
     scrollUpBy((uint64_t) -1);
@@ -395,46 +430,14 @@ static void showTerm(uint8_t t) {
         showCursor();
 }
 
-static void scrollUpBy(uint64_t n) {
-    if (terms[at].top == 0)
-        return;
-
-    hideCursor();
-
-    if (n > terms[at].top / 160)
-        n = terms[at].top / 160;
-
-    terms[at].top -= n * 160;
-
-    syncScreen();
-}
-
-static void scrollDownBy(uint64_t n) {
-    if (curPositionInScreen(at) < LINES * 160)
-        return;
-
-    if (n > curPositionInScreen(at) / 160 - LINES + 1)
-        n = curPositionInScreen(at) / 160 - LINES + 1;
-
-    terms[at].top += n * 160;
-
-    syncScreen();
-
-    if (at != LOGS)
-        showCursor();
-}
-
 // TODO:
 //   (If I switch to page tables, ctrl-pgup to jump up 10 pages, ctrl-pgdn to jump down 10 pages?)
 //
 //   ctrl-l
 //
 //  All of these depend on being able to edit somewhere within input field before end of field, I think:
-//   ctrl-a / home
-//   ctrl-e / end
 //   ctrl-k
 //   del
-//   left arrow, right arrow
 //
 //   How much would it be worth it to invalidate regions rather than the whole screen at once?
 //     - whole screen
