@@ -251,7 +251,7 @@ static inline void printcc(uint8_t t, uint8_t c, uint8_t cl) {
 // This *may* make sense to apply to non-active terminals, or even to handle a '\b' in a string for printing.
 // But for now, I'm not sure if that's the case; let's just handle explicit backspace key pressed at console.
 static inline void backspace() {
-    if (terms[at].anchor == terms[at].cur)
+    if (terms[at].cur == terms[at].anchor)
         return;
 
     for (uint64_t i = terms[at].cur; i < terms[at].end; i += 2)
@@ -260,6 +260,20 @@ static inline void backspace() {
     word_at(at, terms[at].end - 2) = 0x0700;
 
     terms[at].cur -= 2;
+    terms[at].end -= 2;
+
+    syncScreen();
+}
+
+static inline void delete() {
+    if (terms[at].cur == terms[at].end)
+        return;
+
+    for (uint64_t i = terms[at].cur; i + 2 < terms[at].end; i += 2)
+        word_at(at, i) = word_at(at, i + 2);
+
+    word_at(at, terms[at].end - 2) = 0x0700;
+
     terms[at].end -= 2;
 
     syncScreen();
@@ -489,6 +503,9 @@ static void gotInput(struct input i) {
         } else if (i.key == 'u' && !i.alt && i.ctrl && !i.shift) {
             scrollToBottom();
             clearInput();
+        } else if (i.key == KEY_DEL && !i.alt && !i.ctrl && !i.shift) {
+            scrollToBottom();
+            delete();
         }
 
         else if (i.key == KEY_LEFT && !i.alt && i.ctrl && !i.shift)
