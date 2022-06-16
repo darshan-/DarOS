@@ -70,17 +70,16 @@ static inline void addPage(uint8_t t) {
 }
 
 static inline uint64_t top(uint8_t t) {
+    uint64_t v;
+
     if (terms[t].end < (uint64_t) LINES * 160)
-        return 0;
+        v = 0;
+    else if (terms[t].end - terms[t].cur < LINES * 160)
+        v = (line_for(t, end) - LINES + 1) * 160;
+    else
+        v = line_for(t, cur);
 
-    if (terms[t].end - terms[t].cur < LINES * 160)
-        return (line_for(t, end) - LINES + 1) * 160;
-
-    return line_for(t, cur);
-}
-
-static inline uint64_t offset_top(uint8_t t) {
-    return top(t) + (terms[t].v_clear - terms[t].v_scroll) * 160;
+    return v + (terms[t].v_clear - terms[t].v_scroll) * 160;
 }
 
 static inline uint64_t curPositionInScreen(uint8_t t) {
@@ -182,7 +181,7 @@ static void setStatusBar() {
 
 static void syncScreen() {
     for (uint64_t i = 0; i < LINES * 20; i++)
-        VRAM64[i] = qword_at(at, offset_top(at) + i * 8);
+        VRAM64[i] = qword_at(at, top(at) + i * 8);
 
     updateCursorPosition();
 }
