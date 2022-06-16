@@ -284,37 +284,28 @@ static inline void clearInput() {
     // if cur is end, clear from anchor to end, then set cur and end to anchor (easier now with word_at)
     // otherwise we need to copy from region spanning from cur to end to be at anchor, and clear from end of that to old end.
 
-    uint64_t page_index = page_index_for(at, cur);
-    if (terms[at].cur % (LINES * 160) == 0)
-        page_index--;
+    // So what we have is as many copies as characters from anchor to cur, or more, if cur to end is greater than that.
+    // An initial for loop might copy...  Well, let's try to say it in C:
 
-    uint8_t* p;
-    for (p = terms[at].buf[page_index]; p != anchor_page(at); p = terms[at].buf[page_index--]) {
-        for (int i = 0; i < LINES * 20; i++)
-            *((uint64_t*) p++) = 0x0700070007000700ull;
+    // FROM: Copy from cur + i until cur + i == end, then copy 0x0700
+    //   TO: Copy to anchor + i until anchor +i == end
 
-        uint64_t cur_diff = terms[at].cur % (LINES * 160);
-        terms[at].top -= cur_diff / 160 * 160; // Looks funny, but seems the correct and obvious way to get whole number of lines
-        terms[at].cur -= cur_diff;
-        terms[at].end -= cur_diff;
-    }
+    uint64_t cur_diff = terms[at].cur - terms[at].anchor;
+    uint64_t i;
+    for (i = 0; terms[at].cur + i < terms[at].end; i += 2)
+        word_at(at, terms[at].anchor + i) = word_at(at, terms[at].cur + i);
+    for (; terms[at].anchor + i < terms[at].end; i += 2)
+        word_at(at, terms[at].anchor + i) = 0x0700;
 
-    if (terms[at].anchor != terms[at].cur) {
-        uint64_t n = terms[at].cur - terms[at].anchor;
-        uint16_t* q = (uint16_t*) p + (terms[at].anchor % (LINES * 160) / 2);
+    terms[at].cur -= cur_diff;
+    terms[at].end -= cur_diff;
 
-        for (uint64_t i = 0; i < n; i++)
-            *q++ = 0x0700;
-
-        uint64_t top_diff = (terms[at].cur / 160 - terms[at].anchor / 160) * 160;
-
-        if (top_diff > terms[at].top)
-            top_diff = terms[at].top;
-
-        terms[at].top -= top_diff;
-        terms[at].cur -= n;
-        terms[at].end -= n;
-    }
+    // TODO: Set top.  Ignoring ctrl-l offset for now, we can work it out just based on cur, right?  So that... Hmm, well, ignoring the
+    //   case of more than a screenful of input, the basic idea for now is to have end on the bottom row, unless we're on the first page,
+    //   in which case top is just 0.  If we have more than screenful of input, then we'll want cursor to always be on the screen and end
+    //   can go past bottom.  Probabably that's how we'd do it, too: anchor top to top until we can't do that anymore while keeping end on
+    //   the screen, then anchor end to bottom until we can't do that anymore while keeing cursor on the screen, then anchor cursor to top.
+    //   It's like a funny little ping-pong ball.
 
     syncScreen();
 }
