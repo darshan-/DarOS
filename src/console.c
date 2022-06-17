@@ -361,10 +361,10 @@ static inline void cursorEnd() {
     updateCursorPosition();
 }
 
-static inline void clearInput() {
+static inline void clearCurToAnchor() {
     scrollToBottom();
 
-    if (terms[at].anchor == terms[at].cur)
+    if (terms[at].cur == terms[at].anchor)
         return;
 
     uint64_t cur_diff = terms[at].cur - terms[at].anchor;
@@ -376,6 +376,20 @@ static inline void clearInput() {
 
     terms[at].cur -= cur_diff;
     terms[at].end -= cur_diff;
+
+    syncScreen();
+}
+
+static inline void clearCurToEnd() {
+    scrollToBottom();
+
+    if (terms[at].cur == terms[at].end)
+        return;
+
+    for (uint64_t i = terms[at].cur; i < terms[at].end; i += 2)
+        word_at(at, i) = 0x0700;
+
+    terms[at].end = terms[at].cur;
 
     syncScreen();
 }
@@ -455,6 +469,8 @@ static void showTerm(uint8_t t) {
 //   (If I switch to page tables, ctrl-pgup to jump up 10 pages, ctrl-pgdn to jump down 10 pages?)
 //
 //   ctrl-k
+//   alt-left / alt-b and alt-right / alt-f
+//   ctrl-j as enter?
 //
 //   How much would it be worth it to invalidate regions rather than the whole screen at once?
 //     - whole screen
@@ -507,7 +523,10 @@ static void gotInput(struct input i) {
             prompt(at);
 
         else if (i.key == 'u' && !i.alt && i.ctrl && !i.shift)
-            clearInput();
+            clearCurToAnchor();
+
+        else if (i.key == 'k' && !i.alt && i.ctrl && !i.shift)
+            clearCurToEnd();
 
         else if (i.key == KEY_DEL && !i.alt && !i.ctrl && !i.shift)
             delete();
