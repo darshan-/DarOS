@@ -496,9 +496,8 @@ static void showTerm(uint8_t t) {
 // TODO:
 //   (If I switch to page tables, ctrl-pgup to jump up 10 pages, ctrl-pgdn to jump down 10 pages?)
 //
-//   ctrl-k
-//   alt-left / alt-b and alt-right / alt-f
 //   ctrl-j as enter?
+//   alt-backspace to delete previous word?
 //
 //   How much would it be worth it to invalidate regions rather than the whole screen at once?
 //     - whole screen

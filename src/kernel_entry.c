@@ -21,6 +21,13 @@ struct mem_table_entry {
   Overall to-do list:
 
   * User space
+    - Need a user-mode segment in GDT, but I've been conflating GDT and page tables -- set new l4 table in cr3 as part of
+      switch to user mode.  Not new GDT, but new l4 table.  Not new ldtr, but new cr3.
+      We need to set the U/S bit (1<<2) on all three levels.
+      We only make entries for valid addresses.  So first attempt would pick a single 2MB of memory (2MB-aligned) to be for
+        my single user-space task, and wherever we put that, we... Oh, the point is paging.  So we can put that as the first
+        and single entry of an l2 table, right?  And then the process will see itself as having flat memory from 0 to 2MB, and
+        the entry tells the processsor where it is in physical memory.
   * Shell
   * HPET -- not just for finer resolution of timer, but as source of actual timer count -- missed ticks are less bad.
   * Network?

@@ -188,7 +188,9 @@ bits 64
 gdt:
         dq 0
 .code:
-        dq SD_PRESENT | SD_NONTSS | SD_CODESEG | SD_READABLE | SD_GRAN4K | SD_MODE64
+        dq SD_RING0 | SD_PRESENT | SD_NONTSS | SD_CODESEG | SD_READABLE | SD_GRAN4K | SD_MODE64
+.user:
+        dq SD_RING3 | SD_PRESENT | SD_NONTSS | SD_CODESEG | SD_READABLE | SD_GRAN4K | SD_MODE64
 gdtr:
         dw $ - gdt - 1          ; Length in bytes minus 1
         dq gdt                  ; Address
