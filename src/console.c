@@ -35,8 +35,8 @@ struct vterm {
     uint64_t cur;    // Index of cursor (edit point)
     uint64_t end;    // Index after last character
 
-    uint64_t v_scroll; // Vertical offset from scrolling
-    uint64_t v_clear;  // Vertical offset from ctrl-l / clear
+    uint64_t clear_top; // Top position to use due to ctrl-l / clear
+    uint64_t v_scroll;  // Vertical offset from scrolling
 };
 
 static uint8_t at = 255;
@@ -55,38 +55,50 @@ static struct vterm terms[TERM_COUNT];
 #define word_at(t, i) (((uint16_t*) page_for(t, i))[(i) % (LINES * 160) / 2])
 #define qword_at(t, i) (((uint64_t*) page_for(t, i))[(i) % (LINES * 160) / 8])
 
-static inline void addPage(uint8_t t) {
-    if (end_page(t)) // May exist already (e.g., due to backspace decreasing end), so don't malloc unnecessarily or leak that page
+static void addPage(uint8_t t, uint64_t i) {
+    if (terms[t].buf[i])
         return;
 
-    if (terms[t].cap < page_index_for(t, end) + 2) {
+    if (terms[t].cap < i + 2) {
         terms[t].cap *= 2;
         terms[t].buf = reallocz(terms[t].buf, terms[t].cap * sizeof(uint8_t*));
     }
 
-    end_page(t) = malloc(LINES * 160);
-    for (int i = 0; i < LINES * 20; i++)
-        ((uint64_t*) end_page(t))[i] = 0x0700070007000700ull;
+    terms[t].buf[i] = malloc(LINES * 160);
+    for (int j = 0; j < LINES * 20; j++)
+        ((uint64_t*) terms[t].buf[i])[j] = 0x0700070007000700ull;
 }
 
-// This feels like a hacky and ugly approach, but worth at least trying in my super sleep-deprived state.
-static inline void addExtraPage(uint8_t t) {
-    terms[at].end += LINES * 160;
-    addPage(t);
-    terms[at].end -= LINES * 160;
+static inline void ensurePages(uint8_t t) {
+    uint64_t i = page_index_for(t, end);
+
+    if (!terms[t].buf[i])
+        addPage(t, i);
+
+    if (!terms[t].buf[i + 1])
+        addPage(t, i + 1);
 }
 
 static inline uint64_t top(uint8_t t) {
-    uint64_t v;
+    uint64_t l;
 
-    if (terms[t].end < (uint64_t) LINES * 160)
-        v = 0;
-    else if (terms[t].end - terms[t].cur < LINES * 160)
-        v = (line_for(t, end) - LINES + 1) * 160;
+    if (line_for(t, end) - line_for(t, cur) >= LINES)
+        l = line_for(t, cur);
+    else if (line_for(t, end) - terms[t].clear_top < LINES)
+        l = terms[t].clear_top;
     else
-        v = line_for(t, cur);
+        l = line_for(t, end) - LINES + 1;
 
-    return v + (terms[t].v_clear - terms[t].v_scroll) * 160;
+    return (l - terms[t].v_scroll) * 160;
+}
+
+static inline uint64_t clean_top(uint8_t t) {
+    if (line_for(t, end) - line_for(t, cur) >= LINES)
+        return terms[t].cur;
+    else if (line_for(t, end) - terms[t].clear_top < LINES)
+        return 0;
+    else
+        return terms[t].end - (LINES - 1) * 160;
 }
 
 static inline uint64_t curPositionInScreen(uint8_t t) {
@@ -232,12 +244,10 @@ static inline void scrollToTop() {
 static inline void clear() {
     scrollToBottom();
 
-    if (line_for(at, cur) - top(at) == 0)
+    if (line_for(at, anchor) == top(at) / 160)
         return;
-
-    addExtraPage(at);
-
-    terms[at].v_clear = line_for(at, cur) - top(at);
+    terms[at].clear_top = line_for(at, anchor);
+    ensurePages(at);
 
     syncScreen();
 }
@@ -261,7 +271,7 @@ static inline void ensureTerm(uint8_t t) {
     }
 
     if (!terms[t].buf[0]) {
-        addPage(t);
+        ensurePages(t);
 
         if (t == LOGS_TERM) {
             printColorTo(t, "- Start of logs -\n", 0x0f);
@@ -400,6 +410,8 @@ static inline void clearInput() {
 }
 
 static inline void printCharColor(uint8_t t, uint8_t c, uint8_t color) {
+    uint64_t l = top(t);
+
     if (c == '\n') {
         for (uint64_t n = 160 - terms[t].cur % 160; n > 0; n -= 2)
             printcc(t, 0, color);
@@ -407,8 +419,8 @@ static inline void printCharColor(uint8_t t, uint8_t c, uint8_t color) {
         printcc(t, c, color);
     }
 
-    if (terms[t].end % (LINES * 160) == 0)
-        addPage(t);
+    if (top(t) != l)
+        ensurePages(t);
 }
 
 void printColorTo(uint8_t t, char* s, uint8_t c) {
