@@ -70,6 +70,7 @@ void setUpUserMode() {
     // void* l3 = l4 + 0x1000;
     // void* l2 = l3 + 0x1000;
 
+    void* stack = malloc(1024 * 8);
     void* u = malloc(2 * 1024 * 1024 * 2); // 2MB page, doubled so I can clunkily align
     u = (void*) ((uint64_t) u & ~(1024 * 1024 * 4 - 1));
 
@@ -78,11 +79,28 @@ void setUpUserMode() {
     uint64_t* l3 = l4 + 0x1000 / 8;
     uint64_t* l2 = l3 + 0x1000 / 8;
 
+    // Okay, but not 0 for each of those, but rather, work out the l4 index, l3 index, and l2 index for where u actually is
+
+    // Hmm, so, let's see.  I think each entry in l2 represents 2 MB, so each entry in l3 represents 512 * 2 MB, or 1 GB.
+    // Which is familiar from the early days when that's all we mapped.
+    // So for this experiment, we're definitely just using l4[0], and l3[0], and l2 should be pretty easy:
+
     l4[0] = (uint64_t) l3 | PT_PRESENT | PT_WRITABLE | PT_USERMODE;
     l3[0] = (uint64_t) l2 | PT_PRESENT | PT_WRITABLE | PT_USERMODE;
-    l2[0] = (uint64_t) u | PT_PRESENT | PT_WRITABLE | PT_USERMODE | PT_HUGE;
+    l2[(uint64_t) u / (1024 * 1024 * 2)] = (uint64_t) u | PT_PRESENT | PT_WRITABLE | PT_USERMODE | PT_HUGE;
 
-    // Okay, but not 0 for each of those, but rather, work out the l4 index, l3 index, and l2 index for where u actually is
+    // Something like this?:
+
+    // push eflags // has iterrupt bit on
+    // Disable interrupts
+    // pop eflags  // has interrupt bit on
+    ////// put that at top of user mode stack (consider alignment)
+    // set ss to usermode gdt segment
+    // set esp to user stack (consider alignment)
+    // push or modified flags to now-usermode stack
+    // put l4 in cr3
+    // Set ds, es, fs, and gs to usermode gdt segment
+    // iret
 }
 
 void __attribute__((section(".kernel_entry"))) kernel_entry() {
