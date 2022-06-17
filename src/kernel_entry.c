@@ -36,6 +36,55 @@ struct mem_table_entry {
 
  */
 
+/*
+
+  Okay, so to set up a single user-mode page, I need 3 4k pages for tables, plus the 2 MB page itself.
+  The user-mode code needs to be either entirely local references, or know where it's going to end up.
+  Hmm, for this first experiment, trying for simplest and easiest test possible (well, that I can easily think of), I should be
+    able to have it share the same identity-mapped address space.  It's just that they're using different page tables, and the
+    user-space page tables a) are marked with u/s bit, and b) only have one page identity mapped -- the other should be null
+    mapped.  (Mapping all other pages to the null descriptor only occured to me while writing the last sentence, and seems
+    obviously what I'm meant to do, I think.)  Null-mapping means I flesh out all of l4 and l3 with null descriptors too, not
+    just l2.  But all zeros makes a null-descriptor, I think, so getting mallocz to give my arbitrarily aligned memory (or just
+    malloczing a region twice as large as I want to start at the aligned place myself for now) should be a workable approach for
+    this first test.
+
+  Yeah, AMD manual says "When the P bit is 0, indicating a not-present page, all remaining bits in the page data-structure entry
+    are available to software," which seems to mean I can have the whole thing be zeroed, and that's valid, and means a fault will
+    occur if user-mode code tries to access memory for that page.
+
+ */
+
+#define PT_PRESENT  1
+#define PT_WRITABLE 1 << 1
+#define PT_USERMODE 1 << 2
+#define PT_HUGE     1 << 7
+
+void userMode() {
+}
+
+void setUpUserMode() {
+    // void* tables = mallocz(1024 * 4 * 3 * 2); // 3 4K tables, doubled so I can clunkily align
+    // //void* l4 = tables - (uint64_t) tables % 0x1000;
+    // void* l4 = (void*) ((uint64_t) tables & ~0xfff);
+    // void* l3 = l4 + 0x1000;
+    // void* l2 = l3 + 0x1000;
+
+    void* u = malloc(2 * 1024 * 1024 * 2); // 2MB page, doubled so I can clunkily align
+    u = (void*) ((uint64_t) u & ~(1024 * 1024 * 4 - 1));
+
+    uint64_t* tables = mallocz(1024 * 4 * 3 * 2); // 3 4K tables, doubled so I can clunkily align
+    uint64_t* l4 = (uint64_t*) ((uint64_t) tables & ~0xfff);
+    uint64_t* l3 = l4 + 0x1000 / 8;
+    uint64_t* l2 = l3 + 0x1000 / 8;
+
+    l4[0] = (uint64_t) l3 | PT_PRESENT | PT_WRITABLE | PT_USERMODE;
+    l3[0] = (uint64_t) l2 | PT_PRESENT | PT_WRITABLE | PT_USERMODE;
+    l2[0] = (uint64_t) u | PT_PRESENT | PT_WRITABLE | PT_USERMODE | PT_HUGE;
+
+    // Okay, but not 0 for each of those, but rather, work out the l4 index, l3 index, and l2 index for where u actually is
+}
+
 void __attribute__((section(".kernel_entry"))) kernel_entry() {
     uint32_t* entry_count = (uint32_t*) 0x4000;
     uint64_t largest = 0;
@@ -81,6 +130,8 @@ void __attribute__((section(".kernel_entry"))) kernel_entry() {
     logf("Heap is %u MB.\n", heapSize() / 1024 / 1024);
     parse_acpi_tables();
     init_hpet();
+
+    setUpUserMode();
 
     log("Kernel initialized; going to waitloop.\n");
     waitloop();
