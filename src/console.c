@@ -92,15 +92,6 @@ static inline uint64_t top(uint8_t t) {
     return (l - terms[t].v_scroll) * 160;
 }
 
-static inline uint64_t clean_top(uint8_t t) {
-    if (line_for(t, end) - line_for(t, cur) >= LINES)
-        return terms[t].cur;
-    else if (line_for(t, end) - terms[t].clear_top < LINES)
-        return 0;
-    else
-        return terms[t].end - (LINES - 1) * 160;
-}
-
 static inline uint64_t curPositionInScreen(uint8_t t) {
     return terms[t].cur - top(t);
 }
@@ -297,26 +288,6 @@ static inline void printcc(uint8_t t, uint8_t c, uint8_t cl) {
     terms[t].end += 2;
 }
 
-/*
-  Okay, I think the issue I noticed when backspacing across lines was because the code assumes in several places that cur is at the
-    bottom of the screen once we've reached a screenful of output.  That won't be true once we have ctrl-l, but duh, it's also not true
-    once you can backspace up a line.  Should that also use the offset mechanism I'd planned to use for ctrl-l, or is there are better
-    approach to both?  At first glance, it seems still right.  I mean, given that I think backspacing up should have the same behavior --
-    if your'e on the bottom line, type a little over a line of input, then backspace back up to the second-to-last line, then press down
-    or page down, I don't think any scrolling down should happen.  I think the backspacing up a line should have created an offset, a new
-    home base / vertical anchor.  And in fact, I just checked, after writing that, and bash in konsole works this way that I just
-    described.  As I was entering spaces and about to try it, another option did occur to me, however: when backspace takes you up a line
-    (or ctrl-u, which might do multiple lines at once, keep in mind) it would also feel natural, I think, to have the page scroll back
-    down.  So essentially if the cursor is at the last position on the screen and you type a character, everything goes up one and the
-    cursor is at the beginning of the last line, and if you press backspace, we could just undo that.  That's actually easy to do right
-    now (with ctrl-u being a little harder but not hard, I think), and I kind like it, so I think I might try that for now.  Well, yeah,
-    I will, because at least I'd have correct behavior until I have the offset set up and working, at which point I'll be able to pick
-    which behavior I prefer.  I'm honestly not sure which I'll prefer, but in many ways I think I currently lean toward this, and I can
-    do it now and have backspace working a correct way, and then I'll have a better sense which I want.  So, cool.
- */
-
-// This *may* make sense to apply to non-active terminals, or even to handle a '\b' in a string for printing.
-// But for now, I'm not sure if that's the case; let's just handle explicit backspace key pressed at console.
 static inline void backspace() {
     scrollToBottom();
 
@@ -483,9 +454,6 @@ static void showTerm(uint8_t t) {
 // TODO:
 //   (If I switch to page tables, ctrl-pgup to jump up 10 pages, ctrl-pgdn to jump down 10 pages?)
 //
-//   ctrl-l
-//
-//  All of these depend on being able to edit somewhere within input field before end of field, I think:
 //   ctrl-k
 //
 //   How much would it be worth it to invalidate regions rather than the whole screen at once?
