@@ -321,6 +321,34 @@ static inline void delete() {
     syncScreen();
 }
 
+static inline void wordLeft() {
+    scrollToBottom();
+
+    if (terms[at].cur == terms[at].anchor)
+        return;
+
+    while (byte_at(at, terms[at].cur - 2) == ' ' && terms[at].cur != terms[at].anchor)
+        terms[at].cur -= 2;
+    while (byte_at(at, terms[at].cur - 2) != ' ' && terms[at].cur != terms[at].anchor)
+        terms[at].cur -= 2;
+
+    updateCursorPosition();
+}
+
+static inline void wordRight() {
+    scrollToBottom();
+
+    if (terms[at].cur == terms[at].end)
+        return;
+
+    while (byte_at(at, terms[at].cur) == ' ' && terms[at].cur != terms[at].end)
+        terms[at].cur += 2;
+    while (byte_at(at, terms[at].cur) != ' ' && terms[at].cur != terms[at].end)
+        terms[at].cur += 2;
+
+    updateCursorPosition();
+}
+
 static inline void cursorLeft() {
     scrollToBottom();
 
@@ -509,6 +537,9 @@ static void gotInput(struct input i) {
     else if (i.key == KEY_RIGHT && !i.alt && i.ctrl && !i.shift)
         showTerm((at + 1) % 10);
 
+    else if (i.key == KEY_LEFT && !i.alt && i.ctrl && !i.shift)
+        showTerm((at + 9) % 10);
+
     else if (at > 0) {
         if (isPrintable(i.key) && !i.alt && !i.ctrl) {
             scrollToBottom();
@@ -531,14 +562,17 @@ static void gotInput(struct input i) {
         else if (i.key == KEY_DEL && !i.alt && !i.ctrl && !i.shift)
             delete();
 
-        else if (i.key == KEY_LEFT && !i.alt && i.ctrl && !i.shift)
-            showTerm((at + 9) % 10);
-
         else if (i.key == KEY_LEFT && !i.alt && !i.ctrl && !i.shift)
             cursorLeft();
 
+        else if ((i.key == KEY_LEFT || i.key == 'b') && i.alt && !i.ctrl && !i.shift)
+            wordLeft();
+
         else if (i.key == KEY_RIGHT && !i.alt && !i.ctrl && !i.shift)
             cursorRight();
+
+        else if ((i.key == KEY_RIGHT || i.key == 'f') && i.alt && !i.ctrl && !i.shift)
+            wordRight();
 
         else if (i.key == KEY_HOME && !i.alt && !i.ctrl && !i.shift)
             cursorHome();
@@ -557,14 +591,6 @@ static void gotInput(struct input i) {
 
         else if (i.key == 'l' && !i.alt && i.ctrl && !i.shift)
             clear();
-
-        // TODO: Nope, not clearScreen() anymore, since we have scrollback.
-        //   We'll want to scroll, kind of, but differently from advanceLine() and scrollDown(), by our line
-        //    number minus 1.  If we're at line 10, then we want to basically scroll down by 9.  But a bit
-        //    differently, I think; and we'll want to double-check assumptions other functions are making, in
-        //    case anyone's assuming we can't have a scrollback buffer while not being at the bottom.
-        // else if ((i.key == 'l' || i.key == 'L') && !i.alt && i.ctrl) // How shall this interact with scrolling?
-        //     clearScreen();
     }
     ints_okay();
 }

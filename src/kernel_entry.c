@@ -17,6 +17,18 @@ struct mem_table_entry {
 
 #define STACK_SIZE (64 * 1024)
 
+/*
+  Overall to-do list:
+
+  * User space
+  * Shell
+  * HPET -- not just for finer resolution of timer, but as source of actual timer count -- missed ticks are less bad.
+  * Network?
+  * File system?
+  * Graphics? (At least for my own text mode -- better/more colors, custom font, etc.?)
+
+ */
+
 void __attribute__((section(".kernel_entry"))) kernel_entry() {
     uint32_t* entry_count = (uint32_t*) 0x4000;
     uint64_t largest = 0;
