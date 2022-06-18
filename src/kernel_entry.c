@@ -87,6 +87,9 @@ void setUpUserMode() {
 
     l4[0] = (uint64_t) l3 | PT_PRESENT | PT_WRITABLE | PT_USERMODE;
     l3[0] = (uint64_t) l2 | PT_PRESENT | PT_WRITABLE | PT_USERMODE;
+    // Identity map first GB without u/s, then mark just the one page with that bit
+    for (uint64_t i = 0; i < 512; i++)
+        l2[i] = i * 2 * 1024 * 1024 | PT_PRESENT | PT_WRITABLE | PT_HUGE;
     l2[(uint64_t) u / (1024 * 1024 * 2)] = (uint64_t) u | PT_PRESENT | PT_WRITABLE | PT_USERMODE | PT_HUGE;
 
     // Something like this?:
@@ -101,6 +104,39 @@ void setUpUserMode() {
     // put l4 in cr3
     // Set ds, es, fs, and gs to usermode gdt segment
     // iret
+
+    uint64_t* stack_top = (uint64_t*)(((uint64_t) stack + 1024 * 8) & ~0xf);
+
+    __asm__ __volatile__
+    (
+         "pushf\n"
+         "cli\n"
+         "pop %%r8\n"
+         "mov $16, %%ax\n"
+         //"mov %%ax, %%ss\n" // trap!
+         "mov %0, %%esp\n"
+         //"push %%r8\n"
+         "push $16\n"
+         "mov %2, %%rax\n"
+         "push %%rax\n"
+         "push %%r8\n"
+         "push $16\n"
+         "mov %3, %%rax\n"
+         "push %%rax\n"
+
+         "mov $16, %%ax\n"
+         "mov %%ax, %%ds\n"
+         "mov %%ax, %%es\n"
+         "mov %%ax, %%fs\n"
+         "mov %%ax, %%gs\n"
+         "mov %1, %%rax\n"
+
+         ""
+         "mov %%rax, %%cr3\n" // Hmm, maybe the moment I do this, I'm not able to access where I am anymore...  Here isn't paged...
+         // That would mean I need to have the rest of memory mapped in this l2 as well, but without u/s bit.
+         "iretq\n"
+         ::"m"(stack), "m"(l4), "m"(kernel_stack_top), "m"(waitloop)
+    );
 }
 
 void __attribute__((section(".kernel_entry"))) kernel_entry() {
