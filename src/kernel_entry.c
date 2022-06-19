@@ -62,7 +62,7 @@ struct mem_table_entry {
 
 void userMode() {
     for(;;)
-        __asm__ __volatile__ ("hlt\n");
+        __asm__ __volatile__ ("mov $0x1234face, %r15\nhlt\n");
 }
 
 void setUpUserMode() {
@@ -104,8 +104,8 @@ void setUpUserMode() {
     //     l2[i] = i * 2 * 1024 * 1024 | PT_PRESENT | PT_WRITABLE | PT_HUGE;
     //l2[(uint64_t) u / (1024 * 1024 * 2)] = (uint64_t) u | PT_PRESENT | PT_WRITABLE | PT_USERMODE | PT_HUGE;
     l2[(uint64_t) u / (1024 * 1024 * 2)] |= PT_USERMODE;
-    com1_printf("u: 0x%h\n", u);
-    com1_printf("@: 0x%h\n", (uint64_t) u / (1024 * 1024 * 2));
+    // com1_printf("u: 0x%h\n", u);
+    // com1_printf("@: 0x%h\n", (uint64_t) u / (1024 * 1024 * 2));
 
     // Something like this?:
 
@@ -127,32 +127,34 @@ void setUpUserMode() {
     __asm__ __volatile__
     (
      //"pushf\n"
+         "pushf\n"
          "cli\n"
-         //"pushf\n"
-         //"pop %%r8\n"
+         "pop %%r8\n"
          //"mov $24, %%ax\n"
          //"mov %%ax, %%ss\n" // trap!
          "mov %0, %%esp\n"
          //"push %%r8\n"
-         "push $24\n"
+         "push $27\n"
          "mov %0, %%rax\n"
          "push %%rax\n"
-         "pushf\n"
-         //"push %%r8\n"
-         "push $16\n"
-         "mov %3, %%rax\n"
+         //"pushf\n"
+         "push %%r8\n"
+         "push $19\n"
+         "mov %2, %%rax\n"
          "push %%rax\n"
-
+         //"push $1f\n"
          "mov %1, %%rax\n"
-
-         //"jmp $0x10,$user\n"
-         //"user:\n"
-
-         //"hlt\n"
+         // "mov %1, %%r8\n"
+         // "mov $24, %%rax\n"
+         // "mov %%rax, %%ds\n"
+         // "mov %%rax, %%es\n"
+         // "mov %%r8, %%rax\n"
          "mov %%rax, %%cr3\n" // Hmm, maybe the moment I do this, I'm not able to access where I am anymore...  Here isn't paged...
          // That would mean I need to have the rest of memory mapped in this l2 as well, but without u/s bit.
          "iretq\n"
-         ::"m"(stack_top), "m"(l4), "m"(kernel_stack_top), "m"(u)
+         // "1:\n"
+         // "hlt"
+         ::"m"(stack_top), "m"(l4), "m"(u)
     );
 }
 
