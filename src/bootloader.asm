@@ -192,11 +192,11 @@ gdt:
 .code:
         dq SD_RING0 | SD_PRESENT | SD_NONTSS | SD_CODESEG | SD_READABLE | SD_GRAN4K | SD_MODE64
 .user:
-        dq SD_RING3 | SD_PRESENT | SD_NONTSS | SD_CODESEG | SD_READABLE | SD_GRAN4K | SD_MODE64
+        dq SD_RING0 | SD_PRESENT | SD_NONTSS | SD_CODESEG | SD_READABLE | SD_GRAN4K | SD_MODE64
+.userdata:
+        dq SD_RING0 | SD_PRESENT | SD_NONTSS | SD_DATASEG | SD_READABLE | SD_GRAN4K | SD_MODE64
 .tss:
-        ;dq 104 | tss<< 16 | 0x89 << 40 ; NASM won't do tss << 16 even though tss is an assembly-time constant...  blech.
         dw 104
-        ;dd tss | 0x89 << (40 - 16)
         dw tss.tss
         dw 0x89 << 8
         dw 0                    ; Flags okay to be left 0?
@@ -237,7 +237,7 @@ l3_loop2:
 
         lidt [idtr]
 
-        mov ax, 24
+        mov ax, 32
         ltr ax
 
         jmp kernel_entry

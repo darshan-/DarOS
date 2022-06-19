@@ -122,20 +122,23 @@ void setUpUserMode() {
 
     //uint64_t* stack_top = (uint64_t*)(((uint64_t) stack + 1024 * 8) & ~0xf);
 
+    // "SS AR byte not writable or code segment"
+    // Does the segment I push for ss need to be a data segment?  Or explicitly a stack segment (grows down?)
     __asm__ __volatile__
     (
      //"pushf\n"
          "cli\n"
-         "pushf\n"
-         "pop %%r8\n"
-         "mov $16, %%ax\n"
+         //"pushf\n"
+         //"pop %%r8\n"
+         //"mov $24, %%ax\n"
          //"mov %%ax, %%ss\n" // trap!
          "mov %0, %%esp\n"
          //"push %%r8\n"
-         "push $16\n"
-         "mov %2, %%rax\n"
+         "push $24\n"
+         "mov %0, %%rax\n"
          "push %%rax\n"
-         "push %%r8\n"
+         "pushf\n"
+         //"push %%r8\n"
          "push $16\n"
          "mov %3, %%rax\n"
          "push %%rax\n"
