@@ -73,9 +73,11 @@ section .boot
 bits 16
         jmp 0:start16           ; Make sure cs is set to 0
 start16:
-        mov ax, cs
+        xor ax, ax
         mov ds, ax
         mov es, ax
+        mov fs, ax
+        mov gs, ax
         mov ss, ax
 
         mov esp, stack_top
@@ -191,6 +193,14 @@ gdt:
         dq SD_RING0 | SD_PRESENT | SD_NONTSS | SD_CODESEG | SD_READABLE | SD_GRAN4K | SD_MODE64
 .user:
         dq SD_RING3 | SD_PRESENT | SD_NONTSS | SD_CODESEG | SD_READABLE | SD_GRAN4K | SD_MODE64
+.tss:
+        ;dq 104 | tss<< 16 | 0x89 << 40 ; NASM won't do tss << 16 even though tss is an assembly-time constant...  blech.
+        dw 104
+        ;dd tss | 0x89 << (40 - 16)
+        dw tss.tss
+        dw 0x89 << 8
+        dw 0                    ; Flags okay to be left 0?
+        dq 0
 gdtr:
         dw $ - gdt - 1          ; Length in bytes minus 1
         dq gdt                  ; Address
@@ -207,13 +217,6 @@ dap:
 .from:  dq 1                    ; LBA number (sector to start reading from)
 
 start64:
-        xor ax, ax
-        mov ds, ax
-        mov es, ax
-        mov fs, ax
-        mov gs, ax
-        mov ss, ax
-
         mov rax, PT_PRESENT | PT_WRITABLE | PT_HUGE
         mov rbx, page_tables_l2
         mov rcx, 512 * 256
@@ -234,7 +237,10 @@ l3_loop2:
 
         lidt [idtr]
 
-        jmp sect2
+        mov ax, 24
+        ltr ax
+
+        jmp kernel_entry
 
         BOOTABLE equ 1<<7
         times 440 - ($-$$) db 0
@@ -254,3 +260,8 @@ l3_loop2:
         dw 0xaa55
 
 sect2:
+global tss
+tss: dq .tss
+.tss:
+        times 104 db 0
+kernel_entry:

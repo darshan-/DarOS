@@ -61,6 +61,8 @@ struct mem_table_entry {
 #define PT_HUGE     1 << 7
 
 void userMode() {
+    for(;;)
+        __asm__ __volatile__ ("hlt\n");
 }
 
 void setUpUserMode() {
@@ -70,14 +72,20 @@ void setUpUserMode() {
     // void* l3 = l4 + 0x1000;
     // void* l2 = l3 + 0x1000;
 
-    void* stack = malloc(1024 * 8);
-    void* u = malloc(2 * 1024 * 1024 * 2); // 2MB page, doubled so I can clunkily align
-    u = (void*) ((uint64_t) u & ~(1024 * 1024 * 4 - 1));
+    //void* stack = malloc(1024 * 8);
+    uint8_t* u = malloc(2 * 1024 * 1024 * 2); // 2MB page, doubled so I can clunkily align
+    u = (uint8_t*) ((uint64_t) u & ~(1024 * 1024 * 4 - 1));
+    void* stack_top = u + 2 * 1024 * 1024 - 1024;
+
+    uint8_t* uc = (uint8_t*) &userMode;
+    for (uint64_t i = 0; i < 512; i++)
+        u[i] = uc[i];
 
     uint64_t* tables = mallocz(1024 * 4 * 3 * 2); // 3 4K tables, doubled so I can clunkily align
     uint64_t* l4 = (uint64_t*) ((uint64_t) tables & ~0xfff);
     uint64_t* l3 = l4 + 0x1000 / 8;
-    uint64_t* l2 = l3 + 0x1000 / 8;
+    // uint64_t* l2 = l3 + 0x1000 / 8;
+    uint64_t* l2 = (uint64_t*) 0x100000;
 
     // Okay, but not 0 for each of those, but rather, work out the l4 index, l3 index, and l2 index for where u actually is
 
@@ -85,12 +93,19 @@ void setUpUserMode() {
     // Which is familiar from the early days when that's all we mapped.
     // So for this experiment, we're definitely just using l4[0], and l3[0], and l2 should be pretty easy:
 
+    // Wait, can't I just edit my existing l2 table?  Turn on the u/s bit, and everthing with tables is kosher?
+
+    // Herm, no, because l4 and l3 need u/s bit set too, right?  But I should be able to keep the same l2?
+
     l4[0] = (uint64_t) l3 | PT_PRESENT | PT_WRITABLE | PT_USERMODE;
     l3[0] = (uint64_t) l2 | PT_PRESENT | PT_WRITABLE | PT_USERMODE;
     // Identity map first GB without u/s, then mark just the one page with that bit
-    for (uint64_t i = 0; i < 512; i++)
-        l2[i] = i * 2 * 1024 * 1024 | PT_PRESENT | PT_WRITABLE | PT_HUGE;
-    l2[(uint64_t) u / (1024 * 1024 * 2)] = (uint64_t) u | PT_PRESENT | PT_WRITABLE | PT_USERMODE | PT_HUGE;
+    // for (uint64_t i = 0; i < 512; i++)
+    //     l2[i] = i * 2 * 1024 * 1024 | PT_PRESENT | PT_WRITABLE | PT_HUGE;
+    //l2[(uint64_t) u / (1024 * 1024 * 2)] = (uint64_t) u | PT_PRESENT | PT_WRITABLE | PT_USERMODE | PT_HUGE;
+    l2[(uint64_t) u / (1024 * 1024 * 2)] |= PT_USERMODE;
+    com1_printf("u: 0x%h\n", u);
+    com1_printf("@: 0x%h\n", (uint64_t) u / (1024 * 1024 * 2));
 
     // Something like this?:
 
@@ -105,12 +120,13 @@ void setUpUserMode() {
     // Set ds, es, fs, and gs to usermode gdt segment
     // iret
 
-    uint64_t* stack_top = (uint64_t*)(((uint64_t) stack + 1024 * 8) & ~0xf);
+    //uint64_t* stack_top = (uint64_t*)(((uint64_t) stack + 1024 * 8) & ~0xf);
 
     __asm__ __volatile__
     (
-         "pushf\n"
+     //"pushf\n"
          "cli\n"
+         "pushf\n"
          "pop %%r8\n"
          "mov $16, %%ax\n"
          //"mov %%ax, %%ss\n" // trap!
@@ -124,18 +140,16 @@ void setUpUserMode() {
          "mov %3, %%rax\n"
          "push %%rax\n"
 
-         "mov $16, %%ax\n"
-         "mov %%ax, %%ds\n"
-         "mov %%ax, %%es\n"
-         "mov %%ax, %%fs\n"
-         "mov %%ax, %%gs\n"
          "mov %1, %%rax\n"
 
-         ""
+         //"jmp $0x10,$user\n"
+         //"user:\n"
+
+         //"hlt\n"
          "mov %%rax, %%cr3\n" // Hmm, maybe the moment I do this, I'm not able to access where I am anymore...  Here isn't paged...
          // That would mean I need to have the rest of memory mapped in this l2 as well, but without u/s bit.
          "iretq\n"
-         ::"m"(stack), "m"(l4), "m"(kernel_stack_top), "m"(waitloop)
+         ::"m"(stack_top), "m"(l4), "m"(kernel_stack_top), "m"(u)
     );
 }
 
@@ -184,6 +198,9 @@ void __attribute__((section(".kernel_entry"))) kernel_entry() {
     logf("Heap is %u MB.\n", heapSize() / 1024 / 1024);
     parse_acpi_tables();
     init_hpet();
+
+    extern void* tss;
+    *((void**) (tss + 4)) = kernel_stack_top;
 
     setUpUserMode();
 
