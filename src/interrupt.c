@@ -377,13 +377,13 @@ static void set_handler(uint64_t vec, void* handler, uint8_t type) {
     uint64_t offset = (uint64_t) handler;
     *idt_entry = (uint16_t) (offset & 0xffff);
     offset >>= 16;
-    *(idt_entry+3) = (uint16_t) (offset & 0xffff);
+    *(idt_entry + 3) = (uint16_t) (offset & 0xffff);
     offset >>= 16;
-    *((uint32_t*) (idt_entry+4)) = (uint32_t) offset;
+    *((uint32_t*) (idt_entry + 4)) = (uint32_t) offset;
 
-    *(idt_entry+2) = (uint16_t) 1<<15 | type << 8;
-    *(idt_entry+1) = CODE_SEG;
-    *((uint32_t*) (idt_entry+6)) = 0;
+    *(idt_entry + 2) = (uint16_t) 1 << 15 | type << 8;// | 3 << 13; // TODO: Only set ring-3 callable for syscall interrupt
+    *(idt_entry + 1) = CODE_SEG;
+    *((uint32_t*) (idt_entry + 6)) = 0;
 }
 
 static void init_pit() {

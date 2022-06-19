@@ -62,8 +62,21 @@ struct mem_table_entry {
 
 void userMode() {
     for(;;)
-        __asm__ __volatile__ ("mov $0x1234face, %r15\nhlt\n");
+        //__asm__ __volatile__ ("mov $0x1234face, %r15\nint $0x80\n");
+        __asm__ __volatile__ ("inc %r15\nhlt\n");
 }
+
+/*
+  Okay, loop without hlt just runs forever; interrupts don't interupt.
+  But with halt, bochs gives me this:
+   interrupt(long mode): IDT entry extended attributes DWORD4 TYPE != 0
+   interrupt(long mode): gate descriptor is not valid sys seg
+  So, even though thing work from from ring 0, something isn't right, and this is a clue.
+  interrupt stack table?
+  what's with dword not being 0?
+  Is it seeing a different idt?
+  It is mapped; first 2 GB are identity mapped...
+ */
 
 void setUpUserMode() {
     // void* tables = mallocz(1024 * 4 * 3 * 2); // 3 4K tables, doubled so I can clunkily align
@@ -126,34 +139,24 @@ void setUpUserMode() {
     // Does the segment I push for ss need to be a data segment?  Or explicitly a stack segment (grows down?)
     __asm__ __volatile__
     (
-     //"pushf\n"
-         "pushf\n"
-         "cli\n"
-         "pop %%r8\n"
-         //"mov $24, %%ax\n"
-         //"mov %%ax, %%ss\n" // trap!
+         //"pushf\n"
+         //"cli\n"
+         //"pop %%r8\n"
          "mov %0, %%esp\n"
-         //"push %%r8\n"
          "push $27\n"
          "mov %0, %%rax\n"
          "push %%rax\n"
-         //"pushf\n"
-         "push %%r8\n"
+         //"push %%r8\n"
+         "pushf\n"
+         "pop %%rax\n"
+         "or $0x200, %%rax\n"
+         "push %%rax\n"
          "push $19\n"
          "mov %2, %%rax\n"
          "push %%rax\n"
-         //"push $1f\n"
          "mov %1, %%rax\n"
-         // "mov %1, %%r8\n"
-         // "mov $24, %%rax\n"
-         // "mov %%rax, %%ds\n"
-         // "mov %%rax, %%es\n"
-         // "mov %%r8, %%rax\n"
-         "mov %%rax, %%cr3\n" // Hmm, maybe the moment I do this, I'm not able to access where I am anymore...  Here isn't paged...
-         // That would mean I need to have the rest of memory mapped in this l2 as well, but without u/s bit.
+         "mov %%rax, %%cr3\n"
          "iretq\n"
-         // "1:\n"
-         // "hlt"
          ::"m"(stack_top), "m"(l4), "m"(u)
     );
 }
