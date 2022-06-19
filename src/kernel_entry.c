@@ -76,6 +76,17 @@ void userMode() {
   what's with dword not being 0?
   Is it seeing a different idt?
   It is mapped; first 2 GB are identity mapped...
+
+  Hmm, and disappointing, confusing, and kinda surprising more broadly, but also *not* really disappointing, and actually
+    kinda good news given the above -- making the waitloop be busy too, it also can't be interrupted!  I totally thought it
+    could!
+
+  So maybe it's two separate issues, and recognizing that and hopefully solving both without too much trouble, we'll be in
+    pretty good shape!  I had an issue I didn't know about before, and it's great to know and hopefully fix it soon: make
+    interrupts work even when a stream of execution never halts.  And now that I know that, it's maybe less surprising and
+    also maybe not so hard to track down and sort out, that something is up with the idt from user mode.
+
+  Okay, so that's progress, for sure, to figure that much out!
  */
 
 void setUpUserMode() {
@@ -210,7 +221,7 @@ void __attribute__((section(".kernel_entry"))) kernel_entry() {
     extern void* tss;
     *((void**) (tss + 4)) = kernel_stack_top;
 
-    setUpUserMode();
+    //setUpUserMode();
 
     log("Kernel initialized; going to waitloop.\n");
     waitloop();

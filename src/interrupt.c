@@ -161,6 +161,7 @@ void waitloop() {
         //__asm__ __volatile__("hlt");
         __asm__ __volatile__(
             "mov %0, %%rsp\n" // We'll never return anywhere or use anything currently on the stack, so reset it
+            //"inc %%r14\n"
             "sti\n"
             "hlt\n"
             ::"m"(kernel_stack_top)
