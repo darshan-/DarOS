@@ -590,6 +590,9 @@ static void gotInput(struct input i) {
 
         else if (i.key == 'l' && !i.alt && i.ctrl && !i.shift)
             clear();
+
+        else if (i.key == 'U' && !i.alt && i.ctrl && i.shift)
+            setUpUserMode();
     }
     ints_okay();
 }

@@ -150,6 +150,91 @@ static inline void push(struct queue* q, void* p) {
     INC_Q_PT(q, tail);
 }
 
+#define PT_PRESENT  1
+#define PT_WRITABLE 1 << 1
+#define PT_USERMODE 1 << 2
+#define PT_HUGE     1 << 7
+
+void userMode() {
+    for(;;)
+        //__asm__ __volatile__ ("mov $0x1234face, %r15\nint $0x80\n");
+        __asm__ __volatile__ ("inc %r15\ncli\n");
+        //__asm__ __volatile__ ("inc %r15\n");
+}
+
+void setUpUserMode() {
+    //__asm__ __volatile__ ("xchgw %bx, %bx");
+    // void* tables = mallocz(1024 * 4 * 3 * 2); // 3 4K tables, doubled so I can clunkily align
+    // //void* l4 = tables - (uint64_t) tables % 0x1000;
+    // void* l4 = (void*) ((uint64_t) tables & ~0xfff);
+    // void* l3 = l4 + 0x1000;
+    // void* l2 = l3 + 0x1000;
+
+    //void* stack = malloc(1024 * 8);
+    uint8_t* u = malloc(2 * 1024 * 1024 * 2); // 2MB page, doubled so I can clunkily align
+    u = (uint8_t*) ((uint64_t) u & ~(1024 * 1024 * 4 - 1));
+    void* stack_top = u + 2 * 1024 * 1024 - 1024;
+
+    //__asm__ __volatile__ ("xchgw %bx, %bx");
+
+
+    // Okay, let's dump first few IDT entries here, and then again after copying to u...
+    print("\n");
+    for (uint64_t i = 0; i < 10; i++)
+        printf("%u: 0x%p016h\n", i, ((uint64_t*) 0)[i]);
+    uint8_t* uc = (uint8_t*) &userMode;
+    //__asm__ __volatile__ ("xchgw %bx, %bx");
+    //com1_printf("u: 0x%h\n", u);
+    for (uint64_t i = 0; i < 512; i++) { // Uh, this overwrites the IDT?????
+        u[i] = uc[i];
+        //com1_printf("%u: Set 0x%h to 0x%h\n", i, u + i, u[i]);
+    }
+    print("\n");
+    for (uint64_t i = 0; i < 10; i++)
+        printf("%u: 0x%p016h\n", i, ((uint64_t*) 0)[i]);
+    __asm__ __volatile__ ("xchgw %bx, %bx");
+    uint64_t* tables = mallocz(1024 * 4 * 2 * 2); // 2 4K tables, doubled so I can clunkily align
+    uint64_t* l4 = (uint64_t*) ((uint64_t) tables & ~0xfff);
+    uint64_t* l3 = l4 + 0x1000 / 8;
+    uint64_t* l2 = (uint64_t*) 0x100000;
+
+    l4[0] = (uint64_t) l3 | PT_PRESENT | PT_WRITABLE | PT_USERMODE;
+    l3[0] = (uint64_t) l2 | PT_PRESENT | PT_WRITABLE | PT_USERMODE;
+    // Identity map first GB without u/s, then mark just the one page with that bit
+    // for (uint64_t i = 0; i < 512; i++)
+    //     l2[i] |= PT_USERMODE;
+    //     //l2[i] = i * 2 * 1024 * 1024 | PT_PRESENT | PT_WRITABLE | PT_HUGE;
+    // //l2[(uint64_t) u / (1024 * 1024 * 2)] = (uint64_t) u | PT_PRESENT | PT_WRITABLE | PT_USERMODE | PT_HUGE;
+    // l2[(uint64_t) u / (1024 * 1024 * 2)] |= PT_USERMODE;
+
+    // "SS AR byte not writable or code segment"
+    // Does the segment I push for ss need to be a data segment?  Or explicitly a stack segment (grows down?)
+    __asm__ __volatile__
+    (
+         //"pushf\n"
+         //"cli\n"
+         //"pop %%r8\n"
+         "xchgw %%bx, %%bx\n"
+         //"hlt\n"
+         "mov %0, %%esp\n"
+         "push $27\n"
+         "mov %0, %%rax\n"
+         "push %%rax\n"
+         //"push %%r8\n"
+         "pushf\n"
+         "pop %%rax\n"
+         "or $0x200, %%rax\n"
+         "push %%rax\n"
+         "push $19\n"
+         "mov %2, %%rax\n"
+         "push %%rax\n"
+         "mov %1, %%rax\n"
+         "mov %%rax, %%cr3\n"
+         "iretq\n"
+         ::"m"(stack_top), "m"(l4), "m"(u)
+    );
+}
+
 void waitloop() {
     for (;;) {
         void (*f)();
@@ -446,5 +531,6 @@ void init_interrupts() {
 
     registerPeriodicCallback((struct periodic_callback) {1, 2, check_queue_caps});
 
+    //__asm__ __volatile__ ("xchgw %bx, %bx");
     ints_okay();
 }

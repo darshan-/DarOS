@@ -55,17 +55,6 @@ struct mem_table_entry {
 
  */
 
-#define PT_PRESENT  1
-#define PT_WRITABLE 1 << 1
-#define PT_USERMODE 1 << 2
-#define PT_HUGE     1 << 7
-
-void userMode() {
-    for(;;)
-        //__asm__ __volatile__ ("mov $0x1234face, %r15\nint $0x80\n");
-        __asm__ __volatile__ ("inc %r15\nhlt\n");
-}
-
 /*
   Okay, loop without hlt just runs forever; interrupts don't interupt.
   But with halt, bochs gives me this:
@@ -87,90 +76,9 @@ void userMode() {
     also maybe not so hard to track down and sort out, that something is up with the idt from user mode.
 
   Okay, so that's progress, for sure, to figure that much out!
+
+  Hmm, now I can't reproduce it...  Did I accidentally comment out sti along with hlt last night?  I was sooooo tired...
  */
-
-void setUpUserMode() {
-    // void* tables = mallocz(1024 * 4 * 3 * 2); // 3 4K tables, doubled so I can clunkily align
-    // //void* l4 = tables - (uint64_t) tables % 0x1000;
-    // void* l4 = (void*) ((uint64_t) tables & ~0xfff);
-    // void* l3 = l4 + 0x1000;
-    // void* l2 = l3 + 0x1000;
-
-    //void* stack = malloc(1024 * 8);
-    uint8_t* u = malloc(2 * 1024 * 1024 * 2); // 2MB page, doubled so I can clunkily align
-    u = (uint8_t*) ((uint64_t) u & ~(1024 * 1024 * 4 - 1));
-    void* stack_top = u + 2 * 1024 * 1024 - 1024;
-
-    uint8_t* uc = (uint8_t*) &userMode;
-    for (uint64_t i = 0; i < 512; i++)
-        u[i] = uc[i];
-
-    uint64_t* tables = mallocz(1024 * 4 * 3 * 2); // 3 4K tables, doubled so I can clunkily align
-    uint64_t* l4 = (uint64_t*) ((uint64_t) tables & ~0xfff);
-    uint64_t* l3 = l4 + 0x1000 / 8;
-    // uint64_t* l2 = l3 + 0x1000 / 8;
-    uint64_t* l2 = (uint64_t*) 0x100000;
-
-    // Okay, but not 0 for each of those, but rather, work out the l4 index, l3 index, and l2 index for where u actually is
-
-    // Hmm, so, let's see.  I think each entry in l2 represents 2 MB, so each entry in l3 represents 512 * 2 MB, or 1 GB.
-    // Which is familiar from the early days when that's all we mapped.
-    // So for this experiment, we're definitely just using l4[0], and l3[0], and l2 should be pretty easy:
-
-    // Wait, can't I just edit my existing l2 table?  Turn on the u/s bit, and everthing with tables is kosher?
-
-    // Herm, no, because l4 and l3 need u/s bit set too, right?  But I should be able to keep the same l2?
-
-    l4[0] = (uint64_t) l3 | PT_PRESENT | PT_WRITABLE | PT_USERMODE;
-    l3[0] = (uint64_t) l2 | PT_PRESENT | PT_WRITABLE | PT_USERMODE;
-    // Identity map first GB without u/s, then mark just the one page with that bit
-    // for (uint64_t i = 0; i < 512; i++)
-    //     l2[i] = i * 2 * 1024 * 1024 | PT_PRESENT | PT_WRITABLE | PT_HUGE;
-    //l2[(uint64_t) u / (1024 * 1024 * 2)] = (uint64_t) u | PT_PRESENT | PT_WRITABLE | PT_USERMODE | PT_HUGE;
-    l2[(uint64_t) u / (1024 * 1024 * 2)] |= PT_USERMODE;
-    // com1_printf("u: 0x%h\n", u);
-    // com1_printf("@: 0x%h\n", (uint64_t) u / (1024 * 1024 * 2));
-
-    // Something like this?:
-
-    // push eflags // has iterrupt bit on
-    // Disable interrupts
-    // pop eflags  // has interrupt bit on
-    ////// put that at top of user mode stack (consider alignment)
-    // set ss to usermode gdt segment
-    // set esp to user stack (consider alignment)
-    // push or modified flags to now-usermode stack
-    // put l4 in cr3
-    // Set ds, es, fs, and gs to usermode gdt segment
-    // iret
-
-    //uint64_t* stack_top = (uint64_t*)(((uint64_t) stack + 1024 * 8) & ~0xf);
-
-    // "SS AR byte not writable or code segment"
-    // Does the segment I push for ss need to be a data segment?  Or explicitly a stack segment (grows down?)
-    __asm__ __volatile__
-    (
-         //"pushf\n"
-         //"cli\n"
-         //"pop %%r8\n"
-         "mov %0, %%esp\n"
-         "push $27\n"
-         "mov %0, %%rax\n"
-         "push %%rax\n"
-         //"push %%r8\n"
-         "pushf\n"
-         "pop %%rax\n"
-         "or $0x200, %%rax\n"
-         "push %%rax\n"
-         "push $19\n"
-         "mov %2, %%rax\n"
-         "push %%rax\n"
-         "mov %1, %%rax\n"
-         "mov %%rax, %%cr3\n"
-         "iretq\n"
-         ::"m"(stack_top), "m"(l4), "m"(u)
-    );
-}
 
 void __attribute__((section(".kernel_entry"))) kernel_entry() {
     uint32_t* entry_count = (uint32_t*) 0x4000;
