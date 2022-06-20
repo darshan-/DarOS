@@ -157,91 +157,99 @@ static inline void push(struct queue* q, void* p) {
 
 void userMode() {
     for(;;)
-        //__asm__ __volatile__ ("mov $0x1234face, %r15\nint $0x80\n");
+        __asm__ __volatile__ ("mov $0x1234face, %r15\nint $0x80\n");
         //__asm__ __volatile__ ("inc %r15\ncli\n");
-        __asm__ __volatile__ ("inc %r15\n");
+        //__asm__ __volatile__ ("inc %r15\n");
 }
 
 void setUpUserMode() {
-    //__asm__ __volatile__ ("xchgw %bx, %bx");
-    // void* tables = mallocz(1024 * 4 * 3 * 2); // 3 4K tables, doubled so I can clunkily align
-    // //void* l4 = tables - (uint64_t) tables % 0x1000;
-    // void* l4 = (void*) ((uint64_t) tables & ~0xfff);
-    // void* l3 = l4 + 0x1000;
-    // void* l2 = l3 + 0x1000;
-
-    //void* stack = malloc(1024 * 8);
     uint8_t* u = malloc(2 * 1024 * 1024 * 2); // 2MB page, doubled so I can clunkily align
     print("\n");
-    printf("u: 0x%h\n", u);  // Okay, bochs starts with 0x295e80, then goes to 0...
-    u = (uint8_t*) ((uint64_t) (u + 1024 * 1024 * 2) & ~(1024 * 1024 * 2 - 1));  // Okay, yeah, this is garbage...  Hehe.
+    printf("u: 0x%h\n", u);
+    u = (uint8_t*) ((uint64_t) (u + 1024 * 1024 * 2) & ~(1024 * 1024 * 2 - 1));
     void* stack_top = u + 2 * 1024 * 1024 - 1024;
 
     //__asm__ __volatile__ ("xchgw %bx, %bx");
 
-
-    // Okay, let's dump first few IDT entries here, and then again after copying to u...
-    print("\n");
-    printf("u: 0x%h\n", u);
-    for (uint64_t i = 0; i < 10; i++)
-        printf("%u: 0x%p016h\n", i, ((uint64_t*) 0)[i]);
     uint8_t* uc = (uint8_t*) &userMode;
     //__asm__ __volatile__ ("xchgw %bx, %bx");
-    //com1_printf("u: 0x%h\n", u);
-    for (uint64_t i = 0; i < 512; i++) { // Uh, this overwrites the IDT?????
+    for (uint64_t i = 0; i < 512; i++)
         u[i] = uc[i];
-        //com1_printf("%u: Set 0x%h to 0x%h\n", i, u + i, u[i]);
-    }
-    print("\n");
-    for (uint64_t i = 0; i < 10; i++)
-        printf("%u: 0x%p016h\n", i, ((uint64_t*) 0)[i]);
-    //return;
     //__asm__ __volatile__ ("xchgw %bx, %bx");
     uint64_t* tables = mallocz(1024 * 4 * 2 * 2); // 2 4K tables, doubled so I can clunkily align
-    uint64_t* l4 = (uint64_t*) ((uint64_t) (tables + 0x1000)  & ~0xfff); // More garbage; silly me!
+    uint64_t* l4 = (uint64_t*) ((uint64_t) (tables + 0x1000)  & ~0xfff);
     uint64_t* l3 = l4 + 0x1000 / 8;
     uint64_t* l2 = (uint64_t*) 0x100000;
 
     l4[0] = (uint64_t) l3 | PT_PRESENT | PT_WRITABLE | PT_USERMODE;
     l3[0] = (uint64_t) l2 | PT_PRESENT | PT_WRITABLE | PT_USERMODE;
-    // Identity map first GB without u/s, then mark just the one page with that bit
-    // for (uint64_t i = 0; i < 512; i++)
-    //     l2[i] |= PT_USERMODE;
-    //     //l2[i] = i * 2 * 1024 * 1024 | PT_PRESENT | PT_WRITABLE | PT_HUGE;
-    // //l2[(uint64_t) u / (1024 * 1024 * 2)] = (uint64_t) u | PT_PRESENT | PT_WRITABLE | PT_USERMODE | PT_HUGE;
+    for (uint64_t i = 0; i < 512; i++) // TODO: only set user page with this
+        l2[i] |= PT_USERMODE;
     // l2[(uint64_t) u / (1024 * 1024 * 2)] |= PT_USERMODE;
 
-    // "SS AR byte not writable or code segment"
-    // Does the segment I push for ss need to be a data segment?  Or explicitly a stack segment (grows down?)
     __asm__ __volatile__
     (
-         //"pushf\n"
-         "cli\n"
-         //"pop %%r8\n"
-         //"xchgw %%bx, %%bx\n"
-         //"sti\n"
-         //"hlt\n"
-         "mov %0, %%esp\n"
-         "push $27\n"
-         "mov %0, %%rax\n"
-         "push %%rax\n"
-         //"push %%r8\n"
-         "pushf\n"
-         "pop %%rax\n"
-         "or $0x200, %%rax\n"
-         "push %%rax\n"
-         "push $19\n"
-         "mov %2, %%rax\n"
-         "push %%rax\n"
-         "mov %1, %%rax\n"
-         "mov %%rax, %%cr3\n"
-         "iretq\n"
-         ::"m"(stack_top), "m"(l4), "m"(u)
+        "mov %0, %%rax\n"
+        "mov %%rax, %%cr3\n"
+        ::"m"(l4)
+    );
+
+    printf("u stack top: 0x%h\n", stack_top);
+    __asm__ __volatile__
+    (
+        "cli\n"
+        "mov %0, %%rax\n"
+        "mov %%rax, %%rsp\n"
+        "push $27\n"
+        "push %%rax\n"
+        "pushf\n"
+        "pop %%rax\n"
+        "or $0x200, %%rax\n"
+        "mov %%rax, %%r13\n"
+        "push %%rax\n"
+        "push $19\n"
+        "mov %1, %%rax\n"
+        "push %%rax\n"
+        "iretq\n"
+        ::"m"(stack_top), "m"(u)
+    );
+
+    return;
+
+    __asm__ __volatile__
+    (
+        //"pushf\n"
+        "cli\n"
+        //"pop %%r8\n"
+        //"xchgw %%bx, %%bx\n"
+        //"sti\n"
+        //"hlt\n"
+        "mov %0, %%esp\n"
+        "push $27\n"
+        "mov %0, %%rax\n"
+        "push %%rax\n"
+        //"push %%r8\n"
+        "pushf\n"
+        "pop %%rax\n"
+        "or $0x200, %%rax\n"
+        "push %%rax\n"
+        "push $19\n"
+        "mov %1, %%rax\n"
+        "push %%rax\n"
+        "iretq\n"
+        ::"m"(stack_top), "m"(u)
     );
 }
 
+int hlt_in_waitloop = 0;
 void waitloop() {
     for (;;) {
+        //printf("WAITLOOP hlt_in_waitloop: %u\n", hlt_in_waitloop);
+        // if (hlt_in_waitloop) {
+        //     printf("hlt_in_waitloop in waitloop: %u\n", hlt_in_waitloop);
+        //     __asm__ __volatile__("cli\ncli\nhlt\nhlt\n");
+        // }
+
         void (*f)();
 
         while ((f = (void (*)()) pop(&wq)))
@@ -265,8 +273,9 @@ void process_keys() {
 }
 
 static void dumpFrame(struct interrupt_frame *frame) {
-    logf("ip: 0x%p016h    cs: 0x%p016h flags: 0x%p016h\n", frame->ip, frame->cs, frame->flags);
-    logf("sp: 0x%p016h    ss: 0x%p016h\n", frame->sp, frame->ss);
+    printf("ip: 0x%p016h    cs: 0x%p016h flags: 0x%p016h\n", frame->ip, frame->cs, frame->flags);
+    printf("sp: 0x%p016h    ss: 0x%p016h\n", frame->sp, frame->ss);
+    printf("hlt_in_waitlop dumpFrame: %u\n", hlt_in_waitloop);
 }
 
 static inline void generic_trap_n(struct interrupt_frame *frame, int n) {
@@ -285,7 +294,6 @@ static inline void generic_etrap_n(struct interrupt_frame *frame, uint64_t error
     logf("Generic trap handler used for trap vector 0x%h, with error on stack; error: 0x%p016h\n", n, error_code);
     dumpFrame(frame);
     frame->ip = (uint64_t) waitloop;
-    logf("waitloop?");
 }
 
 
@@ -369,7 +377,62 @@ static void init_pic() {
 
 static void __attribute__((interrupt)) default_interrupt_handler(struct interrupt_frame *frame) {
     logf("Default interrupt handler\n");
+    //dumpFrame(frame);
+}
+
+static void __attribute__((interrupt)) int_0x80_handler(struct interrupt_frame *frame) {
+    print("int 0x80 handler\n");
+
     dumpFrame(frame);
+    frame->ip = (uint64_t) waitloop;
+    print("waitloop?");
+    //hlt_in_waitloop = 1;
+    printf("hlt_in_waitloop in int 0x80: %u\n", hlt_in_waitloop);
+    __asm__ __volatile__
+    (
+        "mov %0, %%rax\n"
+        "mov %%rax, %%rsp\n"
+        "push $0\n"
+        "push %%rax\n"
+        "pushf\n"
+        "pop %%rax\n"
+        "or $0x200, %%rax\n"
+        "mov %%rax, %%r13\n"
+        "push %%rax\n"
+        "push $8\n"
+        "mov %1, %%rax\n"
+        "push %%rax\n"
+        "iretq\n"
+        ::"m"(kernel_stack_top), "m"(waitloop)
+    );
+
+
+    //for (int i = 0; i < 5; i++) {
+    int i = 0;
+        uint64_t v;
+        __asm__ __volatile__ ("pop %%rax\n mov %%rax, %0\n":"=m"(v)::"%rax");
+        printf("%u: 0x%p016h\n", i, v);
+        i = 1;
+        __asm__ __volatile__ ("pop %%rax\n mov %%rax, %0\n":"=m"(v)::"%rax");
+        printf("%u: 0x%p016h\n", i, v);
+        i = 2;
+        __asm__ __volatile__ ("pop %%rax\n mov %%rax, %0\n":"=m"(v)::"%rax");
+        printf("%u: 0x%p016h\n", i, v);
+        i = 3;
+        __asm__ __volatile__ ("pop %%rax\n mov %%rax, %0\n":"=m"(v)::"%rax");
+        printf("%u: 0x%p016h\n", i, v);
+        i = 4;
+        __asm__ __volatile__ ("pop %%rax\n mov %%rax, %0\n":"=m"(v)::"%rax");
+        printf("%u: 0x%p016h\n", i, v);
+        i = 5;
+        __asm__ __volatile__ ("pop %%rax\n mov %%rax, %0\n":"=m"(v)::"%rax");
+        printf("%u: 0x%p016h\n", i, v);
+        i = 6;
+        __asm__ __volatile__ ("pop %%rax\n mov %%rax, %0\n":"=m"(v)::"%rax");
+        printf("%u: 0x%p016h\n", i, v);
+        //}
+    // Let's look at stack and see what's there, because that's what determines what happens when we iretq at end of handler...
+    __asm__ __volatile__ ("hlt");
 }
 
 static void __attribute__((interrupt)) default_PIC_P_handler(struct interrupt_frame *frame) {
@@ -472,7 +535,7 @@ static void set_handler(uint64_t vec, void* handler, uint8_t type) {
     offset >>= 16;
     *((uint32_t*) (idt_entry + 4)) = (uint32_t) offset;
 
-    *(idt_entry + 2) = (uint16_t) 1 << 15 | type << 8;// | 3 << 13; // TODO: Only set ring-3 callable for syscall interrupt
+    *(idt_entry + 2) = (uint16_t) 1 << 15 | type << 8 | 3 << 13; // TODO: Only set ring-3 callable for syscall interrupt
     *(idt_entry + 1) = CODE_SEG;
     *((uint32_t*) (idt_entry + 6)) = 0;
 }
@@ -523,6 +586,8 @@ void init_interrupts() {
     SET_GETRAP_N(15);
     SET_GETRAP_N(1d);
     SET_GETRAP_N(1e);
+
+    set_handler(0x80, int_0x80_handler, TYPE_INT);
 
     init_rtc();
     init_pit();

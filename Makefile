@@ -35,7 +35,7 @@ out/bochs.img: out/boot.img
 # -cpu host 
 .PHONY: run
 run: out/boot.img
-	qemu-system-x86_64 -rtc base=localtime -enable-kvm -m 4G -drive format=raw,file=out/boot.img
+	qemu-system-x86_64 -rtc base=localtime -enable-kvm -m 4G -drive format=raw,file=out/boot.img -d int -no-reboot -no-shutdown
 
 .PHONY: run-bochs
 run-bochs: out/bochs.img
