@@ -49,7 +49,7 @@
 #define PIC_SECONDARY_CMD 0xa0
 #define PIC_SECONDARY_DATA 0xa1
 
-#define TICK_HZ 1000
+#define TICK_HZ 19//1000
 
 uint64_t int_tick_hz = TICK_HZ;  // For periodic_callbacks.c to access.
 
@@ -157,15 +157,15 @@ static inline void push(struct queue* q, void* p) {
 
 void userMode() {
     for(;;)
-        __asm__ __volatile__ ("mov $0x1234face, %r15\nint $0x80\n");
+        //__asm__ __volatile__ ("mov $0x1234face, %r15\nint $0x80");
         //__asm__ __volatile__ ("inc %r15\ncli\n");
-        //__asm__ __volatile__ ("inc %r15\n");
+        __asm__ __volatile__ ("inc %r15\n");
 }
 
 void setUpUserMode() {
     uint8_t* u = malloc(2 * 1024 * 1024 * 2); // 2MB page, doubled so I can clunkily align
-    print("\n");
-    printf("u: 0x%h\n", u);
+    // print("\n");
+    // printf("u: 0x%h\n", u);
     u = (uint8_t*) ((uint64_t) (u + 1024 * 1024 * 2) & ~(1024 * 1024 * 2 - 1));
     void* stack_top = u + 2 * 1024 * 1024 - 1024;
 
@@ -194,7 +194,9 @@ void setUpUserMode() {
         ::"m"(l4)
     );
 
-    printf("u stack top: 0x%h\n", stack_top);
+    //printf("u stack top: 0x%h\n", stack_top);
+    __asm__ __volatile__ ("cli");
+    print("About to user mode\n");
     __asm__ __volatile__
     (
         "cli\n"
@@ -244,6 +246,7 @@ void setUpUserMode() {
 int hlt_in_waitloop = 0;
 void waitloop() {
     for (;;) {
+        //print("waitloop top\n");
         //printf("WAITLOOP hlt_in_waitloop: %u\n", hlt_in_waitloop);
         // if (hlt_in_waitloop) {
         //     printf("hlt_in_waitloop in waitloop: %u\n", hlt_in_waitloop);
@@ -273,9 +276,9 @@ void process_keys() {
 }
 
 static void dumpFrame(struct interrupt_frame *frame) {
-    printf("ip: 0x%p016h    cs: 0x%p016h flags: 0x%p016h\n", frame->ip, frame->cs, frame->flags);
-    printf("sp: 0x%p016h    ss: 0x%p016h\n", frame->sp, frame->ss);
-    printf("hlt_in_waitlop dumpFrame: %u\n", hlt_in_waitloop);
+    logf("ip: 0x%p016h    cs: 0x%p016h flags: 0x%p016h\n", frame->ip, frame->cs, frame->flags);
+    logf("sp: 0x%p016h    ss: 0x%p016h\n", frame->sp, frame->ss);
+    //printf("hlt_in_waitlop dumpFrame: %u\n", hlt_in_waitloop);
 }
 
 static inline void generic_trap_n(struct interrupt_frame *frame, int n) {
@@ -384,10 +387,10 @@ static void __attribute__((interrupt)) int_0x80_handler(struct interrupt_frame *
     print("int 0x80 handler\n");
 
     dumpFrame(frame);
-    frame->ip = (uint64_t) waitloop;
-    print("waitloop?");
+    //frame->ip = (uint64_t) waitloop;
+    //print("waitloop?");
     //hlt_in_waitloop = 1;
-    printf("hlt_in_waitloop in int 0x80: %u\n", hlt_in_waitloop);
+    //printf("hlt_in_waitloop in int 0x80: %u\n", hlt_in_waitloop);
     __asm__ __volatile__
     (
         "mov %0, %%rax\n"
@@ -484,6 +487,25 @@ static void __attribute__((interrupt)) irq1_kbd(struct interrupt_frame *) {
     outb(PIC_PRIMARY_CMD, PIC_ACK);
     push(&kbd_buf, (void*) (uint64_t) code);
     push(&wq, process_keys);
+
+    // I may have been doing something in ring 0 that I want to return to; this is just an experiment
+    // __asm__ __volatile__
+    // (
+    //     "mov %0, %%rax\n"
+    //     "mov %%rax, %%rsp\n"
+    //     "push $0\n"
+    //     "push %%rax\n"
+    //     "pushf\n"
+    //     "pop %%rax\n"
+    //     "or $0x200, %%rax\n"
+    //     "mov %%rax, %%r13\n"
+    //     "push %%rax\n"
+    //     "push $8\n"
+    //     "mov %1, %%rax\n"
+    //     "push %%rax\n"
+    //     "iretq\n"
+    //     ::"m"(kernel_stack_top), "m"(waitloop)
+    // );
 }
 
 static void __attribute__((interrupt)) irq8_rtc(struct interrupt_frame *) {
@@ -500,6 +522,7 @@ static uint64_t cpuCountOffset = 0;
 static void __attribute__((interrupt)) irq0_pit(struct interrupt_frame *) {
     //logf("0");
     outb(PIC_PRIMARY_CMD, PIC_ACK);
+    print("irq0_pit\n");
 
     //print("acked irq0\n");
     //__asm__ __volatile__("hlt");
@@ -524,6 +547,26 @@ static void __attribute__((interrupt)) irq0_pit(struct interrupt_frame *) {
         if (pitCount % (TICK_HZ * periodicCallbacks.pcs[i]->period / periodicCallbacks.pcs[i]->count) == 0)
             push(&wq, periodicCallbacks.pcs[i]->f);
     }
+    return;
+
+    // I may have been doing something in ring 0 that I want to return to; this is just an experiment
+    __asm__ __volatile__
+    (
+        "mov %0, %%rax\n"
+        "mov %%rax, %%rsp\n"
+        "push $0\n"
+        "push %%rax\n"
+        "pushf\n"
+        "pop %%rax\n"
+        "or $0x200, %%rax\n"
+        "mov %%rax, %%r13\n"
+        "push %%rax\n"
+        "push $8\n"
+        "mov %1, %%rax\n"
+        "push %%rax\n"
+        "iretq\n"
+        ::"m"(kernel_stack_top), "m"(waitloop)
+    );
 }
 
 static void set_handler(uint64_t vec, void* handler, uint8_t type) {

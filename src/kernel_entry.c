@@ -132,5 +132,6 @@ void __attribute__((section(".kernel_entry"))) kernel_entry() {
     //setUpUserMode();
 
     log("Kernel initialized; going to waitloop.\n");
+    //setUpUserMode();
     waitloop();
 }
