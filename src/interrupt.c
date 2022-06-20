@@ -158,8 +158,8 @@ static inline void push(struct queue* q, void* p) {
 void userMode() {
     for(;;)
         //__asm__ __volatile__ ("mov $0x1234face, %r15\nint $0x80\n");
-        __asm__ __volatile__ ("inc %r15\ncli\n");
-        //__asm__ __volatile__ ("inc %r15\n");
+        //__asm__ __volatile__ ("inc %r15\ncli\n");
+        __asm__ __volatile__ ("inc %r15\n");
 }
 
 void setUpUserMode() {
@@ -172,7 +172,9 @@ void setUpUserMode() {
 
     //void* stack = malloc(1024 * 8);
     uint8_t* u = malloc(2 * 1024 * 1024 * 2); // 2MB page, doubled so I can clunkily align
-    u = (uint8_t*) ((uint64_t) u & ~(1024 * 1024 * 4 - 1));
+    print("\n");
+    printf("u: 0x%h\n", u);  // Okay, bochs starts with 0x295e80, then goes to 0...
+    u = (uint8_t*) ((uint64_t) (u + 1024 * 1024 * 2) & ~(1024 * 1024 * 2 - 1));  // Okay, yeah, this is garbage...  Hehe.
     void* stack_top = u + 2 * 1024 * 1024 - 1024;
 
     //__asm__ __volatile__ ("xchgw %bx, %bx");
@@ -180,6 +182,7 @@ void setUpUserMode() {
 
     // Okay, let's dump first few IDT entries here, and then again after copying to u...
     print("\n");
+    printf("u: 0x%h\n", u);
     for (uint64_t i = 0; i < 10; i++)
         printf("%u: 0x%p016h\n", i, ((uint64_t*) 0)[i]);
     uint8_t* uc = (uint8_t*) &userMode;
@@ -192,9 +195,10 @@ void setUpUserMode() {
     print("\n");
     for (uint64_t i = 0; i < 10; i++)
         printf("%u: 0x%p016h\n", i, ((uint64_t*) 0)[i]);
-    __asm__ __volatile__ ("xchgw %bx, %bx");
+    //return;
+    //__asm__ __volatile__ ("xchgw %bx, %bx");
     uint64_t* tables = mallocz(1024 * 4 * 2 * 2); // 2 4K tables, doubled so I can clunkily align
-    uint64_t* l4 = (uint64_t*) ((uint64_t) tables & ~0xfff);
+    uint64_t* l4 = (uint64_t*) ((uint64_t) (tables + 0x1000)  & ~0xfff); // More garbage; silly me!
     uint64_t* l3 = l4 + 0x1000 / 8;
     uint64_t* l2 = (uint64_t*) 0x100000;
 
@@ -212,9 +216,10 @@ void setUpUserMode() {
     __asm__ __volatile__
     (
          //"pushf\n"
-         //"cli\n"
+         "cli\n"
          //"pop %%r8\n"
-         "xchgw %%bx, %%bx\n"
+         //"xchgw %%bx, %%bx\n"
+         //"sti\n"
          //"hlt\n"
          "mov %0, %%esp\n"
          "push $27\n"
