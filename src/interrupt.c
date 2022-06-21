@@ -285,6 +285,40 @@ void setUpUserMode() {
 //   whether to iretq back to kernel or to go to waitlist/scheduler based on that.  If it's time to schedule, and there's an
 //   active ring 3 process, go to scheduler.  Otherwise iretq.
 
+// So, let's see, I'd want to *not* share l2 table anymore, and instead make a new one per process, where the process sees
+//   itself as beign an a fixed, predicatable address.  (Ah, and I think I finally get the higher-half kernel thing now, or
+//   at least better than I had -- software interrupt puts me in ring 0, with my ring 0 stack (from tss) and cs from idt.  But
+//   it doesn't restore our old cr3.  Kernel and user land both share the same page tables.  When we context switch (change
+//   processes), we change cr3.  But software or hardware interrupt, while similar in some ways, is *not* a context switch, and
+//   page tables remain the same.  So we map the kernel separate from any addresses the userland might use, because the kernel
+//   sees the same addresses!
+// This does require further thought and consideration...  When we're leaving the interrupt to go to the waitloop/scheduler, or
+//   otherwise doing kernel work for the kernel, we go back to the default cr3?  No, friend.  Malloc and everything else sees
+//   *consistent* higher-half addresesses, regardless of which process we are in.  The only addresses changing are lower-half,
+//   userland stuff that only those processes need to worry about.  Kernel will see that userspace 4 MB page at *both* places --
+//   the higher-half returned by malloc, and at the lower-half address we load everything at.  Because that's how we'll map
+//   things in our page tables.
+// So in the original, kernel-only tables, the kernel itself will be identity mapped in lower half (as it currently is) *and*
+//   higher-half mapped as well, as it will be in all tables.  I guess that means we *still* have to make sure we'll compiled
+//   with *only* relative addresses, right?  No absolute addresses other than what we explicitely use, like IDT, and stuff --
+//   which raises the great question: which lower-half things need to be identity mapped?  Certainly first meg.  Well, again,
+//   whole kernel will be, as all kernel code fits within first meg.  It's just things returned from malloc that are above
+//   that.  Stack, heap.
+
+// Hmm, seems hard to get GCC to use relative-only addressing; everything seems to be designed to not be runnable until made
+//   fixed location.  (Linking required.)  That doesn't make sense to me, but whatever.  I guess the idea is lower-half setup
+//   is fixed low; higher-half kernel is fixed high.  So maybe bootloader is lower half, and all of C code is higher-half, and
+//   instead of falling straight through into C (still so cool!), we jump to higher-half address.  Easy to link that way.
+// Do I need to care about physical alignment?  Can I just map my base higher-half address to exactly whatever address is
+//   a label at bottom of bootloader assembly file, regardless of how it's aligned?
+
+struct process {
+    void* page; // All processes 4MB in this first draft; rip pointing at bottom, rsp at at top, on launch
+
+    uint64_t rax;
+    // ...
+};
+
 void waitloop() {
     for (;;) {
         void (*f)();
