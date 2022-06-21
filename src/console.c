@@ -599,7 +599,6 @@ static void gotInput(struct input i) {
 
 void startTty() {
     log("Starting tty\n");
-
     no_ints();
     init_keyboard();
     registerKbdListener(&gotInput);

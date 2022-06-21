@@ -113,6 +113,7 @@ void __attribute__((section(".kernel_entry"))) kernel_entry() {
 
     init_interrupts();
     init_com1();
+    no_ints();
     startTty();
 
     logf("We've got %u mem table entries:\n", *entry_count);
@@ -132,6 +133,6 @@ void __attribute__((section(".kernel_entry"))) kernel_entry() {
     //setUpUserMode();
 
     log("Kernel initialized; going to waitloop.\n");
-    //setUpUserMode();
+    setUpUserMode();
     waitloop();
 }

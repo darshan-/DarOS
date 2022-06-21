@@ -49,7 +49,7 @@
 #define PIC_SECONDARY_CMD 0xa0
 #define PIC_SECONDARY_DATA 0xa1
 
-#define TICK_HZ 19//1000
+#define TICK_HZ 1000
 
 uint64_t int_tick_hz = TICK_HZ;  // For periodic_callbacks.c to access.
 
@@ -183,7 +183,7 @@ void setUpUserMode() {
 
     l4[0] = (uint64_t) l3 | PT_PRESENT | PT_WRITABLE | PT_USERMODE;
     l3[0] = (uint64_t) l2 | PT_PRESENT | PT_WRITABLE | PT_USERMODE;
-    for (uint64_t i = 0; i < 512; i++) // TODO: only set user page with this
+    for (uint64_t i = 0; i < 512; i++) // TODO: only set user page, not full table
         l2[i] |= PT_USERMODE;
     // l2[(uint64_t) u / (1024 * 1024 * 2)] |= PT_USERMODE;
 
@@ -522,7 +522,7 @@ static uint64_t cpuCountOffset = 0;
 static void __attribute__((interrupt)) irq0_pit(struct interrupt_frame *) {
     //logf("0");
     outb(PIC_PRIMARY_CMD, PIC_ACK);
-    print("irq0_pit\n");
+    //print("irq0_pit\n");
 
     //print("acked irq0\n");
     //__asm__ __volatile__("hlt");
@@ -532,6 +532,12 @@ static void __attribute__((interrupt)) irq0_pit(struct interrupt_frame *) {
     pitCount++;
 
     ms_since_boot = pitCount * PIT_COUNT * 1000 / PIT_FREQ;
+    static lpc = 0;
+    if (ms_since_boot % 1000 == 0 && pitCount != lpc) {
+        lpc = pitCount;
+        //print("irq0\n");
+        printf("pitCount: %u\n", pitCount);
+    }
 
     // if (pitCount % TICK_HZ == 0)
     //     logf("Average CPU ticks per PIT tick: %u\n", (read_tsc() - cpuCountOffset) / pitCount);
