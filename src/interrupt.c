@@ -243,6 +243,20 @@ void setUpUserMode() {
     );
 }
 
+
+// Can waitloop be scheduler?
+// Do any kernel work, then bounce between any user processes?  And if none of the above, hlt loop?
+// So most interrupts can return, to whatever was interrupted, but timer interrupt, if the time slice is up, will
+//  call scheduler instead (that thing that we're not returning to will be gotten back to when schedule says it's time)?
+// Well, we'd need to keep track of state ourselves, if not iretq-ing back there.  But stack is messed up?  How do we get
+//  state?  Why is stack weird?
+// And weren't keyboard interrupts *not* happening before?  Wait, are they happening when in user land?  Yes?  What changed?
+// Oh, that's right, if all interrupt does is queue work then go back to userland, we never make it to waitoop to do queued
+//   work.  So I think that's all working as expected.
+// So main issue is storing all registers -- we're not just starting a process, we're trying to get back to exactly the
+//   state of everything when going back to that line of code.  So restoring will mean not just setting up stack, but when
+//   we call iretq, every single register should be restored first.
+
 int hlt_in_waitloop = 0;
 void waitloop() {
     for (;;) {
@@ -553,26 +567,9 @@ static void __attribute__((interrupt)) irq0_pit(struct interrupt_frame *) {
         if (pitCount % (TICK_HZ * periodicCallbacks.pcs[i]->period / periodicCallbacks.pcs[i]->count) == 0)
             push(&wq, periodicCallbacks.pcs[i]->f);
     }
-    return;
 
-    // I may have been doing something in ring 0 that I want to return to; this is just an experiment
-    __asm__ __volatile__
-    (
-        "mov %0, %%rax\n"
-        "mov %%rax, %%rsp\n"
-        "push $0\n"
-        "push %%rax\n"
-        "pushf\n"
-        "pop %%rax\n"
-        "or $0x200, %%rax\n"
-        "mov %%rax, %%r13\n"
-        "push %%rax\n"
-        "push $8\n"
-        "mov %1, %%rax\n"
-        "push %%rax\n"
-        "iretq\n"
-        ::"m"(kernel_stack_top), "m"(waitloop)
-    );
+    if (ms_since_boot > 100)
+        waitloop();
 }
 
 static void set_handler(uint64_t vec, void* handler, uint8_t type) {
