@@ -256,6 +256,14 @@ void setUpUserMode() {
 // So main issue is storing all registers -- we're not just starting a process, we're trying to get back to exactly the
 //   state of everything when going back to that line of code.  So restoring will mean not just setting up stack, but when
 //   we call iretq, every single register should be restored first.
+// Hmm, don't I still need to know if I'm in the interrupt from user land vs kernel code?  I mean, if the above works, then
+//  all interrupts except timer (pit / hpet -- I plan to use HPET where available relatively soon) will just iretq (return
+//  in C).  But timer interrupt will want to pause a user process if it's time.  (Oh, other interrupts will pause user process
+//  too, like when waiting for disk or network or something -- but in that case, they don't need to know how they got there.)
+// So I need to check stack or something, to know.  Because there is no process for kernel stuff, and if kernel is in the middle
+//   of something and we just went to waitloop and abandoned it, we'd never get back to it.  Well, and that makes it obvious
+//   what I'd thought briefly above but hadn't fully sat with -- we need to know not just whether we're here from users space,
+//   but exactly which process -- how else could we save the registers for it?
 
 int hlt_in_waitloop = 0;
 void waitloop() {
