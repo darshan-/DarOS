@@ -278,26 +278,22 @@ void setUpUserMode() {
 //  as we'd want.  Hmm, yeah, I gues I'm spacey and want to consider further when less spacy, but I think I'm good to iretq to
 //  whatever ring 0 thing we were doing if GCC's interrupt stack frame IP isn't part of a user process.
 
-int hlt_in_waitloop = 0;
+// Hmm, in thinking about paging, and how IP wouldn't be reliable if things weren't identity mapped, and wondering how this is
+//   supposed to work, it finally just occured to me that -- duh! -- the kernel can know what it was ding by keeping track
+//   itself, right?  When about to switch to a user process, we mark that as the active process (after turning interrupts off,
+//   obviously, so we're not going to get an interrupt between setting that and actually *being* in that process).  So we know
+//   whether to iretq back to kernel or to go to waitlist/scheduler based on that.  If it's time to schedule, and there's an
+//   active ring 3 process, go to scheduler.  Otherwise iretq.
+
 void waitloop() {
     for (;;) {
-        //print("waitloop top\n");
-        //printf("WAITLOOP hlt_in_waitloop: %u\n", hlt_in_waitloop);
-        // if (hlt_in_waitloop) {
-        //     printf("hlt_in_waitloop in waitloop: %u\n", hlt_in_waitloop);
-        //     __asm__ __volatile__("cli\ncli\nhlt\nhlt\n");
-        // }
-
         void (*f)();
 
         while ((f = (void (*)()) pop(&wq)))
             f();
 
-        //print("waitloop done with work queue, time to set stack, enable interrupts, and wait.\n");
-        //__asm__ __volatile__("hlt");
         __asm__ __volatile__(
             "mov %0, %%rsp\n" // We'll never return anywhere or use anything currently on the stack, so reset it
-            //"inc %%r14\n"
             "sti\n"
             "hlt\n"
             ::"m"(kernel_stack_top)
@@ -313,7 +309,6 @@ void process_keys() {
 static void dumpFrame(struct interrupt_frame *frame) {
     logf("ip: 0x%p016h    cs: 0x%p016h flags: 0x%p016h\n", frame->ip, frame->cs, frame->flags);
     logf("sp: 0x%p016h    ss: 0x%p016h\n", frame->sp, frame->ss);
-    //printf("hlt_in_waitlop dumpFrame: %u\n", hlt_in_waitloop);
 }
 
 static inline void generic_trap_n(struct interrupt_frame *frame, int n) {
@@ -424,7 +419,6 @@ static void __attribute__((interrupt)) int_0x80_handler(struct interrupt_frame *
     dumpFrame(frame);
     //frame->ip = (uint64_t) waitloop;
     //print("waitloop?");
-    //hlt_in_waitloop = 1;
     //printf("hlt_in_waitloop in int 0x80: %u\n", hlt_in_waitloop);
     __asm__ __volatile__
     (

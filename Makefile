@@ -2,7 +2,7 @@
 
 c_objects := $(patsubst src/%.c, build/%.o, $(wildcard src/*.c))
 
-GCC_OPTS := -Wall -Wextra -c -ffreestanding -fno-stack-protector -mgeneral-regs-only -mno-red-zone -fno-PIC -mcmodel=large -momit-leaf-frame-pointer #-fno-zero-initialized-in-bss
+GCC_OPTS := -Wall -Wextra -c -ffreestanding -fno-stack-protector -mgeneral-regs-only -mno-red-zone -fno-PIC -mcmodel=large -momit-leaf-frame-pointer #--static-pie
 
 LD_OPTS := -N --warn-common -T src/linker.ld #--print-map
 
