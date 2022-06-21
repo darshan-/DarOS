@@ -235,6 +235,8 @@ l3_loop2:
         add rbx, SZ_QW
         loop l3_loop2
 
+        ; Okay, we've identity-mapped 256 GB in lower half.  Now map upper half.
+
         lidt [idtr]
 
         mov ax, 32

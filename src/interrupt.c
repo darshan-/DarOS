@@ -312,6 +312,16 @@ void setUpUserMode() {
 // Do I need to care about physical alignment?  Can I just map my base higher-half address to exactly whatever address is
 //   a label at bottom of bootloader assembly file, regardless of how it's aligned?
 
+// Okay, but the question I was starting to ask was about what else needs to be identity mapped low, besides idt, gdtr, etc.
+//   Kernel stack can be mapped both ways.  But what about page tables?  If I'm using tables I'm getting from malloc, I'm going
+//   to see them as upper half.  But I'll need to load them in cr3 (l4, l3, l2) as physical addresses, right?
+// Well, it would seem ugly on the one hand, but in reality not tricky, to translate to physical address simply by subtraction.
+// We'll know the physical address of start of C code, and we'll know the virtual address, and that difference will be constant
+//   across all mappings of virtual to physical, upper to lower.  So we can just use malloc and translate, as one option.
+
+// Also note that Rust book finally answered I question I've had: I guess I want to call invlpg (“invalidate page”) when I update
+//   pages, due to the translation lookaside buffer.
+
 struct process {
     void* page; // All processes 4MB in this first draft; rip pointing at bottom, rsp at at top, on launch
 
