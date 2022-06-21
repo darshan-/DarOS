@@ -264,6 +264,19 @@ void setUpUserMode() {
 //   of something and we just went to waitloop and abandoned it, we'd never get back to it.  Well, and that makes it obvious
 //   what I'd thought briefly above but hadn't fully sat with -- we need to know not just whether we're here from users space,
 //   but exactly which process -- how else could we save the registers for it?
+// I guess the stack frame GCC presents me with should be sufficient... the IP of that should show me which process I'm in
+//  (unless I'm doing something in the kernel on behalf of that process -- which a proper OS would keep track of, but maybe,
+//  as far as playing, experimenting, and learning here, for now at least, I can look at that) -- if the stack frame IP is
+//  part of userland process, and it's time to task switch, save registers for that process, and do process switch; but if it's
+//  not part of a ring 3 proess, iretq to let kernel finish what it's doing?  (Hmm, kernel could also be doing things that
+//  wait -- I/O, etc. -- *and* doing them on bahalf of a user process -- so it's not just a matter of being lax with time
+//  acounting, it's also a matter of it not necessarily making sense to return there.  Hmm, or is it?  Hmm... well, if I was
+//  waiting for disk or network io or somethign, I guess I'd set up data structures for what to do when the data is ready, and
+//  then go to the waitloop.  So the basic design is that the kernel never does anything that takes a long time, and I should
+//  always return to what the kernel was doing?  Ooh -- wait, what about waitloop?  I *don't* want to return to the hlt -- yeah
+//  okay, but it's not a hlt loop, we always, for quite some time now, have been doing work at the top of that very loop, exactly
+//  as we'd want.  Hmm, yeah, I gues I'm spacey and want to consider further when less spacy, but I think I'm good to iretq to
+//  whatever ring 0 thing we were doing if GCC's interrupt stack frame IP isn't part of a user process.
 
 int hlt_in_waitloop = 0;
 void waitloop() {
