@@ -295,7 +295,7 @@ void setUpUserMode() {
 // This does require further thought and consideration...  When we're leaving the interrupt to go to the waitloop/scheduler, or
 //   otherwise doing kernel work for the kernel, we go back to the default cr3?  No, friend.  Malloc and everything else sees
 //   *consistent* higher-half addresesses, regardless of which process we are in.  The only addresses changing are lower-half,
-//   userland stuff that only those processes need to worry about.  Kernel will see that userspace 4 MB page at *both* places --
+//   userland stuff that only those processes need to worry about.  Kernel will see that userspace 2 MB page at *both* places --
 //   the higher-half returned by malloc, and at the lower-half address we load everything at.  Because that's how we'll map
 //   things in our page tables.
 // So in the original, kernel-only tables, the kernel itself will be identity mapped in lower half (as it currently is) *and*
@@ -322,8 +322,20 @@ void setUpUserMode() {
 // Also note that Rust book finally answered I question I've had: I guess I want to call invlpg (“invalidate page”) when I update
 //   pages, due to the translation lookaside buffer.
 
+// Hmm, as I was going to bed, and very much as I was waking up, I realized I was jumping too far: I now have paging motivated,
+//   and having kernel mapped in user process motivated, but the benefits of higher-half aren't clear to me.  Everything about
+//   my process here is to have fun and do things the way that makes most sense to me, that feels fun and/or easy and/or
+//   interesting and/or most right for me me here.
+
+// And so what feels most obvious, fun, natural, and right to me here (which might soon be apparent as flawed, in which case we'd
+//   have learned something!), is to have kernel in the lower half.  So it's always only dealing with physical addresses.  User
+//   space can be high, though not necessarily upper half, just a consistent high location.
+
+// Also, why did I switch from mapping 512 to mapping 256 GB?  I don't recall.  I recall doing it to solve some problem, but I
+//   don't remember what the problem was...  Because I may want to put user processes at 256 GB, for example.
+
 struct process {
-    void* page; // All processes 4MB in this first draft; rip pointing at bottom, rsp at at top, on launch
+    void* page; // All processes 2 MB in this first draft; rip pointing at bottom, rsp at at top, on launch
 
     uint64_t rax;
     // ...
