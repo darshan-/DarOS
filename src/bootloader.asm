@@ -13,20 +13,20 @@
         ; 1: CPU access (leave clear)
 
         ; Access byte is bits 40-47, so bit shift from 40 to 47 for bits 0-7 of access byte
-        SD_PRESENT equ 1<<47
+        SD_PRESENT equ 1 << 47
         SD_RING0 equ 0
-        SD_RING1 equ 1<<45
-        SD_RING2 equ 2<<45
-        SD_RING3 equ 3<<45
-        SD_NONTSS equ 1<<44
+        SD_RING1 equ 1 << 45
+        SD_RING2 equ 2 << 45
+        SD_RING3 equ 3 << 45
+        SD_NONTSS equ 1 << 44
         SD_TSS equ 0
-        SD_CODESEG equ 1<<43
+        SD_CODESEG equ 1 << 43
         SD_DATASEG equ 0
-        SD_DATADOWN equ 1<<42
+        SD_DATADOWN equ 1 << 42
         SD_DATAUP equ 0
-        SD_CONFORMING equ 1<<42
-        SD_READABLE equ 1<<41
-        SD_WRITABLE equ 1<<41
+        SD_CONFORMING equ 1 << 42
+        SD_READABLE equ 1 << 41
+        SD_WRITABLE equ 1 << 41
 
         ; Flags nibble format:
         ; 4: Granularity (0 for 1-byte blocks; 1 for 4-KiB blocks)
@@ -35,11 +35,11 @@
         ; 1: Reserved
 
         ; Flags nibble is bits 52-55, so bit shift from 52 to 55 for bits 0-3 of access byte
-        SD_GRAN4K equ 1<<55
+        SD_GRAN4K equ 1 << 55
         SD_GRANBYTE equ 0
         SD_MODE16 equ 0
-        SD_MODE32 equ 1<<54
-        SD_MODE64 equ 1<<53
+        SD_MODE32 equ 1 << 54
+        SD_MODE64 equ 1 << 53
 
         page_table_l4 equ 0x1000
         page_table_l3 equ 0x2000
@@ -51,15 +51,17 @@
 
         ; Page Table constants
         PT_PRESENT equ 1
-        PT_WRITABLE equ 1<<1
-        PT_HUGE equ 1<<7
+        PT_WRITABLE equ 1 << 1
+        PT_HUGE equ 1 << 7
+        PT_USERMODE equ 1 << 2
 
-        CR4_PAE equ 1<<5
+
+        CR4_PAE equ 1 << 5
         CR0_PROTECTION equ 1
         CR0_PAGING equ 1 << 31
 
         MSR_IA32_EFER equ 0xC0000080 ; Extended Feature Enable Register
-        EFER_LONG_MODE_ENABLE equ 1<<8
+        EFER_LONG_MODE_ENABLE equ 1 << 8
 
         ; Let's load 960 sectors, 120 at a time (128 is max at a time, 961 total is max in safe area)
         ; Well, VirtualBox, and apparently some other BIOSes, can only handle reading one sector at a time...
@@ -142,10 +144,10 @@ smap_done:
 
         cli
 
-        mov eax, page_table_l3 | PT_PRESENT | PT_WRITABLE
+        mov eax, page_table_l3 | PT_PRESENT | PT_WRITABLE | PT_USERMODE
         mov [page_table_l4], eax
 
-        mov eax, page_table_l2 | PT_PRESENT | PT_WRITABLE
+        mov eax, page_table_l2 | PT_PRESENT | PT_WRITABLE | PT_USERMODE
         mov [page_table_l3], eax
 
         mov eax, PT_PRESENT | PT_WRITABLE | PT_HUGE
@@ -233,7 +235,7 @@ l2s_loop:
         add rbx, SZ_QW
         loop l2s_loop
 
-        mov rax, page_tables_l2 | PT_PRESENT | PT_WRITABLE
+        mov rax, page_tables_l2 | PT_PRESENT | PT_WRITABLE | PT_USERMODE
         mov rbx, page_table_l3
         mov rcx, 512
 l3_loop2:

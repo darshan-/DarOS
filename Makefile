@@ -51,7 +51,7 @@ clean:
 crun: clean
 	$(MAKE) run
 
-.PHONE: usb
+.PHONY: usb
 usb: out/boot.img
 	sudo dd if=out/boot.img of=/dev/disk/by-id/usb-Verbatim_STORE_N_GO_077516801042-0\:0 status=progress conv=fdatasync && sync
 
