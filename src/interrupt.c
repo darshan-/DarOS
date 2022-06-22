@@ -163,12 +163,16 @@ void userMode() {
 }
 
 void setUpUserMode() {
-    //uint8_t* u = malloc(2 * 1024 * 1024 * 2);
-    uint8_t* u = malloc(2 * 1024 * 1024 * 2); // 2MB page, doubled so I can clunkily align
-    print("\n");
-    printf("        u: 0x%h\n", u);
+    /*
+      TODO: Figure out how I want to allocate pages.  With standard heap malloc, or otherwise?
+      Maybe have a way to request specific alignment.
+      Maybe have a palloc (page alloc, rather than memory alloc) that gets a multiple of 2 MB pages, and starts
+        search from END of heap.  So it's not taking up big chunks of smaller allocation space at bottom, and it's a
+        bit more effecient to search, scanning qwords at a time rather than bit pairs at a time.
+      At first glance, I like this second approach and think I want to play with it.
+     */
+    uint8_t* u = malloc(2 * 1024 * 1024); // 2MB page, doubled so I can clunkily align
     u = (uint8_t*) ((uint64_t) (u + 1024 * 1024 * 2) & ~(1024 * 1024 * 2 - 1));
-    printf("aligned u: 0x%h\n", u);
     uint8_t* uc = (uint8_t*) &userMode;
     for (uint64_t i = 0; i < 512; i++)
         u[i] = uc[i];
@@ -530,6 +534,7 @@ static void __attribute__((interrupt)) trap_0x0e_page_fault(struct interrupt_fra
     logf("cr2: %p016h\n", cr2);
 
     frame->ip = (uint64_t) waitloop;
+    // TODO: Just call waitloop?
 }
 
 static void __attribute__((interrupt)) double_fault_handler(struct interrupt_frame *frame, uint64_t error_code) {
