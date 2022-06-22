@@ -162,14 +162,30 @@ void userMode() {
         __asm__ __volatile__ ("inc %r15\n");
 }
 
+/*
+  4770k:
+  0x103913680
+  0x103a00000
+  0x103bffc00
+ */
 void setUpUserMode() {
     uint8_t* u = malloc(2 * 1024 * 1024 * 2); // 2MB page, doubled so I can clunkily align
-    // print("\n");
-    // printf("u: 0x%h\n", u);
+    print("\n");
+    printf("initial u: 0x%h\n", u);
     u = (uint8_t*) ((uint64_t) (u + 1024 * 1024 * 2) & ~(1024 * 1024 * 2 - 1));
+    printf("        u: 0x%h\n", u);
     void* stack_top = u + 2 * 1024 * 1024 - 1024;
+    printf("stack_top: 0x%h\n", stack_top);
+    *((uint64_t*) stack_top) = 27;
 
-    //__asm__ __volatile__ ("xchgw %bx, %bx");
+    __asm__ __volatile__
+    (
+        "cli\n"
+        "mov %0, %%rax\n"
+        "mov $27, (%%rax)\n"
+        ::"m"(stack_top)
+    );
+    //__asm__ __volatile__ ("hlt");
 
     uint8_t* uc = (uint8_t*) &userMode;
     //__asm__ __volatile__ ("xchgw %bx, %bx");
@@ -181,28 +197,67 @@ void setUpUserMode() {
     uint64_t* l3 = l4 + 0x1000 / 8;
     uint64_t* l2 = (uint64_t*) 0x100000;
 
+    // TODO:
+    // Hmm, since things are only accessible to ring 3 if all tables say so, it's actually fine, and not a hack, to set
+    //   l3 and l4 this way, right?  And can't / shouldn't I just set them this way to begin with?  Actual l2 entries are
+    //   what actually set access rights for any given address?
+    // And, well, the plan is actually to have l4[0] and all of this full l3 just kernel, so no usermode... but l4[1] will
+    //   be set to usermode, and have a new l3 and l2 for each process, both set to usermode.
     l4[0] = (uint64_t) l3 | PT_PRESENT | PT_WRITABLE | PT_USERMODE;
     l3[0] = (uint64_t) l2 | PT_PRESENT | PT_WRITABLE | PT_USERMODE;
-    for (uint64_t i = 0; i < 512; i++) // TODO: only set user page, not full table
-        l2[i] |= PT_USERMODE;
-    // l2[(uint64_t) u / (1024 * 1024 * 2)] |= PT_USERMODE;
+    // for (uint64_t i = 0; i < 512; i++) // TODO: only set user page, not full table
+    //     l2[i] |= PT_USERMODE;
+    l2[(uint64_t) u / (1024 * 1024 * 2)] |= PT_USERMODE;
+
+    print("About to set user mode page to user mode\n");
+
+    __asm__ __volatile__
+    (
+        "cli\n"
+        "mov %0, %%rax\n"
+        "mov $27, (%%rax)\n"
+        ::"m"(stack_top)
+    );
 
     __asm__ __volatile__
     (
         "mov %0, %%rax\n"
         "mov %%rax, %%cr3\n"
-        ::"m"(l4)
+        "invlpg %1\n"
+        //"hlt\n"
+        // invlpg of u
+        ::"m"(l4), "m"(u)
     );
 
-    //printf("u stack top: 0x%h\n", stack_top);
-    __asm__ __volatile__ ("cli");
-    print("About to user mode\n");
+    *((uint64_t*) stack_top) = 27;
+    __asm__ __volatile__ ("hlt");
+
+    // I okay, I think we've determine that this causes the 4770k to reboot here, right after setting cr3, but not right before.
+    // So I guess we're doing somthing wrong with our paging.  Which was what we've been guessing, but good to have this much
+    //    confirmation.
+
     __asm__ __volatile__
     (
         "cli\n"
         "mov %0, %%rax\n"
-        "mov %%rax, %%rsp\n"
-        "push $27\n"
+        "mov $27, (%%rax)\n"
+        ::"m"(stack_top)
+    );
+
+    __asm__ __volatile__ ("hlt");
+
+    //printf("u stack top: 0x%h\n", stack_top);
+    // __asm__ __volatile__ ("cli");
+    // __asm__ __volatile__ ("hlt");
+    //print("About to user mode\n");
+    __asm__ __volatile__
+    (
+        "cli\n"
+        "mov %0, %%rax\n"
+        //"mov %%rax, %%rsp\n"
+        //"push $27\n"
+        "mov $27, (%%rax)\n"
+        "hlt\n"
         "push %%rax\n"
         "pushf\n"
         "pop %%rax\n"
@@ -568,6 +623,7 @@ static void __attribute__((interrupt)) double_fault_handler(struct interrupt_fra
 }
 
 static void __attribute__((interrupt)) irq1_kbd(struct interrupt_frame *) {
+    //__asm__ __volatile__ ("hlt");
     uint8_t code = inb(0x60);
     outb(PIC_PRIMARY_CMD, PIC_ACK);
     push(&kbd_buf, (void*) (uint64_t) code);
@@ -605,6 +661,7 @@ static void __attribute__((interrupt)) irq8_rtc(struct interrupt_frame *) {
 static uint64_t cpuCountOffset = 0;
 
 static void __attribute__((interrupt)) irq0_pit(struct interrupt_frame *) {
+    //__asm__ __volatile__ ("hlt");
     //logf("0");
     outb(PIC_PRIMARY_CMD, PIC_ACK);
     //print("irq0_pit\n");
@@ -617,12 +674,12 @@ static void __attribute__((interrupt)) irq0_pit(struct interrupt_frame *) {
     pitCount++;
 
     ms_since_boot = pitCount * PIT_COUNT * 1000 / PIT_FREQ;
-    static lpc = 0;
-    if (ms_since_boot % 1000 == 0 && pitCount != lpc) {
-        lpc = pitCount;
-        //print("irq0\n");
-        printf("pitCount: %u\n", pitCount);
-    }
+    // static lpc = 0;
+    // if (ms_since_boot % 1000 == 0 && pitCount != lpc) {
+    //     lpc = pitCount;
+    //     //print("irq0\n");
+    //     //printf("pitCount: %u\n", pitCount);
+    // }
 
     // if (pitCount % TICK_HZ == 0)
     //     logf("Average CPU ticks per PIT tick: %u\n", (read_tsc() - cpuCountOffset) / pitCount);

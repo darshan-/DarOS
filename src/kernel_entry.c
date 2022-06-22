@@ -92,14 +92,14 @@ void __attribute__((section(".kernel_entry"))) kernel_entry() {
         // L2 pages mapping first 256 GB of address space take up the MB from 0x100000 to 0x200000
         // At some point I'll probably want to make that part of this process, but for now it's fixed there,
         //   and we'll just account for it here.
-        if (mem_table[i].start < 0x200000) {
-            if (mem_table[i].start + mem_table[i].length < 0x200000) {
+        if (mem_table[i].start < 0x300000) {
+            if (mem_table[i].start + mem_table[i].length < 0x300000) {
                 mem_table[i].type = 2;
                 continue;
             }
 
-            mem_table[i].length -= 0x200000 - mem_table[i].start;
-            mem_table[i].start = 0x200000;
+            mem_table[i].length -= 0x300000 - mem_table[i].start;
+            mem_table[i].start = 0x300000;
         }
 
         if (mem_table[i].length > largest) {

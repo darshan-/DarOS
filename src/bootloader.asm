@@ -217,9 +217,16 @@ dap:
 .from:  dq 1                    ; LBA number (sector to start reading from)
 
 start64:
+        xor ax, ax
+        mov ds, ax
+        mov es, ax
+        mov fs, ax
+        mov gs, ax
+        mov ss, ax
+
         mov rax, PT_PRESENT | PT_WRITABLE | PT_HUGE
         mov rbx, page_tables_l2
-        mov rcx, 512 * 256
+        mov rcx, 512 * 512
 l2s_loop:
         mov [rbx], rax
         add rax, SZ_2MB       ; Huge page bit makes for 2MB pages, so each page is this far apart
@@ -228,7 +235,7 @@ l2s_loop:
 
         mov rax, page_tables_l2 | PT_PRESENT | PT_WRITABLE
         mov rbx, page_table_l3
-        mov rcx, 256
+        mov rcx, 512
 l3_loop2:
         mov [rbx], rax
         add rax, SZ_QW * 512

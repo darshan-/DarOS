@@ -50,7 +50,10 @@ clean:
 .PHONY: crun
 crun: clean
 	$(MAKE) run
-#	make run
+
+.PHONE: usb
+usb: out/boot.img
+	sudo dd if=out/boot.img of=/dev/disk/by-id/usb-Verbatim_STORE_N_GO_077516801042-0\:0 status=progress conv=fdatasync && sync
 
 # TODO: I guess with C I need to have each object file list any .h files the .c file includes as prereq
 # And I want to set bootloader up to read the right number of sectors.  Oh, er, hmm... BIOS can only
