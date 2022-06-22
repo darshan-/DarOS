@@ -163,61 +163,53 @@ void userMode() {
 }
 
 void setUpUserMode() {
+    //uint8_t* u = malloc(2 * 1024 * 1024 * 2);
     uint8_t* u = malloc(2 * 1024 * 1024 * 2); // 2MB page, doubled so I can clunkily align
     print("\n");
-    printf("initial u: 0x%h\n", u);
-    u = (uint8_t*) ((uint64_t) (u + 1024 * 1024 * 2) & ~(1024 * 1024 * 2 - 1));
     printf("        u: 0x%h\n", u);
-    void* stack_top = u + 2 * 1024 * 1024 - 1024;
-    printf("stack_top: 0x%h\n", stack_top);
-
+    u = (uint8_t*) ((uint64_t) (u + 1024 * 1024 * 2) & ~(1024 * 1024 * 2 - 1));
+    printf("aligned u: 0x%h\n", u);
     uint8_t* uc = (uint8_t*) &userMode;
-    //__asm__ __volatile__ ("xchgw %bx, %bx");
     for (uint64_t i = 0; i < 512; i++)
         u[i] = uc[i];
 
-    uint64_t l2_index = (uint64_t) u / (1024 * 1024 * 2);
-    uint64_t l2_table = l2_index / 512;
-    l2_index %= 512;
-    uint64_t* l2 = (uint64_t*) (0x100000 + (l2_table * 4096));
+    uint64_t* l2 = (uint64_t*) (0x100000 + (511 * 4096));
+    l2[0] = (uint64_t) u | PT_PRESENT | PT_WRITABLE | PT_HUGE | PT_USERMODE;
 
-    // TODO:
-    // The plan is actually to have l4[0] and all of this full first l3 just kernel, so no usermode... but l4[1] will
-    //   be set to usermode, and have a new l3 and l2 for each process, both set to usermode.
-    l2[l2_index] |= PT_USERMODE;
 
-    printf("l2_index: %u, l2_table: %u, l2: 0x%h\n", l2_index, l2_table, l2);
-
-    print("About to set user mode page to user mode\n");
-
-    __asm__ __volatile__
-    (
-        //"mov %0, %%rax\n"
-        //"mov %%rax, %%cr3\n"
-        "invlpg %0\n"
-        ::"m"(u)
+    // 511 * 1024 * 1024 * 1024 = 0x7FC0000000
+    //asm volatile ("invlpg $548682072064\n");
+    asm volatile (
+        "mov $0x7FC0000000ull, %rax\n"
+        "invlpg (%rax)\n"
     );
 
-    //__asm__ __volatile__ ("hlt");
+    uint8_t* v = (uint8_t*) 0x7FC0000000ull;
+    print("\n");
+    for (int i = 0; i < 512; i++)
+        printf("%p02h", u[i]);
+    print("\n--\n");
+    for (int i = 0; i < 512; i++)
+        printf("%p02h", v[i]);
+    print("\n");
 
-
-    print("About to user mode\n");
-    __asm__ __volatile__
+    //__asm__ __volatile__ ("cli\nhlt");
+    //print("About to user mode\n");
+    asm volatile
     (
         "cli\n"
-        "mov %0, %%rax\n"
-        "mov %%rax, %%rsp\n"
+        "mov $0x7FC0200000, %rax\n"
+        "mov %rax, %rsp\n"
         "push $27\n"
-        "push %%rax\n"
+        "push %rax\n"
         "pushf\n"
-        "pop %%rax\n"
-        "or $0x200, %%rax\n"
-        "push %%rax\n"
+        "pop %rax\n"
+        "or $0x200, %rax\n"
+        "push %rax\n"
         "push $19\n"
-        "mov %1, %%rax\n"
-        "push %%rax\n"
+        "mov $0x7FC0000000, %rax\n"
+        "push %rax\n"
         "iretq\n"
-        ::"m"(stack_top), "m"(u)
     );
 }
 
@@ -523,6 +515,7 @@ static void __attribute__((interrupt)) divide_by_zero_handler(struct interrupt_f
 }
 
 static void __attribute__((interrupt)) trap_0x0e_page_fault(struct interrupt_frame *frame, uint64_t error_code) {
+    printf("\nPage fault; error: 0x%p016h\n", error_code);
     logf("Page fault; error: 0x%p016h\n", error_code);
     dumpFrame(frame);
 
@@ -597,12 +590,18 @@ static void __attribute__((interrupt)) irq0_pit(struct interrupt_frame *) {
     pitCount++;
 
     ms_since_boot = pitCount * PIT_COUNT * 1000 / PIT_FREQ;
-    static uint64_t lpc = 0;
-    if (ms_since_boot % 1000 == 0 && pitCount != lpc) {
-        lpc = pitCount;
+    //static uint64_t lpc = 0;
+    static int indicated = 0;
+    if (ms_since_boot > 1000 && !indicated) {
+        //lpc = pitCount;
+        indicated = 1;
         uint64_t r15;
         asm volatile ("mov %%r15, %0":"=m"(r15));
-        printf("r15: %u\n", r15);
+        //printf("r15: %u\n", r15);
+        if (r15)
+            print("\nUser mode ran!\n");
+        else
+            print("\nUser mode did NOT run!\n");
         //print("irq0\n");
         //printf("pitCount: %u\n", pitCount);
     }
