@@ -10,6 +10,7 @@
 #define BLK_SZ 128
 #define MAP_ENTRY_SZ 2
 #define MAP_FACTOR (64 / MAP_ENTRY_SZ * BLK_SZ)
+#define L2_PAGE_SZ (2ull * 1024 * 1024)
 #define BFREE 0b00ull
 #define BPART 0b11ull
 #define BEND  0b10ull
@@ -70,7 +71,7 @@ void* malloc(uint64_t nBytes) {
                 goto not_found;
 
             if (!ret)
-                ret = (void*) (uint64_t) heap + (i * 64 / MAP_ENTRY_SZ) * BLK_SZ;
+                ret = (void*) (uint64_t) heap + i * MAP_FACTOR;
 
             need -= 64 / MAP_ENTRY_SZ;
         }
@@ -96,6 +97,66 @@ void* malloc(uint64_t nBytes) {
                 goto not_found;
             }
         }
+
+    not_found:
+        need = needed;
+        ret = 0;
+    }
+
+    ints_okay();
+    return 0;
+}
+
+void* palloc() {
+    if (heap == 0)
+        return 0;
+
+    /*
+      We want 512 qwords (- (* 32 128 512) (* 2 1024 1024)), 2MB-aligned.
+      Simplest approach for now is to start at end of heap, truncate least significant end to be 2MB-aligned, and see if it's all free.
+      If it's not, go 2 MB earlier and see if that's all free, etc.
+      Certaily inefficient in a number of ways, but easy to understand and actually reasonable for us for now, I'd think.
+     */
+    uint64_t needed = blocks_per(L2_PAGE_SZ, BLK_SZ);
+
+    //void* heap_end = heap + (map_size - 1) * 4096;
+    //void* ret = ((uint64_t) heap_end) & ~(2ull * 1024 * 1024 - 1);
+    //uint64_t addr = ((uint64_t) heap + (map_size - 1) * MAP_FACTOR) & ~(2ull * 1024 * 1024 - 1);
+    uint64_t addr = ((uint64_t) heap + (map_size - 1) * MAP_FACTOR) & ~(L2_PAGE_SZ - 1);
+    printf("\nheap: 0x%h\n", heap);
+    printf("    : 0x%h\n", map_size - 1);
+    printf("    : 0x%h\n", (map_size - 1) * MAP_FACTOR);
+    printf("    : 0x%h\n", (uint64_t) heap + (map_size - 1) * MAP_FACTOR);
+    printf("mask: 0x%h\n", ~(L2_PAGE_SZ - 1));
+    uint64_t a = (uint64_t) heap + (map_size - 1) * MAP_FACTOR;
+    uint64_t b = ~(L2_PAGE_SZ - 1);
+    printf("\n   a: 0x%h\n", a);
+    printf("   b: 0x%h\n", b);
+    printf(" a&b: 0x%h\n", a&b);
+    printf("    : 0x%h\n", (a&b)/MAP_FACTOR);
+    printf("    : 0x%h\n", (a&b)/MAP_FACTOR - (uint64_t) heap);
+    uint64_t need = needed;
+    void* ret = 0;
+
+    no_ints();
+    // for (;ret > heap; ret -= 2 * 1024 * 1024) {
+        
+    // }
+    for (uint64_t i = ((uint64_t) addr - (uint64_t) heap) / MAP_FACTOR; i > 0; i -= L2_PAGE_SZ / MAP_FACTOR) {
+        printf("i: %u\n", i);
+        for (need = needed; need >= 64 / MAP_ENTRY_SZ; i++) {
+            if (map[i])
+                goto not_found;
+
+            if (!ret)
+                ret = heap + i * MAP_FACTOR;
+
+            need -= 64 / MAP_ENTRY_SZ;
+        }
+
+        ints_okay();
+        printf("ret: 0x%h\n", ret);
+        return ret;
 
     not_found:
         need = needed;

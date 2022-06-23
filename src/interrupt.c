@@ -176,8 +176,10 @@ void setUpUserMode() {
         a process, it seems quite straightforward to request individual pages, and process struct have an array or linked
         list of them, and we map them in so they appear contingous at the 511 GB address to the process.
      */
-    uint8_t* u = malloc(2 * 1024 * 1024 * 2); // 2MB page, doubled so I can clunkily align
-    u = (uint8_t*) ((uint64_t) (u + 1024 * 1024 * 2) & ~(1024 * 1024 * 2 - 1));
+    //uint8_t* u = malloc(2 * 1024 * 1024 * 2); // 2MB page, doubled so I can clunkily align
+    //u = (uint8_t*) ((uint64_t) (u + 1024 * 1024 * 2) & ~(1024 * 1024 * 2 - 1));
+    uint8_t* u = palloc();
+    printf("u: 0x%h\n", u);
     uint8_t* uc = (uint8_t*) &userMode;
     for (uint64_t i = 0; i < 512; i++)
         u[i] = uc[i];
@@ -314,11 +316,20 @@ void setUpUserMode() {
 //   don't remember what the problem was...  Because I may want to put user processes at 256 GB, for example.
 
 struct process {
-    void* page;
+    void* page; // For now only one page allowed
 
-    uint64_t rax;
+    //uint64_t rax;
     // ...
 };
+
+/*
+  How do I want to keep track of processes?
+    (Whatever I do, for now the plan is what I think's called "round robin" -- just go in order, who's turn is next.)
+  Linked list and pointer to cur?  I think that feels easier than dynamic array.  Especially because we only ever need to
+    go to next, for now.
+ */
+
+static struct list* processList = (struct list*) 0;
 
 void waitloop() {
     for (;;) {
@@ -632,7 +643,7 @@ static void __attribute__((interrupt)) irq0_pit(struct interrupt_frame *) {
     static uint64_t lms = 0;
     if (ms_since_boot % 1000 == 0 && ms_since_boot != lms) {
         lms = ms_since_boot;
-        printf("r15: %u\n", r15);
+        //printf("r15: %u\n", r15);
     }
 
     // if (r15 && indicated == 0) {
