@@ -26,10 +26,6 @@ static uint64_t* heap = (uint64_t*) 0;
 // TODO: 1. Rename MAP_FACTOR to something conveying PG_SZ_PER_MAP_QWORD -- but hopefully shorter and better!
 //       2. Have MAP_FACTOR be a thing, but be the actual factor?
 
-// Hmm, wait.  As I was brushing my teeth, it occured to me why I was doing that, and it was less wrong than I thought.
-//   It's a weird kind of factor -- it *is* size **in qwords** that we want, or close to it.  But I think I've been confused and
-//   perhaps misusing factor elsewhere, for understandable reasons.  It needs to mean one thing, not two.
-
 // `size' is the number of bytes available to us for (map + heap)
 // I think I want to 4096-align (0x1000) heap start, to make pages page aligned, to make palloc a bit easier
 //   (so l2 2MB page alignment will be a whole number of our pages...)
@@ -124,30 +120,12 @@ void* palloc() {
     if (heap == 0)
         return 0;
 
-    /*
-      We want 512 qwords (- (* 32 128 512) (* 2 1024 1024)), 2MB-aligned.
-      Simplest approach for now is to start at end of heap, truncate least significant end to be 2MB-aligned, and see if it's all free.
-      If it's not, go 2 MB earlier and see if that's all free, etc.
-      Certaily inefficient in a number of ways, but easy to understand and actually reasonable for us for now, I'd think.
-     */
-
-    //void* heap_end = heap + (map_size - 1) * 4096;
-    //void* ret = ((uint64_t) heap_end) & ~(2ull * 1024 * 1024 - 1);
-    //uint64_t addr = ((uint64_t) heap + (map_size - 1) * MAP_FACTOR) & ~(2ull * 1024 * 1024 - 1);
     uint64_t addr = ((uint64_t) heap + (map_size - 1) * MAP_FACTOR) & ~(L2_PAGE_SZ - 1);
-    uint64_t a = (uint64_t) heap + (map_size - 1) * MAP_FACTOR;
-    uint64_t b = ~(L2_PAGE_SZ - 1);
 
     no_ints();
-    // (Subtracting 3 pages rather than 1 from start address helps qemu...  No idea why.)
-    // And Presario, but not desktop.
-    // Wait, am I making the heap to big?
-    // Desktop gives 0x822800000 -- which... puts us past 32 gigs?
-    // init_heap: 0x100010000, 30599479296, so map size should be 7468751
-    // heap: 0x10390c000
-    // map_size: 0x71f6cf, so correct
     for (uint64_t i = ((uint64_t) addr - (uint64_t) heap - L2_PAGE_SZ) / MAP_FACTOR; i > 0; i -= L2_PAGE_SZ / MAP_FACTOR) {
         int unfree = 0;
+
         for (uint64_t j = 0; j < 512; j++) {
             if (map[i + j]) {
                 unfree = 1;
@@ -160,12 +138,12 @@ void* palloc() {
 
         for (uint64_t j = 0; j < 512; j++)
             map[i + j] = -1ull;
+
         map[i + 511] -= 1;
 
         ints_okay();
         return (void*) heap + i * MAP_FACTOR;
     }
-
     ints_okay();
     return 0;
 }
