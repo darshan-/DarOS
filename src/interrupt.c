@@ -643,7 +643,7 @@ static void __attribute__((interrupt)) irq0_pit(struct interrupt_frame *) {
     static uint64_t lms = 0;
     if (ms_since_boot % 1000 == 0 && ms_since_boot != lms) {
         lms = ms_since_boot;
-        //printf("r15: %u\n", r15);
+        printf("r15: %u\n", r15);
     }
 
     // if (r15 && indicated == 0) {

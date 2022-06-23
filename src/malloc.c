@@ -26,12 +26,16 @@ static uint64_t* heap = (uint64_t*) 0;
 // TODO: 1. Rename MAP_FACTOR to something conveying PG_SZ_PER_MAP_QWORD -- but hopefully shorter and better!
 //       2. Have MAP_FACTOR be a thing, but be the actual factor?
 
+// Hmm, wait.  As I was brushing my teeth, it occured to me why I was doing that, and it was less wrong than I thought.
+//   It's a weird kind of factor -- it *is* size **in qwords** that we want, or close to it.  But I think I've been confused and
+//   perhaps misusing factor elsewhere, for understandable reasons.  It needs to mean one thing, not two.
 
 // `size' is the number of bytes available to us for (map + heap)
 // I think I want to 4096-align (0x1000) heap start, to make pages page aligned, to make palloc a bit easier
 //   (so l2 2MB page alignment will be a whole number of our pages...)
 void init_heap(uint64_t* start, uint64_t size) {
-    map_size = size / 513 - 1;
+    //map_size = size / 513 / 8;
+    map_size = size / (8 / MAP_ENTRY_SZ * BLK_SZ + 1) / 8;
     map = start;
     for (uint64_t i = 0; i < map_size; i++)
         map[i] = 0;
@@ -131,18 +135,8 @@ void* palloc() {
     //void* ret = ((uint64_t) heap_end) & ~(2ull * 1024 * 1024 - 1);
     //uint64_t addr = ((uint64_t) heap + (map_size - 1) * MAP_FACTOR) & ~(2ull * 1024 * 1024 - 1);
     uint64_t addr = ((uint64_t) heap + (map_size - 1) * MAP_FACTOR) & ~(L2_PAGE_SZ - 1);
-    printf("\nheap: 0x%h\n", heap);
-    printf("    : 0x%u\n", map_size - 1);
-    printf("    : 0x%h\n", (map_size - 1) * MAP_FACTOR);
-    printf("    : 0x%h\n", (uint64_t) heap + (map_size - 1) * MAP_FACTOR);
-    printf("mask: 0x%h\n", ~(L2_PAGE_SZ - 1));
     uint64_t a = (uint64_t) heap + (map_size - 1) * MAP_FACTOR;
     uint64_t b = ~(L2_PAGE_SZ - 1);
-    printf("\n   a: 0x%h\n", a);
-    printf("   b: 0x%h\n", b);
-    printf(" a&b: 0x%h\n", a&b);
-    printf("    : 0x%h\n", (a&b)/MAP_FACTOR);
-    printf("    : 0x%h\n", (a&b)/MAP_FACTOR - (uint64_t) heap);
 
     no_ints();
     // (Subtracting 3 pages rather than 1 from start address helps qemu...  No idea why.)
