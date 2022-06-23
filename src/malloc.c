@@ -9,8 +9,10 @@
 
 #define BLK_SZ 128
 #define MAP_ENTRY_SZ 2
-#define MAP_FACTOR (64 / MAP_ENTRY_SZ * BLK_SZ)
+#define QBLK_SZ (64 / MAP_ENTRY_SZ * BLK_SZ)
 #define L2_PAGE_SZ (2ull * 1024 * 1024)
+#define heap64 ((uint64_t) heap)
+
 #define BFREE 0b00ull
 #define BPART 0b11ull
 #define BEND  0b10ull
@@ -21,23 +23,18 @@ static uint64_t map_size; // Size in quadwords
 static uint64_t* map = (uint64_t*) 0;
 static uint64_t* heap = (uint64_t*) 0;
 
-// Okay, I worded "factor" wrong!  1 qword gets us 4096 bytes, so that's not the factor, that's mem size per qword.
-// Factor is an eighth of that.
-// TODO: 1. Rename MAP_FACTOR to something conveying PG_SZ_PER_MAP_QWORD -- but hopefully shorter and better!
-//       2. Have MAP_FACTOR be a thing, but be the actual factor?
-
 // `size' is the number of bytes available to us for (map + heap)
 // I think I want to 4096-align (0x1000) heap start, to make pages page aligned, to make palloc a bit easier
 //   (so l2 2MB page alignment will be a whole number of our pages...)
 void init_heap(uint64_t* start, uint64_t size) {
     //map_size = size / 513 / 8;
-    map_size = size / (8 / MAP_ENTRY_SZ * BLK_SZ + 1) / 8;
+    map_size = size / (QBLK_SZ / 8 + 1) / 8;
     map = start;
     for (uint64_t i = 0; i < map_size; i++)
         map[i] = 0;
     heap = map + map_size;
-    if ((uint64_t) heap % 0x1000)
-        heap = (void*) (((uint64_t) heap + 0x1000) & ~0xfffull);
+    if (heap64 % 0x1000)
+        heap = (void*) ((heap64 + 0x1000) & ~0xfffull);
 }
 
 uint64_t heapUsed() {
@@ -57,7 +54,7 @@ uint64_t heapUsed() {
 
 // Number of bytes in the actual heap (not counting map of heap as part of heap)
 uint64_t heapSize() {
-    return map_size * MAP_FACTOR;
+    return map_size * QBLK_SZ;
 }
 
 void* malloc(uint64_t nBytes) {
@@ -80,7 +77,7 @@ void* malloc(uint64_t nBytes) {
                 goto not_found;
 
             if (!ret)
-                ret = (void*) (uint64_t) heap + i * MAP_FACTOR;
+                ret = (void*) heap + i * QBLK_SZ;
 
             need -= 64 / MAP_ENTRY_SZ;
         }
@@ -94,7 +91,7 @@ void* malloc(uint64_t nBytes) {
                 mask ^= 1ull << ((need - 1 + j) * 2);
 
                 if (!ret)
-                    ret = (void*) (uint64_t) heap + (i * (64 / MAP_ENTRY_SZ) + j) * BLK_SZ;
+                    ret = (void*) heap + (i * (64 / MAP_ENTRY_SZ) + j) * BLK_SZ;
 
                 map[i] |= mask;
                 for (; needed > 64 / MAP_ENTRY_SZ; needed -= 64 / MAP_ENTRY_SZ, i--)
@@ -120,10 +117,10 @@ void* palloc() {
     if (heap == 0)
         return 0;
 
-    uint64_t i = ((uint64_t) heap + (map_size - 1) * MAP_FACTOR) & ~(L2_PAGE_SZ - 1);
+    uint64_t i = (((heap64 + map_size * QBLK_SZ) & ~(L2_PAGE_SZ - 1)) - heap64 - L2_PAGE_SZ) / QBLK_SZ;
 
     no_ints();
-    for (i = (i - (uint64_t) heap - L2_PAGE_SZ) / MAP_FACTOR; i > 0; i -= L2_PAGE_SZ / MAP_FACTOR) {
+    for (; i > 0; i -= L2_PAGE_SZ / QBLK_SZ) {
         for (uint64_t j = 0; j < 512; j++)
             if (map[i + j])
                 goto next;
@@ -134,7 +131,7 @@ void* palloc() {
         map[i + 511] -= 1;
 
         ints_okay();
-        return (void*) heap + i * MAP_FACTOR;
+        return (void*) heap + i * QBLK_SZ;
     next:
     }
     ints_okay();
@@ -156,9 +153,9 @@ void free(void *p) {
     if (heap == 0 || p < (void*) heap || p > (void*) heap + (map_size * (64 / MAP_ENTRY_SZ) - 1) * BLK_SZ)
         return;
 
-    uint64_t n = (uint64_t) p - (uint64_t) heap;
-    uint64_t o = (n % MAP_FACTOR) / BLK_SZ * MAP_ENTRY_SZ;
-    n /= MAP_FACTOR;
+    uint64_t n = (uint64_t) p - heap64;
+    uint64_t o = (n % QBLK_SZ) / BLK_SZ * MAP_ENTRY_SZ;
+    n /= QBLK_SZ;
 
     // If we were only ever changing a whole qword at time I think we'd be fine without turning of interrupts, but since each entry
     //   is only a couple bits, someone else may also want to change another part of a given qword at the same time.
@@ -180,9 +177,9 @@ static void* dorealloc(void* p, uint64_t newSize, int zero) {
         return 0;
 
     uint64_t nbc = blocks_per(newSize, BLK_SZ);
-    uint64_t n = (uint64_t) p - (uint64_t) heap;
-    uint64_t o = (n % MAP_FACTOR) / BLK_SZ * MAP_ENTRY_SZ;
-    n /= MAP_FACTOR;
+    uint64_t n = (uint64_t) p - heap64;
+    uint64_t o = (n % QBLK_SZ) / BLK_SZ * MAP_ENTRY_SZ;
+    n /= QBLK_SZ;
 
     uint64_t count = 0;
     uint8_t freeing = 0;
