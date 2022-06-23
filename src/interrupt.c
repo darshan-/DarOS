@@ -170,8 +170,13 @@ void setUpUserMode() {
         search from END of heap.  So it's not taking up big chunks of smaller allocation space at bottom, and it's a
         bit more effecient to search, scanning qwords at a time rather than bit pairs at a time.
       At first glance, I like this second approach and think I want to play with it.
+
+      Hmm, I think no reason to pass in a count of pages to allocate.  While it would be fine for now to require
+        contiguous pages, there's really not much benefit.  If/when we ever reach a point of needing more than 2 MB for
+        a process, it seems quite straightforward to request individual pages, and process struct have an array or linked
+        list of them, and we map them in so they appear contingous at the 511 GB address to the process.
      */
-    uint8_t* u = malloc(2 * 1024 * 1024); // 2MB page, doubled so I can clunkily align
+    uint8_t* u = malloc(2 * 1024 * 1024 * 2); // 2MB page, doubled so I can clunkily align
     u = (uint8_t*) ((uint64_t) (u + 1024 * 1024 * 2) & ~(1024 * 1024 * 2 - 1));
     uint8_t* uc = (uint8_t*) &userMode;
     for (uint64_t i = 0; i < 512; i++)
@@ -188,14 +193,14 @@ void setUpUserMode() {
         "invlpg (%rax)\n"
     );
 
-    uint8_t* v = (uint8_t*) 0x7FC0000000ull;
-    print("\n");
-    for (int i = 0; i < 512; i++)
-        printf("%p02h", u[i]);
-    print("\n--\n");
-    for (int i = 0; i < 512; i++)
-        printf("%p02h", v[i]);
-    print("\n");
+    // uint8_t* v = (uint8_t*) 0x7FC0000000ull;
+    // print("\n");
+    // for (int i = 0; i < 512; i++)
+    //     printf("%p02h", u[i]);
+    // print("\n--\n");
+    // for (int i = 0; i < 512; i++)
+    //     printf("%p02h", v[i]);
+    // print("\n");
 
     //__asm__ __volatile__ ("cli\nhlt");
     //print("About to user mode\n");
@@ -309,7 +314,7 @@ void setUpUserMode() {
 //   don't remember what the problem was...  Because I may want to put user processes at 256 GB, for example.
 
 struct process {
-    void* page; // All processes 2 MB in this first draft; rip pointing at bottom, rsp at at top, on launch
+    void* page;
 
     uint64_t rax;
     // ...
@@ -595,20 +600,14 @@ static void __attribute__((interrupt)) irq0_pit(struct interrupt_frame *) {
     pitCount++;
 
     ms_since_boot = pitCount * PIT_COUNT * 1000 / PIT_FREQ;
-    //static uint64_t lpc = 0;
     static int indicated = 0;
-    if (ms_since_boot > 1000 && !indicated) {
-        //lpc = pitCount;
-        indicated = 1;
-        uint64_t r15;
-        asm volatile ("mov %%r15, %0":"=m"(r15));
-        //printf("r15: %u\n", r15);
-        if (r15)
-            print("\nUser mode ran!\n");
-        else
-            print("\nUser mode did NOT run!\n");
-        //print("irq0\n");
-        //printf("pitCount: %u\n", pitCount);
+    uint64_t r15;
+    asm volatile ("mov %%r15, %0":"=m"(r15));
+    //static uint64_t lpc = 0;
+
+    if (ms_since_boot > 500 && !indicated) {
+        indicated = -1;
+        print("\nUser mode did NOT run!\n");
     }
 
     // if (pitCount % TICK_HZ == 0)
@@ -626,8 +625,15 @@ static void __attribute__((interrupt)) irq0_pit(struct interrupt_frame *) {
             push(&wq, periodicCallbacks.pcs[i]->f);
     }
 
-    if (ms_since_boot > 100)
+    if (r15 && indicated == 0) {
+        indicated = 1;
+        print("\nUser mode ran!\n");
         waitloop();
+    }
+
+    // // TODO
+    // if (ms_since_boot > 100)
+    //     waitloop();
 }
 
 static void set_handler(uint64_t vec, void* handler, uint8_t type) {
