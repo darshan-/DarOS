@@ -22,6 +22,8 @@ static uint64_t* map = (uint64_t*) 0;
 static uint64_t* heap = (uint64_t*) 0;
 
 // `size' is the number of bytes available to us for (map + heap)
+// I think I want to 4096-align (0x1000) heap start, to make pages page aligned, to make palloc a bit easier
+//   (so l2 2MB page alignment will be a whole number of our pages...)
 void init_heap(uint64_t* start, uint64_t size) {
     map_size = size / (1 + MAP_FACTOR);
     map = start;
@@ -29,6 +31,8 @@ void init_heap(uint64_t* start, uint64_t size) {
     for (uint64_t i = 0; i < map_size; i++)
         map[i] = 0;
     heap = map + map_size;
+    if ((uint64_t) heap % 0x1000)
+        heap = (void*) (((uint64_t) heap + 0x1000) & ~0xfffull);
 }
 
 uint64_t heapUsed() {
@@ -139,23 +143,19 @@ void* palloc() {
     void* ret = 0;
 
     no_ints();
-    // for (;ret > heap; ret -= 2 * 1024 * 1024) {
-        
-    // }
-    for (uint64_t i = ((uint64_t) addr - (uint64_t) heap) / MAP_FACTOR; i > 0; i -= L2_PAGE_SZ / MAP_FACTOR) {
-        printf("i: %u\n", i);
+    for (uint64_t i = ((uint64_t) addr - (uint64_t) heap) / MAP_FACTOR - L2_PAGE_SZ / MAP_FACTOR; i > 0; i -= L2_PAGE_SZ / MAP_FACTOR) {
         for (need = needed; need >= 64 / MAP_ENTRY_SZ; i++) {
             if (map[i])
                 goto not_found;
 
             if (!ret)
-                ret = heap + i * MAP_FACTOR;
+                ret = (void*) heap + i * MAP_FACTOR;
 
             need -= 64 / MAP_ENTRY_SZ;
         }
 
+        // TODO: Mark pages as used
         ints_okay();
-        printf("ret: 0x%h\n", ret);
         return ret;
 
     not_found:
