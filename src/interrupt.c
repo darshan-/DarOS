@@ -600,15 +600,11 @@ static void __attribute__((interrupt)) irq0_pit(struct interrupt_frame *) {
     pitCount++;
 
     ms_since_boot = pitCount * PIT_COUNT * 1000 / PIT_FREQ;
-    static int indicated = 0;
-    uint64_t r15;
-    asm volatile ("mov %%r15, %0":"=m"(r15));
-    //static uint64_t lpc = 0;
 
-    if (ms_since_boot > 500 && !indicated) {
-        indicated = -1;
-        print("\nUser mode did NOT run!\n");
-    }
+    // if (ms_since_boot > 500 && !indicated) {
+    //     indicated = -1;
+    //     print("\nUser mode did NOT run!\n");
+    // }
 
     // if (pitCount % TICK_HZ == 0)
     //     logf("Average CPU ticks per PIT tick: %u\n", (read_tsc() - cpuCountOffset) / pitCount);
@@ -625,11 +621,25 @@ static void __attribute__((interrupt)) irq0_pit(struct interrupt_frame *) {
             push(&wq, periodicCallbacks.pcs[i]->f);
     }
 
-    if (r15 && indicated == 0) {
-        indicated = 1;
-        print("\nUser mode ran!\n");
-        waitloop();
+    // static int indicated = 0;
+    void (*f)();
+
+    while ((f = (void (*)()) pop(&wq)))
+        f();
+
+    uint64_t r15;
+    asm volatile ("mov %%r15, %0":"=m"(r15));
+    static uint64_t lms = 0;
+    if (ms_since_boot % 1000 == 0 && ms_since_boot != lms) {
+        lms = ms_since_boot;
+        printf("r15: %u\n", r15);
     }
+
+    // if (r15 && indicated == 0) {
+    //     indicated = 1;
+    //     print("\nUser mode ran!\n");
+    //     waitloop();
+    // }
 
     // // TODO
     // if (ms_since_boot > 100)
