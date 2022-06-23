@@ -21,13 +21,18 @@ static uint64_t map_size; // Size in quadwords
 static uint64_t* map = (uint64_t*) 0;
 static uint64_t* heap = (uint64_t*) 0;
 
+// Okay, I worded "factor" wrong!  1 qword gets us 4096 bytes, so that's not the factor, that's mem size per qword.
+// Factor is an eighth of that.
+// TODO: 1. Rename MAP_FACTOR to something conveying PG_SZ_PER_MAP_QWORD -- but hopefully shorter and better!
+//       2. Have MAP_FACTOR be a thing, but be the actual factor?
+
+
 // `size' is the number of bytes available to us for (map + heap)
 // I think I want to 4096-align (0x1000) heap start, to make pages page aligned, to make palloc a bit easier
 //   (so l2 2MB page alignment will be a whole number of our pages...)
 void init_heap(uint64_t* start, uint64_t size) {
-    map_size = size / (1 + MAP_FACTOR);
+    map_size = size / 513 - 1;
     map = start;
-    map[0] = 0;
     for (uint64_t i = 0; i < map_size; i++)
         map[i] = 0;
     heap = map + map_size;
@@ -121,14 +126,13 @@ void* palloc() {
       If it's not, go 2 MB earlier and see if that's all free, etc.
       Certaily inefficient in a number of ways, but easy to understand and actually reasonable for us for now, I'd think.
      */
-    uint64_t needed = blocks_per(L2_PAGE_SZ, BLK_SZ);
 
     //void* heap_end = heap + (map_size - 1) * 4096;
     //void* ret = ((uint64_t) heap_end) & ~(2ull * 1024 * 1024 - 1);
     //uint64_t addr = ((uint64_t) heap + (map_size - 1) * MAP_FACTOR) & ~(2ull * 1024 * 1024 - 1);
     uint64_t addr = ((uint64_t) heap + (map_size - 1) * MAP_FACTOR) & ~(L2_PAGE_SZ - 1);
     printf("\nheap: 0x%h\n", heap);
-    printf("    : 0x%h\n", map_size - 1);
+    printf("    : 0x%u\n", map_size - 1);
     printf("    : 0x%h\n", (map_size - 1) * MAP_FACTOR);
     printf("    : 0x%h\n", (uint64_t) heap + (map_size - 1) * MAP_FACTOR);
     printf("mask: 0x%h\n", ~(L2_PAGE_SZ - 1));
@@ -139,28 +143,33 @@ void* palloc() {
     printf(" a&b: 0x%h\n", a&b);
     printf("    : 0x%h\n", (a&b)/MAP_FACTOR);
     printf("    : 0x%h\n", (a&b)/MAP_FACTOR - (uint64_t) heap);
-    uint64_t need = needed;
-    void* ret = 0;
 
     no_ints();
-    for (uint64_t i = ((uint64_t) addr - (uint64_t) heap) / MAP_FACTOR - L2_PAGE_SZ / MAP_FACTOR; i > 0; i -= L2_PAGE_SZ / MAP_FACTOR) {
-        for (need = needed; need >= 64 / MAP_ENTRY_SZ; i++) {
-            if (map[i])
-                goto not_found;
-
-            if (!ret)
-                ret = (void*) heap + i * MAP_FACTOR;
-
-            need -= 64 / MAP_ENTRY_SZ;
+    // (Subtracting 3 pages rather than 1 from start address helps qemu...  No idea why.)
+    // And Presario, but not desktop.
+    // Wait, am I making the heap to big?
+    // Desktop gives 0x822800000 -- which... puts us past 32 gigs?
+    // init_heap: 0x100010000, 30599479296, so map size should be 7468751
+    // heap: 0x10390c000
+    // map_size: 0x71f6cf, so correct
+    for (uint64_t i = ((uint64_t) addr - (uint64_t) heap - L2_PAGE_SZ) / MAP_FACTOR; i > 0; i -= L2_PAGE_SZ / MAP_FACTOR) {
+        int unfree = 0;
+        for (uint64_t j = 0; j < 512; j++) {
+            if (map[i + j]) {
+                unfree = 1;
+                break;
+            }
         }
 
-        // TODO: Mark pages as used
-        ints_okay();
-        return ret;
+        if (unfree)
+            continue;
 
-    not_found:
-        need = needed;
-        ret = 0;
+        for (uint64_t j = 0; j < 512; j++)
+            map[i + j] = -1ull;
+        map[i + 511] -= 1;
+
+        ints_okay();
+        return (void*) heap + i * MAP_FACTOR;
     }
 
     ints_okay();

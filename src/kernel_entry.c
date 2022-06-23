@@ -131,6 +131,7 @@ void __attribute__((section(".kernel_entry"))) kernel_entry() {
     *((void**) (tss + 4)) = kernel_stack_top;
 
     //setUpUserMode();
+    logf("Set up heap with 0x%h, %u\n", kernel_stack_top, mem_table[il].length - STACK_SIZE);
 
     log("Kernel initialized; going to waitloop.\n");
     setUpUserMode();
