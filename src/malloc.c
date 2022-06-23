@@ -124,17 +124,9 @@ void* palloc() {
 
     no_ints();
     for (uint64_t i = ((uint64_t) addr - (uint64_t) heap - L2_PAGE_SZ) / MAP_FACTOR; i > 0; i -= L2_PAGE_SZ / MAP_FACTOR) {
-        int unfree = 0;
-
-        for (uint64_t j = 0; j < 512; j++) {
-            if (map[i + j]) {
-                unfree = 1;
-                break;
-            }
-        }
-
-        if (unfree)
-            continue;
+        for (uint64_t j = 0; j < 512; j++)
+            if (map[i + j])
+                goto next;
 
         for (uint64_t j = 0; j < 512; j++)
             map[i + j] = -1ull;
@@ -143,6 +135,7 @@ void* palloc() {
 
         ints_okay();
         return (void*) heap + i * MAP_FACTOR;
+    next:
     }
     ints_okay();
     return 0;
