@@ -187,30 +187,11 @@ void um_r14() {
 }
 
 void setUpUserMode() {
-    /*
-      TODO: Figure out how I want to allocate pages.  With standard heap malloc, or otherwise?
-      Maybe have a way to request specific alignment.
-      Maybe have a palloc (page alloc, rather than memory alloc) that gets a multiple of 2 MB pages, and starts
-        search from END of heap.  So it's not taking up big chunks of smaller allocation space at bottom, and it's a
-        bit more effecient to search, scanning qwords at a time rather than bit pairs at a time.
-      At first glance, I like this second approach and think I want to play with it.
-
-      Hmm, I think no reason to pass in a count of pages to allocate.  While it would be fine for now to require
-        contiguous pages, there's really not much benefit.  If/when we ever reach a point of needing more than 2 MB for
-        a process, it seems quite straightforward to request individual pages, and process struct have an array or linked
-        list of them, and we map them in so they appear contingous at the 511 GB address to the process.
-     */
-    //uint8_t* u = malloc(2 * 1024 * 1024 * 2); // 2MB page, doubled so I can clunkily align
-    //u = (uint8_t*) ((uint64_t) (u + 1024 * 1024 * 2) & ~(1024 * 1024 * 2 - 1));
-    uint8_t* u = palloc();
-    printf("u: 0x%h\n", u);
-    uint8_t* uc = (uint8_t*) &userMode;
-    for (uint64_t i = 0; i < 512; i++)
-        u[i] = uc[i];
+    uint64_t* u = palloc();
+    u[0] = 0xfbebc7ff49;
 
     uint64_t* l2 = (uint64_t*) (0x100000 + (511 * 4096));
     l2[0] = (uint64_t) u | PT_PRESENT | PT_WRITABLE | PT_HUGE | PT_USERMODE;
-
 
     // 511 * 1024 * 1024 * 1024 = 0x7FC0000000
     //asm volatile ("invlpg $548682072064\n");
@@ -218,15 +199,6 @@ void setUpUserMode() {
         "mov $0x7FC0000000ull, %rax\n"
         "invlpg (%rax)\n"
     );
-
-    // uint8_t* v = (uint8_t*) 0x7FC0000000ull;
-    // print("\n");
-    // for (int i = 0; i < 512; i++)
-    //     printf("%p02h", u[i]);
-    // print("\n--\n");
-    // for (int i = 0; i < 512; i++)
-    //     printf("%p02h", v[i]);
-    // print("\n");
 
     //__asm__ __volatile__ ("cli\nhlt");
     //print("About to user mode\n");
