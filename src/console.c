@@ -591,8 +591,11 @@ static void gotInput(struct input i) {
         else if (i.key == 'l' && !i.alt && i.ctrl && !i.shift)
             clear();
 
-        else if (i.key == 'U' && !i.alt && i.ctrl && i.shift)
-            setUpUserMode();
+        else if (i.key == '4' && !i.alt && i.ctrl && i.shift)
+            um_r14();
+
+        else if (i.key == '5' && !i.alt && i.ctrl && i.shift)
+            um_r15();
     }
     ints_okay();
 }

@@ -204,10 +204,15 @@ void startProc(struct process* p) {
     ");
 }
 
-void setUpUserMode() {
+void um_r15() {
     struct process p = {palloc()};
     ((uint64_t*) (p.page))[0] = 0xfbebc7ff49;
+    startProc(&p);
+}
 
+void um_r14() {
+    struct process p = {palloc()};
+    ((uint64_t*) (p.page))[0] = 0xfbebc6ff49;
     startProc(&p);
 }
 
@@ -611,12 +616,13 @@ static void __attribute__((interrupt)) irq0_pit(struct interrupt_frame *) {
     while ((f = (void (*)()) pop(&wq)))
         f();
 
-    uint64_t r15;
-    asm volatile ("mov %%r15, %0":"=m"(r15));
     static uint64_t lms = 0;
+    uint64_t r14, r15;
+    asm volatile ("mov %%r14, %0":"=m"(r14));
+    asm volatile ("mov %%r15, %0":"=m"(r15));
     if (ms_since_boot % 1000 == 0 && ms_since_boot != lms) {
         lms = ms_since_boot;
-        printf("r15: %u\n", r15);
+        printf(" r14: %p025u    r15: %p025u\n", r14, r15);
     }
 
     // if (r15 && indicated == 0) {
