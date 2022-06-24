@@ -189,6 +189,8 @@ struct process {
     uint64_t r13;
     uint64_t r14;
     uint64_t r15;
+
+    uint64_t rip;
 };
 
 static struct list* processList = (struct list*) 0;
@@ -202,21 +204,45 @@ void startProc(struct process* p) {
     l2[0] = (uint64_t) p->page | PT_PRESENT | PT_WRITABLE | PT_HUGE | PT_USERMODE;
 
     asm volatile ("\
-    \n  mov $0x7FC0000000ull, %rax \
-    \n  invlpg (%rax) \
-    \n  mov $0x7FC0200000, %rax \
-    \n  mov %rax, %rsp \
-    \n  push $27 \
-    \n  push %rax \
-    \n  pushf \
-    \n  pop %rax \
-    \n  or $0x200, %rax \
-    \n  push %rax \
-    \n  push $19 \
-    \n  mov $0x7FC0000000, %rax \
-    \n  push %rax \
-    \n  iretq \
-    ");
+    \n    mov $0x7FC0000000ull, %%rax       \
+    \n    invlpg (%%rax)                    \
+    \n    mov $0x7FC0200000, %%rax          \
+    \n    mov %%rax, %%rsp                  \
+    \n    push $27                          \
+    \n    push %%rax                        \
+    \n    pushf                             \
+    \n    pop %%rax                         \
+    \n    or $0x200, %%rax                  \
+    \n    push %%rax                        \
+    \n    push $19                          \
+    \n    mov $0x7FC0000000, %%rax          \
+    \n    push %%rax                        \
+    \n    mov $0, %%rax                     \
+    \n    mov $1, %%rbx                     \
+    \n    mov $2, %%rcx                     \
+    \n    mov $3, %%rdx                     \
+    \n    iretq                             \
+    " ::
+                  "m"(p->rax),
+                  "m"(p->rbx),
+                  "m"(p->rcx),
+                  "m"(p->rdx),
+                  "m"(p->rsi),
+                  "m"(p->rdi),
+                  "m"(p->rbp),
+                  "m"(p->rsp),
+                  "m"(p->r8),
+                  "m"(p->r9),
+                  "m"(p->r10),
+                  "m"(p->r11),
+                  "m"(p->r12),
+                  "m"(p->r13),
+                  "m"(p->r14),
+                  "m"(p->r15)
+    );
+
+    // Maybe call nasm for this too?  Copy from curProc to regs (global), do everything but register restore, then call nasm function to
+    //   copy from regs to registers.  Don't forget to set IP
 }
 
 void um_r15() {
