@@ -203,8 +203,11 @@ void startProc(struct process* p) {
     uint64_t* l2 = (uint64_t*) (0x100000 + (511 * 4096));
     l2[0] = (uint64_t) p->page | PT_PRESENT | PT_WRITABLE | PT_HUGE | PT_USERMODE;
 
+    if (!p->rip)
+        p->rip = 0x7FC0000000ull;
+
     asm volatile ("\
-    \n    mov $0x7FC0000000ull, %%rax       \
+    \n    mov $0, %%rax                     \
     \n    invlpg (%%rax)                    \
     \n    mov $0x7FC0200000, %%rax          \
     \n    mov %%rax, %%rsp                  \
@@ -217,32 +220,12 @@ void startProc(struct process* p) {
     \n    push $19                          \
     \n    mov $0x7FC0000000, %%rax          \
     \n    push %%rax                        \
-    \n    mov $0, %%rax                     \
-    \n    mov $1, %%rbx                     \
-    \n    mov $2, %%rcx                     \
-    \n    mov $3, %%rdx                     \
     \n    iretq                             \
-    " ::
-                  "m"(p->rax),
-                  "m"(p->rbx),
-                  "m"(p->rcx),
-                  "m"(p->rdx),
-                  "m"(p->rsi),
-                  "m"(p->rdi),
-                  "m"(p->rbp),
-                  "m"(p->rsp),
-                  "m"(p->r8),
-                  "m"(p->r9),
-                  "m"(p->r10),
-                  "m"(p->r11),
-                  "m"(p->r12),
-                  "m"(p->r13),
-                  "m"(p->r14),
-                  "m"(p->r15)
+    " :: "m"(p->rip)
     );
 
     // Maybe call nasm for this too?  Copy from curProc to regs (global), do everything but register restore, then call nasm function to
-    //   copy from regs to registers.  Don't forget to set IP
+    //   copy from regs to registers.
 }
 
 void um_r15() {
@@ -498,51 +481,6 @@ static void __attribute__((interrupt)) int_0x80_handler(struct interrupt_frame *
     //frame->ip = (uint64_t) waitloop;
     //print("waitloop?");
     //printf("hlt_in_waitloop in int 0x80: %u\n", hlt_in_waitloop);
-    __asm__ __volatile__
-    (
-        "mov %0, %%rax\n"
-        "mov %%rax, %%rsp\n"
-        "push $0\n"
-        "push %%rax\n"
-        "pushf\n"
-        "pop %%rax\n"
-        "or $0x200, %%rax\n"
-        "mov %%rax, %%r13\n"
-        "push %%rax\n"
-        "push $8\n"
-        "mov %1, %%rax\n"
-        "push %%rax\n"
-        "iretq\n"
-        ::"m"(kernel_stack_top), "m"(waitloop)
-    );
-
-
-    //for (int i = 0; i < 5; i++) {
-    int i = 0;
-        uint64_t v;
-        __asm__ __volatile__ ("pop %%rax\n mov %%rax, %0\n":"=m"(v)::"%rax");
-        printf("%u: 0x%p016h\n", i, v);
-        i = 1;
-        __asm__ __volatile__ ("pop %%rax\n mov %%rax, %0\n":"=m"(v)::"%rax");
-        printf("%u: 0x%p016h\n", i, v);
-        i = 2;
-        __asm__ __volatile__ ("pop %%rax\n mov %%rax, %0\n":"=m"(v)::"%rax");
-        printf("%u: 0x%p016h\n", i, v);
-        i = 3;
-        __asm__ __volatile__ ("pop %%rax\n mov %%rax, %0\n":"=m"(v)::"%rax");
-        printf("%u: 0x%p016h\n", i, v);
-        i = 4;
-        __asm__ __volatile__ ("pop %%rax\n mov %%rax, %0\n":"=m"(v)::"%rax");
-        printf("%u: 0x%p016h\n", i, v);
-        i = 5;
-        __asm__ __volatile__ ("pop %%rax\n mov %%rax, %0\n":"=m"(v)::"%rax");
-        printf("%u: 0x%p016h\n", i, v);
-        i = 6;
-        __asm__ __volatile__ ("pop %%rax\n mov %%rax, %0\n":"=m"(v)::"%rax");
-        printf("%u: 0x%p016h\n", i, v);
-        //}
-    // Let's look at stack and see what's there, because that's what determines what happens when we iretq at end of handler...
-    __asm__ __volatile__ ("hlt");
 }
 
 static void __attribute__((interrupt)) default_PIC_P_handler(struct interrupt_frame *frame) {
@@ -636,15 +574,21 @@ void __attribute__((interrupt)) irq0_pit(struct interrupt_frame *frame) {
     uint64_t r14, r15;
     asm volatile ("mov %%r14, %0":"=m"(r14));
     asm volatile ("mov %%r15, %0":"=m"(r15));
-    if (ms_since_boot % 1000 == 0 && ms_since_boot != lms) {
-        lms = ms_since_boot;
-        printf(" r14: %p025u    r15: %p025u\n", r14, r15);
-        extern uint64_t regs[16];
-        printf("gr14: %p025u   gr15: %p025u\n", regs[14], regs[15]);
-    }
 
     if (ms_since_boot % 2 == 0 && ms_since_boot != lms) {
         lms = ms_since_boot;
+
+        if (curProc) {
+            extern uint64_t regs[16];
+            uint64_t* curRegs = (uint64_t*) curProc;
+            curRegs++;
+            for (int i = 0; i < 16; i++)
+                curRegs[i] = regs[i];
+            curProc->rip = frame->ip;
+        }
+
+        if (ms_since_boot % 1000 == 0)
+            printf(" r14: %p025u    r15: %p025u\n", r14, r15);
 
         if (frame->ip >= 511ull * 1024 * 1024 * 1024)
             waitloop();
