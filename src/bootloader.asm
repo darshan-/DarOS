@@ -272,7 +272,6 @@ l3_loop2:
 
 sect2:
 global tss
-; tss: dq .tss
 tss:
         times 104 db 0
 
@@ -296,8 +295,6 @@ regs:
 .r15:   dq 0
 
 global irq0
-; irq0: dq irq0_handler
-; irq0_handler:
 irq0:
         mov [regs.rax], rax
         mov [regs.rbx], rbx

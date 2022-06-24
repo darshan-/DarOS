@@ -584,44 +584,6 @@ static void __attribute__((interrupt)) irq8_rtc(struct interrupt_frame *) {
 static uint64_t cpuCountOffset = 0;
 
 void __attribute__((interrupt)) irq0_pit(struct interrupt_frame *frame) {
-    /*
-    // asm volatile("\
-    // \n  mov %%rax, %0 \
-    // \n  mov %%rbx, %1 \
-    // \n  mov %%rcx, %2 \
-    // \n  mov %%rdx, %3 \
-    // \n  mov %%rsi, %4 \
-    // \n  mov %%rdi, %5 \
-    // \n  mov %%rbp, %6 \
-    // \n  mov %%rsp, %7 \
-    // \n  mov %%r8, %8 \
-    // \n  mov %%r9, %9 \
-    // \n  mov %%r10, %10 \
-    // \n  mov %%r11, %11 \
-    // \n  mov %%r12, %12 \
-    // \n  mov %%r13, %13 \
-    // \n  mov %%r14, %14 \
-    // \n  mov %%r15, %15 \
-    // ":
-    //    "=m"(curProc->rax),
-    //    "=m"(curProc->rbx),
-    //    "=m"(curProc->rcx),
-    //    "=m"(curProc->rdx),
-    //    "=m"(curProc->rsi),
-    //    "=m"(curProc->rdi),
-    //    "=m"(curProc->rbp),
-    //    "=m"(curProc->rsp),
-    //    "=m"(curProc->r8),
-    //    "=m"(curProc->r9),
-    //    "=m"(curProc->r10),
-    //    "=m"(curProc->r11),
-    //    "=m"(curProc->r12),
-    //    "=m"(curProc->r13),
-    //    "=m"(curProc->r14),
-    //    "=m"(curProc->r15)
-    // );
-    */
-
     outb(PIC_PRIMARY_CMD, PIC_ACK);
 
     pitCount++;
