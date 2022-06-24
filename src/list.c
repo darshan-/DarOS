@@ -51,6 +51,16 @@ void* nextNode(void* ln) {
     return ((struct list_node*) ln)->next;
 }
 
+void* nextNodeCirc(struct list* l, void* ln) {
+    if (!ln || !l) return 0;
+
+    void* next = ((struct list_node*) ln)->next;
+    if (next)
+        return next;
+
+    return l->head;
+}
+
 void* prevNode(void* ln) {
     if (!ln) return 0;
 

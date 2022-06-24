@@ -181,6 +181,7 @@ static struct list* processList = (struct list*) 0;
 static struct process* curProc = 0;
 
 void startProc(struct process* p) {
+    print("Trying to start proc...\n");
     asm volatile ("cli");
 
     uint64_t* l2 = (uint64_t*) (0x100000 + (511 * 4096));
@@ -207,12 +208,14 @@ void startProc(struct process* p) {
 void um_r15() {
     struct process p = {palloc()};
     ((uint64_t*) (p.page))[0] = 0xfbebc7ff49;
+    curProc = pushListHead(processList, &p);
     startProc(&p);
 }
 
 void um_r14() {
     struct process p = {palloc()};
     ((uint64_t*) (p.page))[0] = 0xfbebc6ff49;
+    curProc = pushListHead(processList, &p);
     startProc(&p);
 }
 
@@ -314,7 +317,7 @@ void waitloop() {
             f();
 
         if (curProc)
-            startProc(nextNode(curProc));
+            startProc(nextNodeCirc(processList, curProc));
 
         __asm__ __volatile__(
             "mov %0, %%rsp\n" // We'll never return anywhere or use anything currently on the stack, so reset it
@@ -611,10 +614,10 @@ static void __attribute__((interrupt)) irq0_pit(struct interrupt_frame *) {
     }
 
     // static int indicated = 0;
-    void (*f)();
+    // void (*f)();
 
-    while ((f = (void (*)()) pop(&wq)))
-        f();
+    // while ((f = (void (*)()) pop(&wq)))
+    //     f();
 
     static uint64_t lms = 0;
     uint64_t r14, r15;
@@ -623,6 +626,7 @@ static void __attribute__((interrupt)) irq0_pit(struct interrupt_frame *) {
     if (ms_since_boot % 1000 == 0 && ms_since_boot != lms) {
         lms = ms_since_boot;
         printf(" r14: %p025u    r15: %p025u\n", r14, r15);
+        waitloop();
     }
 
     // if (r15 && indicated == 0) {
@@ -710,6 +714,9 @@ void init_interrupts() {
     cpuCountOffset = read_tsc();
 
     registerPeriodicCallback((struct periodic_callback) {1, 2, check_queue_caps});
+
+    if (!processList)
+        processList = newList();
 
     //__asm__ __volatile__ ("xchgw %bx, %bx");
     ints_okay();

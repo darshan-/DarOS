@@ -9,6 +9,7 @@ uint32_t listLen(struct list* l);
 void* listHead(struct list* l);
 void* listTail(struct list* l);
 void* nextNode(void*);
+void* nextNodeCirc(struct list* l, void* ln);
 void* prevNode(void*);
 void* listItem(void*);
 void* pushListHead(struct list* l, void* item);
