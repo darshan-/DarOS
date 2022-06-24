@@ -208,10 +208,15 @@ void startProc(struct process* p) {
     //else if (p->rip < 0x7FC0000000ull)
     //    printf("keeping rip: 0x%h\n", p->rip);
 
+        printf("p->rip: 0x%h\n", p->rip);
+        //asm volatile("mov %0, %%rax\nhlt"::"m"(p->rip));
     asm volatile ("\
     \n    mov $0x7FC0000000, %%rax       \
     \n    invlpg (%%rax)                    \
     \n    mov $0x7FC0200000, %%rax       \
+\n hlt \
+    \n    mov %0, %%rax          \
+\n hlt \
     \n    mov %%rax, %%rsp                  \
     \n    push $27                          \
     \n    push %%rax                        \
