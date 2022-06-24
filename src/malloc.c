@@ -117,7 +117,8 @@ void* palloc() {
     if (heap == 0)
         return 0;
 
-    uint64_t i = (((heap64 + map_size * QBLK_SZ) & ~(L2_PAGE_SZ - 1)) - heap64 - L2_PAGE_SZ) / QBLK_SZ;
+    // heap64 % L2_PAGE_SZ is something...  Hmm, if we subtract that from a 512-map-qword-aligned...  Ugh, I think it's fine how we have it!
+    uint64_t i = (((heap64 + map_size * QBLK_SZ) & ~(L2_PAGE_SZ - 1)) - L2_PAGE_SZ - heap64) / QBLK_SZ;
 
     no_ints();
     for (; i > 0; i -= L2_PAGE_SZ / QBLK_SZ) {

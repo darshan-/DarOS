@@ -155,11 +155,35 @@ static inline void push(struct queue* q, void* p) {
 #define PT_USERMODE 1 << 2
 #define PT_HUGE     1 << 7
 
-void userMode() {
+// 4=REX
+//  9 = 0b1001 WRXB
+//             W = quadword operand
+//               X is index field extension; not sued here
+//              R and B combine with below
+//    ff = inc
+//       c7 = 0b_11000111 (combines with above)
+//               11 = ModRM
+//                 000111
+//                 000_111
+//                R000_B111
+//                0000_1111 = 15 = r15
+// 49 ff c7   inc r15
+// eb fb      jmp -5      eb = jmp, fb = -5
+void um_r15() {
     for(;;)
-        //__asm__ __volatile__ ("mov $0x1234face, %r15\nint $0x80");
-        //__asm__ __volatile__ ("inc %r15\ncli\n");
         __asm__ __volatile__ ("inc %r15\n");
+}
+
+// 49 ff c6 eb fb
+//       c6 = 0b_11000110
+//               11 = ModRM
+//                 000110
+//                 000_110
+//                R000_B110
+//                0000_1110 = 14 = r14
+void um_r14() {
+    for(;;)
+        __asm__ __volatile__ ("inc %r14\n");
 }
 
 void setUpUserMode() {
