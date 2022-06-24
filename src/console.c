@@ -594,7 +594,13 @@ static void gotInput(struct input i) {
         else if (i.key == '4' && !i.alt && i.ctrl && i.shift)
             um_r14();
 
+        else if (i.key == '$' && !i.alt && i.ctrl && i.shift)
+            um_r14();
+
         else if (i.key == '5' && !i.alt && i.ctrl && i.shift)
+            um_r15();
+
+        else if (i.key == '%' && !i.alt && i.ctrl && i.shift)
             um_r15();
     }
     ints_okay();

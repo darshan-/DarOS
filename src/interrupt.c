@@ -582,7 +582,7 @@ static void __attribute__((interrupt)) irq8_rtc(struct interrupt_frame *) {
 
 static uint64_t cpuCountOffset = 0;
 
-static void __attribute__((interrupt)) irq0_pit(struct interrupt_frame *) {
+static void __attribute__((interrupt)) irq0_pit(struct interrupt_frame *frame) {
     //__asm__ __volatile__ ("hlt");
     //logf("0");
     outb(PIC_PRIMARY_CMD, PIC_ACK);
@@ -605,23 +605,17 @@ static void __attribute__((interrupt)) irq0_pit(struct interrupt_frame *) {
     // if (pitCount % TICK_HZ == 0)
     //     logf("Average CPU ticks per PIT tick: %u\n", (read_tsc() - cpuCountOffset) / pitCount);
 
-    if (!periodicCallbacks.pcs) return;
+    if (periodicCallbacks.pcs) {
+        for (uint64_t i = 0; i < periodicCallbacks.len; i++) {
+            if (periodicCallbacks.pcs[i]->count == 0 || periodicCallbacks.pcs[i]->count > TICK_HZ) {
+                logf("halting!\n");
+                __asm__ __volatile__ ("hlt");
+            }
 
-    for (uint64_t i = 0; i < periodicCallbacks.len; i++) {
-        if (periodicCallbacks.pcs[i]->count == 0 || periodicCallbacks.pcs[i]->count > TICK_HZ) {
-            logf("halting!\n");
-            __asm__ __volatile__ ("hlt");
+            if (pitCount % (TICK_HZ * periodicCallbacks.pcs[i]->period / periodicCallbacks.pcs[i]->count) == 0)
+                push(&wq, periodicCallbacks.pcs[i]->f);
         }
-
-        if (pitCount % (TICK_HZ * periodicCallbacks.pcs[i]->period / periodicCallbacks.pcs[i]->count) == 0)
-            push(&wq, periodicCallbacks.pcs[i]->f);
     }
-
-    // static int indicated = 0;
-    // void (*f)();
-
-    // while ((f = (void (*)()) pop(&wq)))
-    //     f();
 
     static uint64_t lms = 0;
     uint64_t r14, r15;
@@ -634,18 +628,10 @@ static void __attribute__((interrupt)) irq0_pit(struct interrupt_frame *) {
 
     if (ms_since_boot % 2 == 0 && ms_since_boot != lms) {
         lms = ms_since_boot;
-        waitloop();
+
+        if (frame->ip >= 511ull * 1024 * 1024 * 1024)
+            waitloop();
     }
-
-    // if (r15 && indicated == 0) {
-    //     indicated = 1;
-    //     print("\nUser mode ran!\n");
-    //     waitloop();
-    // }
-
-    // // TODO
-    // if (ms_since_boot > 100)
-    //     waitloop();
 }
 
 static void set_handler(uint64_t vec, void* handler, uint8_t type) {
