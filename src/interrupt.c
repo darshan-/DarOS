@@ -173,13 +173,27 @@ static inline void push(struct queue* q, void* p) {
 struct process {
     void* page; // For now only one page allowed
 
-    //uint64_t rax;
-    // ...
+    uint64_t rax;
+    uint64_t rbx;
+    uint64_t rcx;
+    uint64_t rdx;
+    uint64_t rsi;
+    uint64_t rdi;
+    uint64_t rbp;
+    uint64_t rsp;
+    uint64_t r8;
+    uint64_t r9;
+    uint64_t r10;
+    uint64_t r11;
+    uint64_t r12;
+    uint64_t r13;
+    uint64_t r14;
+    uint64_t r15;
 };
 
 static struct list* processList = (struct list*) 0;
-//static struct process* curProc = 0;
-void* curProc = 0;
+static struct process* curProc = 0;
+void* curProcN = 0;
 
 void startProc(struct process* p) {
     asm volatile ("cli");
@@ -209,7 +223,9 @@ void um_r15() {
     struct process *p = malloc(sizeof(struct process));
     p->page = palloc();
     ((uint64_t*) (p->page))[0] = 0xfbebc7ff49;
-    curProc = pushListHead(processList, p);
+    asm volatile("cli");
+    curProcN = pushListHead(processList, p);
+    curProc = p;
     startProc(p);
 }
 
@@ -217,7 +233,9 @@ void um_r14() {
     struct process *p = malloc(sizeof(struct process));
     p->page = palloc();
     ((uint64_t*) (p->page))[0] = 0xfbebc6ff49;
-    curProc = pushListHead(processList, p);
+    asm volatile("cli");
+    curProcN = pushListHead(processList, p);
+    curProc = p;
     startProc(p);
 }
 
@@ -318,12 +336,15 @@ void waitloop() {
         while ((f = (void (*)()) pop(&wq)))
             f();
 
-        if (curProc) {
-            curProc = nextNodeCirc(processList, curProc);
-            startProc(listItem(curProc));
+        asm volatile("cli");
+
+        if (curProcN) {
+            curProcN = nextNodeCirc(processList, curProcN);
+            curProc = listItem(curProcN);
+            startProc(curProc);
         }
 
-        __asm__ __volatile__(
+        asm volatile (
             "mov %0, %%rsp\n" // We'll never return anywhere or use anything currently on the stack, so reset it
             "sti\n"
             "hlt\n"
@@ -545,30 +566,10 @@ static void __attribute__((interrupt)) double_fault_handler(struct interrupt_fra
 }
 
 static void __attribute__((interrupt)) irq1_kbd(struct interrupt_frame *) {
-    //__asm__ __volatile__ ("hlt");
     uint8_t code = inb(0x60);
     outb(PIC_PRIMARY_CMD, PIC_ACK);
     push(&kbd_buf, (void*) (uint64_t) code);
     push(&wq, process_keys);
-
-    // I may have been doing something in ring 0 that I want to return to; this is just an experiment
-    // __asm__ __volatile__
-    // (
-    //     "mov %0, %%rax\n"
-    //     "mov %%rax, %%rsp\n"
-    //     "push $0\n"
-    //     "push %%rax\n"
-    //     "pushf\n"
-    //     "pop %%rax\n"
-    //     "or $0x200, %%rax\n"
-    //     "mov %%rax, %%r13\n"
-    //     "push %%rax\n"
-    //     "push $8\n"
-    //     "mov %1, %%rax\n"
-    //     "push %%rax\n"
-    //     "iretq\n"
-    //     ::"m"(kernel_stack_top), "m"(waitloop)
-    // );
 }
 
 static void __attribute__((interrupt)) irq8_rtc(struct interrupt_frame *) {
@@ -582,25 +583,51 @@ static void __attribute__((interrupt)) irq8_rtc(struct interrupt_frame *) {
 
 static uint64_t cpuCountOffset = 0;
 
-static void __attribute__((interrupt)) irq0_pit(struct interrupt_frame *frame) {
-    //__asm__ __volatile__ ("hlt");
-    //logf("0");
-    outb(PIC_PRIMARY_CMD, PIC_ACK);
-    //print("irq0_pit\n");
+void __attribute__((interrupt)) irq0_pit(struct interrupt_frame *frame) {
+    /*
+    // asm volatile("\
+    // \n  mov %%rax, %0 \
+    // \n  mov %%rbx, %1 \
+    // \n  mov %%rcx, %2 \
+    // \n  mov %%rdx, %3 \
+    // \n  mov %%rsi, %4 \
+    // \n  mov %%rdi, %5 \
+    // \n  mov %%rbp, %6 \
+    // \n  mov %%rsp, %7 \
+    // \n  mov %%r8, %8 \
+    // \n  mov %%r9, %9 \
+    // \n  mov %%r10, %10 \
+    // \n  mov %%r11, %11 \
+    // \n  mov %%r12, %12 \
+    // \n  mov %%r13, %13 \
+    // \n  mov %%r14, %14 \
+    // \n  mov %%r15, %15 \
+    // ":
+    //    "=m"(curProc->rax),
+    //    "=m"(curProc->rbx),
+    //    "=m"(curProc->rcx),
+    //    "=m"(curProc->rdx),
+    //    "=m"(curProc->rsi),
+    //    "=m"(curProc->rdi),
+    //    "=m"(curProc->rbp),
+    //    "=m"(curProc->rsp),
+    //    "=m"(curProc->r8),
+    //    "=m"(curProc->r9),
+    //    "=m"(curProc->r10),
+    //    "=m"(curProc->r11),
+    //    "=m"(curProc->r12),
+    //    "=m"(curProc->r13),
+    //    "=m"(curProc->r14),
+    //    "=m"(curProc->r15)
+    // );
+    */
 
-    //print("acked irq0\n");
-    //__asm__ __volatile__("hlt");
-    // if (cpuCountOffset == 0)
-    //     cpuCountOffset = read_tsc();
+    outb(PIC_PRIMARY_CMD, PIC_ACK);
 
     pitCount++;
 
     ms_since_boot = pitCount * PIT_COUNT * 1000 / PIT_FREQ;
 
-    // if (ms_since_boot > 500 && !indicated) {
-    //     indicated = -1;
-    //     print("\nUser mode did NOT run!\n");
-    // }
 
     // if (pitCount % TICK_HZ == 0)
     //     logf("Average CPU ticks per PIT tick: %u\n", (read_tsc() - cpuCountOffset) / pitCount);
@@ -624,6 +651,8 @@ static void __attribute__((interrupt)) irq0_pit(struct interrupt_frame *frame) {
     if (ms_since_boot % 1000 == 0 && ms_since_boot != lms) {
         lms = ms_since_boot;
         printf(" r14: %p025u    r15: %p025u\n", r14, r15);
+        extern uint64_t regs[16];
+        printf("gr14: %p025u   gr15: %p025u\n", regs[14], regs[15]);
     }
 
     if (ms_since_boot % 2 == 0 && ms_since_boot != lms) {
@@ -672,7 +701,11 @@ void init_interrupts() {
     for (int i = 48; i < 256; i++)
         set_handler(i, default_interrupt_handler, TYPE_INT);
 
-    set_handler(0x20, irq0_pit, TYPE_INT);
+    //set_handler(0x20, irq0_pit, TYPE_INT);
+    extern void* irq0;
+    printf("&irq0: 0x%h\n", &irq0);
+    //asm volatile("cli\nhlt");
+    set_handler(0x20, &irq0, TYPE_INT);
     set_handler(0x21, irq1_kbd, TYPE_INT);
     set_handler(0x28, irq8_rtc, TYPE_INT);
 
@@ -700,8 +733,8 @@ void init_interrupts() {
     init_rtc();
     init_pit();
     init_pic();
-    set_handler(0x20, irq0_pit, TYPE_INT);
-    set_handler(0x21, irq1_kbd, TYPE_INT);
+    //set_handler(0x20, irq0_pit, TYPE_INT);
+    //set_handler(0x21, irq1_kbd, TYPE_INT);
     INITQ(wq, INIT_WQ_CAP);
     INITQ(kbd_buf, INIT_KB_CAP);
 
@@ -709,8 +742,8 @@ void init_interrupts() {
 
     registerPeriodicCallback((struct periodic_callback) {1, 2, check_queue_caps});
 
-    if (!processList)
-        processList = newList();
+    processList = newList();
+    curProc = malloc(sizeof(struct process));
 
     //__asm__ __volatile__ ("xchgw %bx, %bx");
     ints_okay();
