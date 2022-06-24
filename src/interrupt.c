@@ -169,57 +169,47 @@ static inline void push(struct queue* q, void* p) {
 //                0000_1111 = 15 = r15
 // 49 ff c7   inc r15
 // eb fb      jmp -5      eb = jmp, fb = -5
-void um_r15() {
-    for(;;)
-        __asm__ __volatile__ ("inc %r15\n");
-}
 
-// 49 ff c6 eb fb
-//       c6 = 0b_11000110
-//               11 = ModRM
-//                 000110
-//                 000_110
-//                R000_B110
-//                0000_1110 = 14 = r14
-void um_r14() {
-    for(;;)
-        __asm__ __volatile__ ("inc %r14\n");
+struct process {
+    void* page; // For now only one page allowed
+
+    //uint64_t rax;
+    // ...
+};
+
+static struct list* processList = (struct list*) 0;
+static struct process* curProc = 0;
+
+void startProc(struct process* p) {
+    asm volatile ("cli");
+
+    uint64_t* l2 = (uint64_t*) (0x100000 + (511 * 4096));
+    l2[0] = (uint64_t) p->page | PT_PRESENT | PT_WRITABLE | PT_HUGE | PT_USERMODE;
+
+    asm volatile ("\
+    \n  mov $0x7FC0000000ull, %rax \
+    \n  invlpg (%rax) \
+    \n  mov $0x7FC0200000, %rax \
+    \n  mov %rax, %rsp \
+    \n  push $27 \
+    \n  push %rax \
+    \n  pushf \
+    \n  pop %rax \
+    \n  or $0x200, %rax \
+    \n  push %rax \
+    \n  push $19 \
+    \n  mov $0x7FC0000000, %rax \
+    \n  push %rax \
+    \n  iretq \
+    ");
 }
 
 void setUpUserMode() {
-    uint64_t* u = palloc();
-    u[0] = 0xfbebc7ff49;
+    struct process p = {palloc()};
+    ((uint64_t*) (p.page))[0] = 0xfbebc7ff49;
 
-    uint64_t* l2 = (uint64_t*) (0x100000 + (511 * 4096));
-    l2[0] = (uint64_t) u | PT_PRESENT | PT_WRITABLE | PT_HUGE | PT_USERMODE;
-
-    // 511 * 1024 * 1024 * 1024 = 0x7FC0000000
-    //asm volatile ("invlpg $548682072064\n");
-    asm volatile (
-        "mov $0x7FC0000000ull, %rax\n"
-        "invlpg (%rax)\n"
-    );
-
-    //__asm__ __volatile__ ("cli\nhlt");
-    //print("About to user mode\n");
-    asm volatile
-    (
-        "cli\n"
-        "mov $0x7FC0200000, %rax\n"
-        "mov %rax, %rsp\n"
-        "push $27\n"
-        "push %rax\n"
-        "pushf\n"
-        "pop %rax\n"
-        "or $0x200, %rax\n"
-        "push %rax\n"
-        "push $19\n"
-        "mov $0x7FC0000000, %rax\n"
-        "push %rax\n"
-        "iretq\n"
-    );
+    startProc(&p);
 }
-
 
 // Can waitloop be scheduler?
 // Do any kernel work, then bounce between any user processes?  And if none of the above, hlt loop?
@@ -311,28 +301,15 @@ void setUpUserMode() {
 // Also, why did I switch from mapping 512 to mapping 256 GB?  I don't recall.  I recall doing it to solve some problem, but I
 //   don't remember what the problem was...  Because I may want to put user processes at 256 GB, for example.
 
-struct process {
-    void* page; // For now only one page allowed
-
-    //uint64_t rax;
-    // ...
-};
-
-/*
-  How do I want to keep track of processes?
-    (Whatever I do, for now the plan is what I think's called "round robin" -- just go in order, who's turn is next.)
-  Linked list and pointer to cur?  I think that feels easier than dynamic array.  Especially because we only ever need to
-    go to next, for now.
- */
-
-static struct list* processList = (struct list*) 0;
-
 void waitloop() {
     for (;;) {
         void (*f)();
 
         while ((f = (void (*)()) pop(&wq)))
             f();
+
+        if (curProc)
+            startProc(nextNode(curProc));
 
         __asm__ __volatile__(
             "mov %0, %%rsp\n" // We'll never return anywhere or use anything currently on the stack, so reset it
