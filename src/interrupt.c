@@ -178,10 +178,10 @@ struct process {
 };
 
 static struct list* processList = (struct list*) 0;
-static struct process* curProc = 0;
+//static struct process* curProc = 0;
+void* curProc = 0;
 
 void startProc(struct process* p) {
-    print("Trying to start proc...\n");
     asm volatile ("cli");
 
     uint64_t* l2 = (uint64_t*) (0x100000 + (511 * 4096));
@@ -206,17 +206,19 @@ void startProc(struct process* p) {
 }
 
 void um_r15() {
-    struct process p = {palloc()};
-    ((uint64_t*) (p.page))[0] = 0xfbebc7ff49;
-    curProc = pushListHead(processList, &p);
-    startProc(&p);
+    struct process *p = malloc(sizeof(struct process));
+    p->page = palloc();
+    ((uint64_t*) (p->page))[0] = 0xfbebc7ff49;
+    curProc = pushListHead(processList, p);
+    startProc(p);
 }
 
 void um_r14() {
-    struct process p = {palloc()};
-    ((uint64_t*) (p.page))[0] = 0xfbebc6ff49;
-    curProc = pushListHead(processList, &p);
-    startProc(&p);
+    struct process *p = malloc(sizeof(struct process));
+    p->page = palloc();
+    ((uint64_t*) (p->page))[0] = 0xfbebc6ff49;
+    curProc = pushListHead(processList, p);
+    startProc(p);
 }
 
 // Can waitloop be scheduler?
@@ -316,8 +318,10 @@ void waitloop() {
         while ((f = (void (*)()) pop(&wq)))
             f();
 
-        if (curProc)
-            startProc(nextNodeCirc(processList, curProc));
+        if (curProc) {
+            curProc = nextNodeCirc(processList, curProc);
+            startProc(listItem(curProc));
+        }
 
         __asm__ __volatile__(
             "mov %0, %%rsp\n" // We'll never return anywhere or use anything currently on the stack, so reset it
@@ -626,6 +630,10 @@ static void __attribute__((interrupt)) irq0_pit(struct interrupt_frame *) {
     if (ms_since_boot % 1000 == 0 && ms_since_boot != lms) {
         lms = ms_since_boot;
         printf(" r14: %p025u    r15: %p025u\n", r14, r15);
+    }
+
+    if (ms_since_boot % 2 == 0 && ms_since_boot != lms) {
+        lms = ms_since_boot;
         waitloop();
     }
 
