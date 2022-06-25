@@ -203,33 +203,27 @@ void startProc(struct process* p) {
     uint64_t* l2 = (uint64_t*) (0x100000 + (511 * 4096));
     l2[0] = (uint64_t) p->page | PT_PRESENT | PT_WRITABLE | PT_HUGE | PT_USERMODE;
 
-    //if (!p->rip)
+    if (!p->rip)
         p->rip = 0x7FC0000000ull;
-    //else if (p->rip < 0x7FC0000000ull)
-    //    printf("keeping rip: 0x%h\n", p->rip);
 
-        printf("p->rip: 0x%h\n", p->rip);
-        //asm volatile("mov %0, %%rax\nhlt"::"m"(p->rip));
+    uint64_t prip = p->rip;
     asm volatile ("\
-    \n    mov $0x7FC0000000, %%rax       \
-    \n    invlpg (%%rax)                    \
-    \n    mov $0x7FC0200000, %%rax       \
-\n hlt \
-    \n    mov %0, %%rax          \
-\n hlt \
-    \n    mov %%rax, %%rsp                  \
-    \n    push $27                          \
-    \n    push %%rax                        \
-    \n    pushf                             \
-    \n    pop %%rax                         \
-    \n    or $0x200, %%rax                  \
-    \n    push %%rax                        \
-    \n    push $19                          \
-    \n    mov %0, %%rax          \
-\n hlt \
-    \n    push %%rax                        \
-    \n    iretq                             \
-    " :: "m"(p->rip)
+    \n    movq %0, %%r8                        \
+    \n    movq $0x7FC0000000, %%rax            \
+    \n    invlpg (%%rax)                       \
+    \n    movq $0x7FC0200000, %%rax            \
+    \n    movq %%rax, %%rsp                    \
+    \n    push $27                             \
+    \n    push %%rax                           \
+    \n    pushf                                \
+    \n    pop %%rax                            \
+    \n    or $0x200, %%rax                     \
+    \n    push %%rax                           \
+    \n    push $19                             \
+    \n    movq %%r8, %%rax                     \
+    \n    push %%rax                           \
+    \n    iretq                                \
+    " :: "m"(prip)
     );
 
     // Maybe call nasm for this too?  Copy from curProc to regs (global), do everything but register restore, then call nasm function to
