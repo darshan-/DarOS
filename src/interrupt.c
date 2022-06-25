@@ -206,7 +206,6 @@ void startProc(struct process* p) {
     if (!p->rip)
         p->rip = 0x7FC0000000ull;
 
-    uint64_t prip = p->rip;
     asm volatile ("\
     \n    movq %0, %%r8                        \
     \n    movq $0x7FC0000000, %%rax            \
@@ -223,7 +222,7 @@ void startProc(struct process* p) {
     \n    movq %%r8, %%rax                     \
     \n    push %%rax                           \
     \n    iretq                                \
-    " :: "m"(prip)
+    " :: "m"(p->rip)
     );
 
     // Maybe call nasm for this too?  Copy from curProc to regs (global), do everything but register restore, then call nasm function to
