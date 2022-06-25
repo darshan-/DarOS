@@ -303,7 +303,6 @@ irq0:
         mov [regs.rsi], rsi
         mov [regs.rdi], rdi
         mov [regs.rbp], rbp
-        mov [regs.rsp], rsp
         mov [regs.r8], r8
         mov [regs.r9], r9
         mov [regs.r10], r10

@@ -208,17 +208,20 @@ void startProc(struct process* p) {
 \n      invlpg (%rax)                          \
     ");
 
-    if (!p->rip)
+    if (!p->rip) {
         p->rip = 0x7FC0000000ull;
-
+        p->rsp = 0x7FC0200000ull;
+        p->r15 = 0;
+        //asm volatile("xchgw %bx, %bx");
+    }
 
     // Okay, I want to try setting up the stack in C.  It's just memory -- I don't have to go to assembly and push, I can set it up first,
     //   then set rsp.  And that's how I'll get registers set up too -- put them on the stack under the stuff iretq needs, then pop them into
     //   their registers, and iretq.
 
-    uint64_t* sp = (uint64_t*) 0x7FC0200000ull;
+    uint64_t* sp = (uint64_t*) p->rsp;
     *--sp = 27;
-    *--sp = 0x7FC0200000ull;
+    *--sp = p->rsp;
     uint64_t flags;
     asm volatile("\
 \n      pushf                                   \
@@ -226,15 +229,20 @@ void startProc(struct process* p) {
 \n      or $0x200, %%rax                        \
 \n      mov %%rax, %0                           \
     ":"=m"(flags));
-//    ":"=m"(*--sp));
     *--sp = flags;
     *--sp = 19;
-    *--sp = p->rip;
+    //*--sp = p->rip;
+    *--sp = 0x7FC0000000ull;
+    // Push registers
 
-    // printf("sp: 0x%h\n", sp);
-    // for (int i = 4; i >= 0; i--)
-    //     printf("sp[%u]: 0x%h\n", i, sp[i]);
+    if (!p->r15) {
+        printf("sp: 0x%h\n", sp);
+        for (int i = 4; i >= 0; i--)
+            printf("sp[%u]: 0x%h\n", i, sp[i]);
+        // asm volatile("xchgw %bx, %bx");
+    }
 
+    // Pop registers between setting rsp and doing iretq
     asm volatile ("\
 \n      mov %0, %%rsp                          \
 \n      iretq                                  \
@@ -248,6 +256,7 @@ void um_r15() {
     asm volatile("cli");
     curProcN = pushListHead(processList, p);
     curProc = p;
+    asm volatile("xchgw %bx, %bx");
     startProc(p);
 }
 
@@ -258,6 +267,7 @@ void um_r14() {
     asm volatile("cli");
     curProcN = pushListHead(processList, p);
     curProc = p;
+    asm volatile("xchgw %bx, %bx");
     startProc(p);
 }
 
@@ -601,6 +611,7 @@ void __attribute__((interrupt)) irq0_pit(struct interrupt_frame *frame) {
             for (int i = 0; i < 16; i++)
                 curRegs[i] = regs[i];
             curProc->rip = frame->ip;
+            curProc->rsp = frame->sp;
 
             waitloop();
         }
