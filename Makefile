@@ -1,29 +1,35 @@
 .DEFAULT_GOAL := out/boot.img
 
-c_objects := $(patsubst src/%.c, build/%.o, $(wildcard src/*.c))
+c_objects := $(patsubst src/kernel/%.c, build/%.o, $(wildcard src/kernel/*.c))
 
 GCC_OPTS := -Wall -Wextra -c -ffreestanding -fno-stack-protector -mgeneral-regs-only -mno-red-zone -fno-PIC -mcmodel=large -momit-leaf-frame-pointer #--static-pie
 
-LD_OPTS := -N --warn-common -T src/linker.ld #--print-map
+LD_OPTS := -N --warn-common -T src/kernel/linker.ld #--print-map
 
 include build/headers.mk
 
-build out:
+build out build/userspace:
 	mkdir -p $@
 
 # TODO: Doesn't account for headers including other local headers (could use gcc --freestanding -M instead?)
 #   For now let's just have a rule against doing that, and deal with it if I ever need to do it.
-build/headers.mk: src/*.c src/*.h | build
-	cd src && for cf in *.c; do echo -n "build/$$cf" | sed 's/\.c$$/\.o: /'; grep "#include \"" "$$cf" | awk '{print $$2}' | awk -F '"' '{print "src/"$$2}' | xargs; done >../build/headers.mk
+build/headers.mk: src/kernel/*.c src/kernel/*.h | build
+	cd src/kernel && for cf in *.c; do echo -n "build/$$cf" | sed 's/\.c$$/\.o: /'; grep "#include \"" "$$cf" | awk '{print $$2}' | awk -F '"' '{print "src/kernel/"$$2}' | xargs; done >../../build/headers.mk
 
-build/bootloader.o: Makefile src/bootloader.asm | build
-	nasm -f elf64 src/bootloader.asm -o build/bootloader.o
+build/bootloader.o: Makefile src/kernel/bootloader.asm | build
+	nasm -f elf64 src/kernel/bootloader.asm -o build/bootloader.o
 
 build/*.o: Makefile
-build/%.o: src/%.c | build
+build/%.o: src/kernel/%.c | build
 	gcc $(GCC_OPTS) $< -o $@
 
-out/boot.img: $(c_objects) src/linker.ld build/bootloader.o | out
+build/userspace/app.o1: src/userspace/app.c | build/userspace
+	gcc $(GCC_OPTS) src/userspace/app.c -o build/userspace/app.o1
+build/userspace/app.o2: build/userspace/app.o1
+	ld -o build/userspace/app.o2 -N --warn-common -T src/userspace/linker.ld build/userspace/app.o1
+
+
+out/boot.img: $(c_objects) src/kernel/linker.ld build/bootloader.o | out
 	ld -o out/boot.img $(LD_OPTS) build/bootloader.o $(c_objects)
 
 out/bochs.img: out/boot.img
