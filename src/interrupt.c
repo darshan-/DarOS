@@ -203,25 +203,14 @@ void startProc(struct process* p) {
     uint64_t* l2 = (uint64_t*) (0x100000 + (511 * 4096));
     l2[0] = (uint64_t) p->page | PT_PRESENT | PT_WRITABLE | PT_HUGE | PT_USERMODE;
 
+    p->rip = 0x7FC0000000ull;
+    p->rsp = 0x7FC0200000ull;
+
     asm volatile ("\
 \n      mov $0x7FC0000000, %rax                \
 \n      invlpg (%rax)                          \
     ");
 
-    if (!p->rip) {
-        p->rip = 0x7FC0000000ull;
-        p->rsp = 0x7FC0200000ull;
-        p->r15 = 0;
-        //asm volatile("xchgw %bx, %bx");
-    }
-
-    // Okay, I want to try setting up the stack in C.  It's just memory -- I don't have to go to assembly and push, I can set it up first,
-    //   then set rsp.  And that's how I'll get registers set up too -- put them on the stack under the stuff iretq needs, then pop them into
-    //   their registers, and iretq.
-
-    uint64_t* sp = (uint64_t*) p->rsp;
-    *--sp = 27;
-    *--sp = p->rsp;
     uint64_t flags;
     asm volatile("\
 \n      pushf                                   \
@@ -229,18 +218,41 @@ void startProc(struct process* p) {
 \n      or $0x200, %%rax                        \
 \n      mov %%rax, %0                           \
     ":"=m"(flags));
+
+    uint64_t* sp = (uint64_t*) p->rsp;
+    *--sp = 27;
+    *--sp = p->rsp;
     *--sp = flags;
     *--sp = 19;
     //*--sp = p->rip;
     *--sp = 0x7FC0000000ull;
     // Push registers
 
-    if (!p->r15) {
-        printf("sp: 0x%h\n", sp);
-        for (int i = 4; i >= 0; i--)
-            printf("sp[%u]: 0x%h\n", i, sp[i]);
-        // asm volatile("xchgw %bx, %bx");
-    }
+    asm volatile ("\
+    \n  mov $0x7FC0200000, %rax \
+    \n  mov %rax, %rsp \
+    \n  push $27 \
+    \n  push %rax \
+    \n  pushf \
+    \n  pop %rax \
+    \n  or $0x200, %rax \
+    \n  push %rax \
+    \n  push $19 \
+    \n  mov $0x7FC0000000, %rax \
+    \n  push %rax \
+    \n  iretq \
+    ");
+
+    // Okay, I want to try setting up the stack in C.  It's just memory -- I don't have to go to assembly and push, I can set it up first,
+    //   then set rsp.  And that's how I'll get registers set up too -- put them on the stack under the stuff iretq needs, then pop them into
+    //   their registers, and iretq.
+
+    // if (!p->r15) {
+    //     printf("sp: 0x%h\n", sp);
+    //     for (int i = 4; i >= 0; i--)
+    //         printf("sp[%u]: 0x%h\n", i, sp[i]);
+    //     // asm volatile("xchgw %bx, %bx");
+    // }
 
     // Pop registers between setting rsp and doing iretq
     asm volatile ("\
@@ -256,7 +268,7 @@ void um_r15() {
     asm volatile("cli");
     curProcN = pushListHead(processList, p);
     curProc = p;
-    asm volatile("xchgw %bx, %bx");
+    //asm volatile("xchgw %bx, %bx");
     startProc(p);
 }
 
@@ -267,7 +279,7 @@ void um_r14() {
     asm volatile("cli");
     curProcN = pushListHead(processList, p);
     curProc = p;
-    asm volatile("xchgw %bx, %bx");
+    //asm volatile("xchgw %bx, %bx");
     startProc(p);
 }
 
