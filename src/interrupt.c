@@ -229,19 +229,9 @@ void startProc(struct process* p) {
     // Push registers
 
     asm volatile ("\
-    \n  mov $0x7FC0200000, %rax \
-    \n  mov %rax, %rsp \
-    \n  push $27 \
-    \n  push %rax \
-    \n  pushf \
-    \n  pop %rax \
-    \n  or $0x200, %rax \
-    \n  push %rax \
-    \n  push $19 \
-    \n  mov $0x7FC0000000, %rax \
-    \n  push %rax \
-    \n  iretq \
-    ");
+\n      mov %0, %%rsp                          \
+\n      iretq                                  \
+    "::"m"(sp));
 
     // Okay, I want to try setting up the stack in C.  It's just memory -- I don't have to go to assembly and push, I can set it up first,
     //   then set rsp.  And that's how I'll get registers set up too -- put them on the stack under the stuff iretq needs, then pop them into
@@ -254,11 +244,6 @@ void startProc(struct process* p) {
     //     // asm volatile("xchgw %bx, %bx");
     // }
 
-    // Pop registers between setting rsp and doing iretq
-    asm volatile ("\
-\n      mov %0, %%rsp                          \
-\n      iretq                                  \
-    "::"m"(sp));
 }
 
 void um_r15() {
