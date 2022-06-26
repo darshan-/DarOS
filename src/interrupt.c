@@ -203,65 +203,73 @@ void startProc(struct process* p) {
     uint64_t* l2 = (uint64_t*) (0x100000 + (511 * 4096));
     l2[0] = (uint64_t) p->page | PT_PRESENT | PT_WRITABLE | PT_HUGE | PT_USERMODE;
 
-    //printf("proc 0x%h rip 0x%h rsp 0x%h\n", p, p->rip, p->rsp);
-
-    if (!p->rip)
-        p->rip = 0x7FC0000000ull;
-    if (!p->rsp)
-        p->rsp = 0x7FC0200000ull;
-    if (p->rsp != 0x7FC0200000ull) {
-        printf("p->rsp is 0x%h\n", p->rsp);
-        asm volatile("hlt");
-    }
-
     asm volatile ("\
 \n      mov $0x7FC0000000, %rax                \
 \n      invlpg (%rax)                          \
     ");
 
     uint64_t flags;
-    asm volatile("\
+    asm volatile ("\
 \n      pushf                                   \
 \n      pop %%rax                               \
 \n      or $0x200, %%rax                        \
 \n      mov %%rax, %0                           \
-    ":"=m"(flags));
+    " : "=m"(flags));
 
     uint64_t* sp = (uint64_t*) p->rsp;
     *--sp = 27;
     *--sp = p->rsp;
     *--sp = flags;
     *--sp = 19;
+
     *--sp = p->rip;
-    //*--sp = 0x7FC0000000ull;
-    // Push registers
+    *--sp = p->rax;
+    *--sp = p->rbx;
+    *--sp = p->rcx;
+    *--sp = p->rdx;
+    *--sp = p->rsi;
+    *--sp = p->rdi;
+    *--sp = p->rbp;
+    *--sp = p->r8;
+    *--sp = p->r9;
+    *--sp = p->r10;
+    *--sp = p->r11;
+    *--sp = p->r12;
+    *--sp = p->r13;
+    *--sp = p->r14;
+    *--sp = p->r15;
+
+    asm volatile ("mov %0, %%rsp"::"m"(sp));
 
     asm volatile ("\
-\n      mov %0, %%rsp                          \
-\n      iretq                                  \
-    "::"m"(sp));
-
-    // Okay, I want to try setting up the stack in C.  It's just memory -- I don't have to go to assembly and push, I can set it up first,
-    //   then set rsp.  And that's how I'll get registers set up too -- put them on the stack under the stuff iretq needs, then pop them into
-    //   their registers, and iretq.
-
-    // if (!p->r15) {
-    //     printf("sp: 0x%h\n", sp);
-    //     for (int i = 4; i >= 0; i--)
-    //         printf("sp[%u]: 0x%h\n", i, sp[i]);
-    //     // asm volatile("xchgw %bx, %bx");
-    // }
-
+\n      pop %r15                                \
+\n      pop %r14                                \
+\n      pop %r13                                \
+\n      pop %r12                                \
+\n      pop %r11                                \
+\n      pop %r10                                \
+\n      pop %r9                                 \
+\n      pop %r8                                 \
+\n      pop %rbp                                \
+\n      pop %rdi                                \
+\n      pop %rsi                                \
+\n      pop %rdx                                \
+\n      pop %rcx                                \
+\n      pop %rbx                                \
+\n      pop %rax                                \
+\n      iretq                                   \
+    ");
 }
 
 void um_r15() {
     struct process *p = mallocz(sizeof(struct process));
     p->page = palloc();
     ((uint64_t*) (p->page))[0] = 0xfbebc7ff49c6ff49;
+    p->rip = 0x7FC0000000ull;
+    p->rsp = 0x7FC0200000ull;
     asm volatile("cli");
     curProcN = pushListHead(processList, p);
     curProc = p;
-    //asm volatile("xchgw %bx, %bx");
     startProc(p);
 }
 
@@ -269,10 +277,11 @@ void um_r14() {
     struct process *p = mallocz(sizeof(struct process));
     p->page = palloc();
     ((uint64_t*) (p->page))[0] = 0xfbebc6ff49;
+    p->rip = 0x7FC0000000ull;
+    p->rsp = 0x7FC0200000ull;
     asm volatile("cli");
     curProcN = pushListHead(processList, p);
     curProc = p;
-    //asm volatile("xchgw %bx, %bx");
     startProc(p);
 }
 
