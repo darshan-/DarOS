@@ -180,7 +180,6 @@ struct process {
     uint64_t rsi;
     uint64_t rdi;
     uint64_t rbp;
-    uint64_t rsp;
     uint64_t r8;
     uint64_t r9;
     uint64_t r10;
@@ -191,6 +190,7 @@ struct process {
     uint64_t r15;
 
     uint64_t rip;
+    uint64_t rsp;
 };
 
 static struct list* processList = (struct list*) 0;
@@ -203,8 +203,16 @@ void startProc(struct process* p) {
     uint64_t* l2 = (uint64_t*) (0x100000 + (511 * 4096));
     l2[0] = (uint64_t) p->page | PT_PRESENT | PT_WRITABLE | PT_HUGE | PT_USERMODE;
 
-    p->rip = 0x7FC0000000ull;
-    p->rsp = 0x7FC0200000ull;
+    //printf("proc 0x%h rip 0x%h rsp 0x%h\n", p, p->rip, p->rsp);
+
+    if (!p->rip)
+        p->rip = 0x7FC0000000ull;
+    if (!p->rsp)
+        p->rsp = 0x7FC0200000ull;
+    if (p->rsp != 0x7FC0200000ull) {
+        printf("p->rsp is 0x%h\n", p->rsp);
+        asm volatile("hlt");
+    }
 
     asm volatile ("\
 \n      mov $0x7FC0000000, %rax                \
@@ -224,8 +232,8 @@ void startProc(struct process* p) {
     *--sp = p->rsp;
     *--sp = flags;
     *--sp = 19;
-    //*--sp = p->rip;
-    *--sp = 0x7FC0000000ull;
+    *--sp = p->rip;
+    //*--sp = 0x7FC0000000ull;
     // Push registers
 
     asm volatile ("\
@@ -247,9 +255,9 @@ void startProc(struct process* p) {
 }
 
 void um_r15() {
-    struct process *p = malloc(sizeof(struct process));
+    struct process *p = mallocz(sizeof(struct process));
     p->page = palloc();
-    ((uint64_t*) (p->page))[0] = 0xfbebc7ff49;
+    ((uint64_t*) (p->page))[0] = 0xfbebc7ff49c6ff49;
     asm volatile("cli");
     curProcN = pushListHead(processList, p);
     curProc = p;
@@ -258,7 +266,7 @@ void um_r15() {
 }
 
 void um_r14() {
-    struct process *p = malloc(sizeof(struct process));
+    struct process *p = mallocz(sizeof(struct process));
     p->page = palloc();
     ((uint64_t*) (p->page))[0] = 0xfbebc6ff49;
     asm volatile("cli");

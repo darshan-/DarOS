@@ -284,7 +284,6 @@ regs:
 .rsi:   dq 0
 .rdi:   dq 0
 .rbp:   dq 0
-.rsp:   dq 0
 .r8:    dq 0
 .r9:    dq 0
 .r10:   dq 0
