@@ -261,10 +261,16 @@ void startProc(struct process* p) {
     ");
 }
 
+extern uint8_t app[];
+extern uint64_t app_len;
+
+// TODO: Use qwords, so hexdump automatically zero-pads to multiple of 8 bytes, and copying is more efficient
 void um_r15() {
     struct process *p = mallocz(sizeof(struct process));
     p->page = palloc();
-    ((uint64_t*) (p->page))[0] = 0xfbebc7ff49c6ff49;
+    for (int i = 0; i < app_len; i++)
+        ((uint8_t*) (p->page))[i] = app[i];
+
     p->rip = 0x7FC0000000ull;
     p->rsp = 0x7FC0200000ull;
     asm volatile("cli");
