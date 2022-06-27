@@ -750,8 +750,8 @@ void init_interrupts() {
         set_handler(i, default_interrupt_handler, TYPE_INT);
 
     //set_handler(0x20, irq0_pit, TYPE_INT);
-    extern void* irq0;
-    printf("&irq0: 0x%h\n", &irq0);
+    extern void irq0();
+    printf("&irq0: 0x%h\n", irq0);
     //asm volatile("cli\nhlt");
     set_handler(0x20, &irq0, TYPE_INT);
     set_handler(0x21, irq1_kbd, TYPE_INT);
@@ -777,8 +777,8 @@ void init_interrupts() {
     SET_GETRAP_N(1e);
 
     //set_handler(0x80, int_0x80_handler, TYPE_INT);
-    extern void* int0x80;
-    set_handler(0x80, &int0x80, TYPE_INT);
+    extern void int0x80();
+    set_handler(0x80, int0x80, TYPE_INT);
     //set_handler(0x80, int0x80_syscall, TYPE_INT);
 
     init_rtc();
