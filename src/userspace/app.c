@@ -19,6 +19,10 @@ void main() {
         fibNext();
 
     printf("Hi, I'm app; I've stopped fib-ing with a: %u and b: %u\n", a, b);
+
+    for (a = 0; a < 10000000000000000000ull; a++)
+        if (a % 1000000000ull == 0)
+            printf("a: %u\n", a);
 }
 
 
