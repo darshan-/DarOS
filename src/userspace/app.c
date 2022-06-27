@@ -3,7 +3,7 @@
 static uint64_t a;
 static uint64_t b;
 
-static uint64_t fibNext() {
+static void fibNext() {
     uint64_t c = a;
     a = b;
     b = a + c;
@@ -16,7 +16,7 @@ void __attribute__((section(".entry"))) main() {
     for (;;) {
         asm volatile("movq %0, %%r14"::"m"(a));
         asm volatile("movq %0, %%r15"::"m"(b));
-        if (b < 10000000000000000000000ull)
+        if (b < 10000000000000000000ull)
             fibNext();
     }
 }
