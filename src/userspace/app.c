@@ -1,5 +1,7 @@
 #include <stdint.h>
 
+#include "sys.h"
+
 static uint64_t a;
 static uint64_t b;
 
@@ -9,20 +11,21 @@ static void fibNext() {
     b = a + c;
 }
 
-void __attribute__((section(".entry"))) main() {
+void main() {
+    return;
     a = 1;
     b = 1;
 
-    for (;;) {
-        asm volatile("movq %0, %%r14"::"m"(a));
-        asm volatile("movq %0, %%r15"::"m"(b));
-        if (b < 10000000000000000000ull)
-            fibNext();
-    }
+    while (b < 10000000000000000000ull)
+        fibNext();
+
+    printf("Hi, I'm app; I've stopped fib-ing with a: %u and b: %u\n", a, b);
 }
 
 
 /*
+
+  I guess we want to set up an entry point in sys, which calls main(), and then calls exit().  Wow, cool!!
 
   How do I want do have a printf?
   I see two paths:

@@ -280,15 +280,19 @@ void um_r15() {
 }
 
 void um_r14() {
-    struct process *p = mallocz(sizeof(struct process));
-    p->page = palloc();
-    ((uint64_t*) (p->page))[0] = 0xfbebc6ff49;
-    p->rip = 0x7FC0000000ull;
-    p->rsp = 0x7FC0200000ull;
-    asm volatile("cli");
-    curProcN = pushListHead(processList, p);
-    curProc = p;
-    startProc(p);
+    asm volatile("\
+\n      mov $0, %rax                            \
+\n      int $0x80                               \
+    ");
+    // struct process *p = mallocz(sizeof(struct process));
+    // p->page = palloc();
+    // ((uint64_t*) (p->page))[0] = 0xfbebc6ff49;
+    // p->rip = 0x7FC0000000ull;
+    // p->rsp = 0x7FC0200000ull;
+    // asm volatile("cli");
+    // curProcN = pushListHead(processList, p);
+    // curProc = p;
+    // startProc(p);
 }
 
 // Can waitloop be scheduler?
@@ -411,8 +415,8 @@ void process_keys() {
 }
 
 static void dumpFrame(struct interrupt_frame *frame) {
-    logf("ip: 0x%p016h    cs: 0x%p016h flags: 0x%p016h\n", frame->ip, frame->cs, frame->flags);
-    logf("sp: 0x%p016h    ss: 0x%p016h\n", frame->sp, frame->ss);
+    printf("ip: 0x%p016h    cs: 0x%p016h flags: 0x%p016h\n", frame->ip, frame->cs, frame->flags);
+    printf("sp: 0x%p016h    ss: 0x%p016h\n", frame->sp, frame->ss);
 }
 
 static inline void generic_trap_n(struct interrupt_frame *frame, int n) {
@@ -517,10 +521,27 @@ static void __attribute__((interrupt)) default_interrupt_handler(struct interrup
     //dumpFrame(frame);
 }
 
-static void __attribute__((interrupt)) int_0x80_handler(struct interrupt_frame *frame) {
+void __attribute__((interrupt)) int0x80_syscall(struct interrupt_frame *frame) {
     print("int 0x80 handler\n");
+    extern void int0x80();
+    int0x80();
 
     dumpFrame(frame);
+    //asm volatile("hlt");
+
+    if (frame->ip >= 511ull * 1024 * 1024 * 1024) {
+        extern uint64_t regs[16];
+        uint64_t* curRegs = (uint64_t*) curProc;
+        curRegs++;
+        for (int i = 0; i < 16; i++)
+            curRegs[i] = regs[i];
+        curProc->rip = frame->ip;
+        curProc->rsp = frame->sp;
+
+        if (!curProc->rax)
+            waitloop();
+    }
+
     //frame->ip = (uint64_t) waitloop;
     //print("waitloop?");
     //printf("hlt_in_waitloop in int 0x80: %u\n", hlt_in_waitloop);
@@ -597,7 +618,6 @@ void __attribute__((interrupt)) irq0_pit(struct interrupt_frame *frame) {
 
     ms_since_boot = pitCount * PIT_COUNT * 1000 / PIT_FREQ;
 
-
     // if (pitCount % TICK_HZ == 0)
     //     logf("Average CPU ticks per PIT tick: %u\n", (read_tsc() - cpuCountOffset) / pitCount);
 
@@ -614,15 +634,9 @@ void __attribute__((interrupt)) irq0_pit(struct interrupt_frame *frame) {
     }
 
     static uint64_t lms = 0;
-    uint64_t r14, r15;
-    asm volatile ("mov %%r14, %0":"=m"(r14));
-    asm volatile ("mov %%r15, %0":"=m"(r15));
 
     if (ms_since_boot % 2 == 0 && ms_since_boot != lms) {
         lms = ms_since_boot;
-
-        if (ms_since_boot % 1000 == 0)
-            printf(" r14: %p025u    r15: %p025u\n", r14, r15);
 
         if (frame->ip >= 511ull * 1024 * 1024 * 1024) {
             extern uint64_t regs[16];
@@ -647,7 +661,8 @@ static void set_handler(uint64_t vec, void* handler, uint8_t type) {
     offset >>= 16;
     *((uint32_t*) (idt_entry + 4)) = (uint32_t) offset;
 
-    *(idt_entry + 2) = (uint16_t) 1 << 15 | type << 8 | 3 << 13; // TODO: Only set ring-3 callable for syscall interrupt
+    uint16_t ring = vec == 0x80 ? 3 << 13 : 0;
+    *(idt_entry + 2) = (uint16_t) 1 << 15 | type << 8 | ring;
     *(idt_entry + 1) = CODE_SEG;
     *((uint32_t*) (idt_entry + 6)) = 0;
 }
@@ -703,7 +718,10 @@ void init_interrupts() {
     SET_GETRAP_N(1d);
     SET_GETRAP_N(1e);
 
-    set_handler(0x80, int_0x80_handler, TYPE_INT);
+    //set_handler(0x80, int_0x80_handler, TYPE_INT);
+    //extern void* int0x80;
+    //set_handler(0x80, int0x80, TYPE_INT);
+    set_handler(0x80, int0x80_syscall, TYPE_INT);
 
     init_rtc();
     init_pit();

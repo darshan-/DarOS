@@ -25,8 +25,8 @@ build/%.o: src/kernel/%.c | build
 
 build/userspace/app.o1: Makefile src/userspace/app.c | build/userspace
 	gcc $(GCC_OPTS) src/userspace/app.c -o build/userspace/app.o1
-build/userspace/app.o2: Makefile build/userspace/app.o1
-	ld -o build/userspace/app.o2 -N --warn-common -T src/userspace/linker.ld build/userspace/app.o1
+build/userspace/app.o2: Makefile build/userspace/app.o1 build/userspace/sys.o
+	ld -o build/userspace/app.o2 -N --warn-common -T src/userspace/linker.ld build/userspace/app.o1 build/userspace/sys.o
 build/userspace/app.c: Makefile build/userspace/app.o2
 	echo "#include <stdint.h>" >build/userspace/app.c
 	echo "uint64_t app[] = {" >>build/userspace/app.c
@@ -37,6 +37,9 @@ build/userspace/app.c: Makefile build/userspace/app.o2
 	echo " / 8 + 1;" >>build/userspace/app.c
 build/userspace/app.o: Makefile build/userspace/app.c
 	gcc $(GCC_OPTS) build/userspace/app.c -o build/userspace/app.o
+
+build/userspace/sys.o: Makefile src/userspace/sys.c | build/userspace
+	gcc $(GCC_OPTS) src/userspace/sys.c -o build/userspace/sys.o
 
 out/boot.img: $(c_objects) src/kernel/linker.ld build/bootloader.o build/userspace/app.o | out
 	ld -o out/boot.img $(LD_OPTS) build/bootloader.o $(c_objects) build/userspace/app.o
