@@ -37,6 +37,8 @@ struct vterm {
 
     uint64_t clear_top; // Top position to use due to ctrl-l / clear
     uint64_t v_scroll;  // Vertical offset from scrolling
+
+    void* proc; // Foreground process -- we won't prompt until it exits (and we will prompt when it exits)
 };
 
 static uint64_t at = -1;
@@ -458,6 +460,7 @@ void printColorTo(uint64_t t, char* s, uint8_t c) {
 
     terms[t].anchor = terms[t].cur;
 
+    syncScreen();
     ints_okay();
 }
 
@@ -491,7 +494,6 @@ void printf(char* fmt, ...) {
 void vaprintf(uint64_t t, char* fmt, va_list ap) {
     char* s = M_vsprintf(0, 0, fmt, ap);
     printTo(t, s);
-    prompt(t);
     free(s);
 }
 
@@ -526,6 +528,14 @@ static void showTerm(uint64_t t) {
 
 static inline int isPrintable(uint8_t c) {
     return c >= ' ' && c <= '~';
+}
+
+void procDone(void* p, uint64_t t) {
+    if (terms[t].proc != p)
+        return;
+
+    terms[t].proc = 0; // Do we need a zero value? Or just leave old value alone?  Edit: Yeah, good to zero it, e.g. for prompting on \n.
+    prompt(t);
 }
 
 static void gotInput(struct input i) {
@@ -569,17 +579,15 @@ static void gotInput(struct input i) {
             backspace();
 
         else if (i.key == '\n' && !i.alt && !i.ctrl && !i.shift) {
-            // Take anchor anchor to end as input.
-            // If input is "app", call interrupt.c function to start app, passing in `at' as stdout along with "app"
             char* l = M_readline();
             print("\n");
-            //printf("I read: %s\n", l);
-            if (!strcmp(l, "app")) {
-                //printf("Asking for app to be started with output going to stdout: %u\n", at);
-                startApp(at);
-            }
+            
+            if (!strcmp(l, "app"))
+                terms[at].proc = startApp(at);
+            else if (!terms[at].proc)
+                prompt(at);
+
             free(l);
-            prompt(at);
         }
 
         else if (i.key == 'u' && !i.alt && i.ctrl && !i.shift)

@@ -3,6 +3,7 @@
 
 #include "interrupt.h"
 
+#include "console.h"
 #include "io.h"
 #include "keyboard.h"
 #include "list.h"
@@ -201,6 +202,14 @@ void* curProcN = 0;
 
 void killProc(struct process* p) {
     free(p->page);
+    //procDone(p->at);  Hmm, not really... might be sub-processes...
+    // I guess I need to keep track of top-level process that is keeping shell from prompting?
+    // Or give shell a process ID, and don't tell shell "proc done on terminal t", but do tell it "process with id x is done"?
+    // I think the latter?  (Well, the latter is so console does the former, I guess?)
+    // That way you can have a background process, by not waiting for it -- and you can have something similar if a process launched
+    //   another process, and the first one returned at some point after that.  That first one returning is the signal the console needs
+    //   to go ahead and prompt again.  The sub-process can still write to the termainal, and is a background process.
+    procDone(p, p->stdout); // Would rather console doesn't understand proc; it just sees p as a unique id.
     free(p);
 
     if (p == curProc) {
@@ -304,7 +313,7 @@ void startProc(struct process* p) {
 extern uint64_t app[];
 extern uint64_t app_len;
 
-void startApp(uint64_t stdout) {
+void* startApp(uint64_t stdout) {
     struct process *p = mallocz(sizeof(struct process));
     p->page = palloc();
     p->stdout = stdout;
@@ -315,6 +324,7 @@ void startApp(uint64_t stdout) {
     p->rsp = 0x7FC0200000ull;
 
     pushListHead(processList, p); // TODO: I may have assumptions elsewhere that aren't met with this as is...
+    return p;
 }
 
 // static void doStartApp(uint64_t stdout) {

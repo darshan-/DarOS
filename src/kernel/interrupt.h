@@ -6,6 +6,7 @@
 
 void init_interrupts();
 void waitloop();
+void* startApp(uint64_t stdout);
 
 extern uint64_t int_blocks;
 extern uint64_t* kernel_stack_top;

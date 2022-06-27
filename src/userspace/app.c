@@ -20,8 +20,9 @@ void main() {
 
     printf("Hi, I'm app; I've stopped fib-ing with a: %u and b: %u\n", a, b);
 
-    for (a = 0; a < 10000000000000000000ull; a++)
-        if (a % 1000000000ull == 0)
+    const uint64_t chunk = 1000000000ull; // Chunk that's not too fast, not too slow, for target system
+    for (a = 0; a < chunk * 10; a++)
+        if (a % chunk == 0)
             printf("a: %u\n", a);
 }
 
