@@ -129,27 +129,31 @@ void* pushListTail(struct list* l, void* item) {
     return n;
 }
 
+void removeNodeFromList(struct list* l, void* ln) {
+    struct list_node* n = (struct list_node*) ln; // I still prefer caller not needing a definition of node; mabye silly, but, shrug.
+
+    if (n->prev)
+        n->prev->next = n->next;
+    if (n->next)
+        n->next->prev = n->prev;
+
+    if (n == l->head)
+        l->head = n->next;
+    if (n == l->tail)
+        l->tail = n->prev;
+
+    free(n);
+
+    return;
+ }
+
 void removeFromListWithEquality(struct list* l, int (*equals)(void*)) {
     if (!l || !l->head) return;
 
     l->len--;
-    for (struct list_node* cur = l->head; cur; cur = cur->next) {
-        if (equals(cur->item)) {
-            if (cur->prev)
-                cur->prev->next = cur->next;
-            if (cur->next)
-                cur->next->prev = cur->prev;
-
-            if (cur == l->head)
-                l->head = cur->next;
-            if (cur == l->tail)
-                l->tail = cur->prev;
-
-            free(cur);
-
-            return;
-        }
-    }
+    for (struct list_node* cur = l->head; cur; cur = cur->next)
+        if (equals(cur->item))
+            removeNodeFromList(l, cur);
 }
 
 // Removes first occurance of item from list, if it exists

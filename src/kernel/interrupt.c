@@ -197,6 +197,44 @@ static struct list* processList = (struct list*) 0;
 static struct process* curProc = 0;
 void* curProcN = 0;
 
+void killProc(struct process* p) {
+    free(p->page);
+    free(p);
+
+    if (p == curProc) {
+        void* n = nextNodeCirc(processList, curProcN);
+        int same = n == curProcN;
+        removeNodeFromList(processList, curProcN);
+
+        if (same) {
+            curProcN = 0;
+            curProc = 0;
+        } else {
+            curProcN = n;
+            curProc = listItem(n);
+        }
+    } else {
+        removeFromList(processList, p);
+    }
+
+    // int cur = p == curProc;
+    // void* n = nextNodeCirc(processList, curProcN);
+    // int same = n == curProcN;
+    // removeNodeFromList(processList, curProcN);
+
+    // if (cur) {
+    //     if (same) {
+    //         curProcN = 0;
+    //         curProc = 0;
+    //     } else {
+    //         curProcN = n;
+    //         curProc = listItem(curProcN);
+    //     }
+    // }
+
+    // free(p);
+}
+
 void startProc(struct process* p) {
     asm volatile ("cli");
 
@@ -415,8 +453,8 @@ void process_keys() {
 }
 
 static void dumpFrame(struct interrupt_frame *frame) {
-    printf("ip: 0x%p016h    cs: 0x%p016h flags: 0x%p016h\n", frame->ip, frame->cs, frame->flags);
-    printf("sp: 0x%p016h    ss: 0x%p016h\n", frame->sp, frame->ss);
+    logf("ip: 0x%p016h    cs: 0x%p016h flags: 0x%p016h\n", frame->ip, frame->cs, frame->flags);
+    logf("sp: 0x%p016h    ss: 0x%p016h\n", frame->sp, frame->ss);
 }
 
 static inline void generic_trap_n(struct interrupt_frame *frame, int n) {
@@ -522,12 +560,8 @@ static void __attribute__((interrupt)) default_interrupt_handler(struct interrup
 }
 
 void __attribute__((interrupt)) int0x80_syscall(struct interrupt_frame *frame) {
-    print("int 0x80 handler\n");
-    extern void int0x80();
-    int0x80();
-
-    dumpFrame(frame);
-    //asm volatile("hlt");
+    //print("int 0x80 handler\n");
+    //dumpFrame(frame);
 
     if (frame->ip >= 511ull * 1024 * 1024 * 1024) {
         extern uint64_t regs[16];
@@ -535,11 +569,35 @@ void __attribute__((interrupt)) int0x80_syscall(struct interrupt_frame *frame) {
         curRegs++;
         for (int i = 0; i < 16; i++)
             curRegs[i] = regs[i];
+
         curProc->rip = frame->ip;
         curProc->rsp = frame->sp;
 
-        if (!curProc->rax)
+        switch (curProc->rax) {
+        case 0:
+            killProc(curProc);
             waitloop();
+            break;
+        case 1:
+            // Just calling normal print stuff will do no_ints and ints_okay, but we don't want ints on until iretq.
+            // We could call no_ints here ourselves, but then
+            //   1. If we call ints_okay afterward, that'll turn them on before we're ready, and
+            //   2. If we don't, we'll have incremented count of reasons not to turn ints on...
+            // I guess I need something to the effect of ints_okay_but_not_now()...
+            //   Then we do say no_ints before printing, and that aftward.
+            //printf
+            no_ints(); // Printing will disable and then reenable, but we want them to stay off until iretq, so inc count of noes
+            vaprintf((char*) curProc->rbx, (va_list*) curProc->rcx);
+            ints_okay_once_on(); // dec count of noes, so count is restored and iretq turns them on
+
+            break;
+        default:
+            logf("Unknown syscall 0x%h\n", curProc->rax);
+        }
+        // if (!curProc->rax) {
+        //     killProc(curProc);
+        //     waitloop();
+        // }
     }
 
     //frame->ip = (uint64_t) waitloop;
@@ -719,9 +777,9 @@ void init_interrupts() {
     SET_GETRAP_N(1e);
 
     //set_handler(0x80, int_0x80_handler, TYPE_INT);
-    //extern void* int0x80;
-    //set_handler(0x80, int0x80, TYPE_INT);
-    set_handler(0x80, int0x80_syscall, TYPE_INT);
+    extern void* int0x80;
+    set_handler(0x80, &int0x80, TYPE_INT);
+    //set_handler(0x80, int0x80_syscall, TYPE_INT);
 
     init_rtc();
     init_pit();
@@ -736,7 +794,7 @@ void init_interrupts() {
     registerPeriodicCallback((struct periodic_callback) {1, 2, check_queue_caps});
 
     processList = newList();
-    curProc = malloc(sizeof(struct process));
+    //curProc = malloc(sizeof(struct process));
 
     //__asm__ __volatile__ ("xchgw %bx, %bx");
     ints_okay();

@@ -476,6 +476,12 @@ void printf(char* fmt, ...) {
     VARIADIC_PRINT(print);
 }
 
+void vaprintf(char* fmt, va_list ap) {
+    char* s = M_vsprintf(0, 0, fmt, ap);
+    print(s);
+    free(s);
+}
+
 static void showTerm(uint8_t t) {
     if (t == at)
         return;

@@ -12,7 +12,6 @@ static void fibNext() {
 }
 
 void main() {
-    return;
     a = 1;
     b = 1;
 

@@ -19,6 +19,7 @@ void exit() {
 
 void printf(char* fmt, ...) {
     va_list ap;
+    va_list* app = &ap;
     va_start(ap, fmt);
     //void* v = va_arg(ap, void*);
 
@@ -28,12 +29,11 @@ void printf(char* fmt, ...) {
 \n      mov %0, %%rbx                           \
 \n      mov %1, %%rcx                           \
 \n      int $0x80                               \
-    "::"m"(fmt),"m"(ap));
+    "::"m"(fmt),"m"(app));
     va_end(ap);
 }
 extern void main();
 void __attribute__((section(".entry"))) _entry() {
     main();
     exit();
-    // main();
 }

@@ -315,10 +315,7 @@ extern irq0_pit
 
 global int0x80
 int0x80:
-        hlt
         mov [regs.rax], rax
-extern int0x80_syscall
-        jmp int0x80_syscall
         mov [regs.rbx], rbx
         mov [regs.rcx], rcx
         mov [regs.rdx], rdx
