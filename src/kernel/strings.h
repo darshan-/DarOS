@@ -39,6 +39,7 @@ char* M_sprintf(char* fmt, ...);
 char* sprintf(char* buf, uint64_t buf_len, char* fmt, ...);
 char* M_vsprintf(char* s, uint64_t s_cap, char* fmt, va_list ap);
 uint64_t strlen(char* s);
+int strcmp(char* s, char* t);
 char* M_sappend(char* s, char* t);
 char* M_scopy(char* s);
 // Decimal string to unsigned int

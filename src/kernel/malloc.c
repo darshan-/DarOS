@@ -58,7 +58,7 @@ uint64_t heapSize() {
 }
 
 void* malloc(uint64_t nBytes) {
-    if (heap == 0)
+    if (heap == 0 || nBytes == 0)
         return 0;
 
     uint64_t needed = blocks_per(nBytes, BLK_SZ);
@@ -67,7 +67,7 @@ void* malloc(uint64_t nBytes) {
     for (uint64_t i = 0; i < needed && mask != -1ull; i++)
         mask = (mask << 2) + 0b11;
 
-    uint64_t need = needed;
+    uint64_t need;// = needed; // TODO: Looks like this was redundant, right?
     void* ret = 0;
 
     no_ints();

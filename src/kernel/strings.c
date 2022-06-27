@@ -173,6 +173,16 @@ uint64_t strlen(char* s) {
     return i;
 }
 
+int strcmp(char* s, char* t) {
+    for (uint64_t i = 0;;i++) {
+        int d;
+        if (d = s[i] - t[i])
+            return d;
+        if (!s[i])
+            return 0;
+    }
+}
+
 char* M_sappend(char* s, char* t) {
     char* u = malloc(strlen(s) + strlen(t) + 1);
 

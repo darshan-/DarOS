@@ -39,7 +39,7 @@ struct vterm {
     uint64_t v_scroll;  // Vertical offset from scrolling
 };
 
-static uint8_t at = 255;
+static uint64_t at = -1;
 
 static struct vterm terms[TERM_COUNT];
 
@@ -55,7 +55,7 @@ static struct vterm terms[TERM_COUNT];
 #define word_at(t, i) (((uint16_t*) page_for(t, i))[(i) % (LINES * 160) / 2])
 #define qword_at(t, i) (((uint64_t*) page_for(t, i))[(i) % (LINES * 160) / 8])
 
-static void addPage(uint8_t t, uint64_t i) {
+static void addPage(uint64_t t, uint64_t i) {
     if (terms[t].buf[i])
         return;
 
@@ -69,7 +69,7 @@ static void addPage(uint8_t t, uint64_t i) {
         ((uint64_t*) terms[t].buf[i])[j] = 0x0700070007000700ull;
 }
 
-static inline void ensurePages(uint8_t t) {
+static inline void ensurePages(uint64_t t) {
     uint64_t i = page_index_for(t, end);
 
     if (!terms[t].buf[i])
@@ -79,7 +79,7 @@ static inline void ensurePages(uint8_t t) {
         addPage(t, i + 1);
 }
 
-static inline uint64_t top(uint8_t t) {
+static inline uint64_t top(uint64_t t) {
     uint64_t l;
 
     if (line_for(t, end) - line_for(t, cur) >= LINES)
@@ -92,7 +92,7 @@ static inline uint64_t top(uint8_t t) {
     return (l - terms[t].v_scroll) * 160;
 }
 
-static inline uint64_t curPositionInScreen(uint8_t t) {
+static inline uint64_t curPositionInScreen(uint64_t t) {
     return terms[t].cur - top(t);
 }
 
@@ -243,7 +243,7 @@ static inline void clear() {
     syncScreen();
 }
 
-static void prompt(uint8_t t) {
+static void prompt(uint64_t t) {
     scrollToBottom();
     terms[at].cur = terms[at].end;
     if (terms[t].cur % 160 != 0)
@@ -254,7 +254,7 @@ static void prompt(uint8_t t) {
         syncScreen();
 }
 
-static inline void ensureTerm(uint8_t t) {
+static inline void ensureTerm(uint64_t t) {
     no_ints();
     if (!terms[t].buf) {
         terms[t].cap = 16;
@@ -277,7 +277,7 @@ static inline void ensureTerm(uint8_t t) {
     ints_okay();
 }
 
-static inline void printcc(uint8_t t, uint8_t c, uint8_t cl) {
+static inline void printcc(uint64_t t, uint8_t c, uint8_t cl) {
     if (terms[t].cur < terms[t].end)
         for (uint64_t i = terms[t].end; i > terms[t].cur; i -= 2)
             word_at(t, i) = word_at(t, i - 2);
@@ -389,6 +389,18 @@ static inline void cursorEnd() {
     updateCursorPosition();
 }
 
+char* M_readline() {
+    uint64_t len = terms[at].end - terms[at].anchor + 1;
+    char* s = malloc(len);
+    s[len - 1] = 0;
+
+    //for (uint64_t i = terms[at].anchor; i < terms[at].end; i++)
+    for (uint64_t i = 0; i < len; i++)
+        s[i] = byte_at(at, terms[at].anchor + i * 2);
+
+    return s;
+}
+
 static inline void clearCurToAnchor() {
     scrollToBottom();
 
@@ -422,7 +434,7 @@ static inline void clearCurToEnd() {
     syncScreen();
 }
 
-static inline void printCharColor(uint8_t t, uint8_t c, uint8_t color) {
+static inline void printCharColor(uint64_t t, uint8_t c, uint8_t color) {
     uint64_t l = top(t);
 
     if (c == '\n') {
@@ -436,7 +448,7 @@ static inline void printCharColor(uint8_t t, uint8_t c, uint8_t color) {
         ensurePages(t);
 }
 
-void printColorTo(uint8_t t, char* s, uint8_t c) {
+void printColorTo(uint64_t t, char* s, uint8_t c) {
     no_ints();
 
     ensureTerm(t);
@@ -456,7 +468,7 @@ void printColor(char* s, uint8_t c) {
     ints_okay();
 }
 
-void printTo(uint8_t t, char* s) {
+void printTo(uint64_t t, char* s) {
     printColorTo(t, s, 0x07);
 }
 
@@ -476,13 +488,14 @@ void printf(char* fmt, ...) {
     VARIADIC_PRINT(print);
 }
 
-void vaprintf(char* fmt, va_list ap) {
+void vaprintf(uint64_t t, char* fmt, va_list ap) {
     char* s = M_vsprintf(0, 0, fmt, ap);
-    print(s);
+    printTo(t, s);
+    prompt(t);
     free(s);
 }
 
-static void showTerm(uint8_t t) {
+static void showTerm(uint64_t t) {
     if (t == at)
         return;
 
@@ -555,8 +568,19 @@ static void gotInput(struct input i) {
         else if (i.key == '\b' && !i.alt && !i.ctrl && !i.shift)
             backspace();
 
-        else if (i.key == '\n' && !i.alt && !i.ctrl && !i.shift)
+        else if (i.key == '\n' && !i.alt && !i.ctrl && !i.shift) {
+            // Take anchor anchor to end as input.
+            // If input is "app", call interrupt.c function to start app, passing in `at' as stdout along with "app"
+            char* l = M_readline();
+            print("\n");
+            //printf("I read: %s\n", l);
+            if (!strcmp(l, "app")) {
+                //printf("Asking for app to be started with output going to stdout: %u\n", at);
+                startApp(at);
+            }
+            free(l);
             prompt(at);
+        }
 
         else if (i.key == 'u' && !i.alt && i.ctrl && !i.shift)
             clearCurToAnchor();
@@ -596,18 +620,6 @@ static void gotInput(struct input i) {
 
         else if (i.key == 'l' && !i.alt && i.ctrl && !i.shift)
             clear();
-
-        else if (i.key == '4' && !i.alt && i.ctrl && i.shift)
-            um_r14();
-
-        else if (i.key == '$' && !i.alt && i.ctrl && i.shift)
-            um_r14();
-
-        else if (i.key == '5' && !i.alt && i.ctrl && i.shift)
-            um_r15();
-
-        else if (i.key == '%' && !i.alt && i.ctrl && i.shift)
-            um_r15();
     }
     ints_okay();
 }

@@ -132,3 +132,6 @@ Compile a basic program that calls an interrupt, and include that in my kernel s
   memory and load the program there and call it, basically.  I'm sure there's a lot I'm not understanding, and playing
   around with this should help!
 
+
+TODO: Figure out leak of about 4K every time I start and stop a process.
+Userspace malloc (work out end of code, have rest of page be available for process heap).

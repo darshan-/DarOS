@@ -191,6 +191,8 @@ struct process {
 
     uint64_t rip;
     uint64_t rsp;
+
+    uint64_t stdout;
 };
 
 static struct list* processList = (struct list*) 0;
@@ -302,36 +304,38 @@ void startProc(struct process* p) {
 extern uint64_t app[];
 extern uint64_t app_len;
 
-// TODO: Use qwords, so hexdump automatically zero-pads to multiple of 8 bytes, and copying is more efficient
-void um_r15() {
+void startApp(uint64_t stdout) {
     struct process *p = mallocz(sizeof(struct process));
     p->page = palloc();
+    p->stdout = stdout;
     for (uint64_t i = 0; i < app_len; i++)
         ((uint64_t*) (p->page))[i] = app[i];
 
     p->rip = 0x7FC0000000ull;
     p->rsp = 0x7FC0200000ull;
-    asm volatile("cli");
-    curProcN = pushListHead(processList, p);
-    curProc = p;
-    startProc(p);
+
+    pushListHead(processList, p); // TODO: I may have assumptions elsewhere that aren't met with this as is...
 }
 
-void um_r14() {
-    asm volatile("\
-\n      mov $0, %rax                            \
-\n      int $0x80                               \
-    ");
-    // struct process *p = mallocz(sizeof(struct process));
-    // p->page = palloc();
-    // ((uint64_t*) (p->page))[0] = 0xfbebc6ff49;
-    // p->rip = 0x7FC0000000ull;
-    // p->rsp = 0x7FC0200000ull;
-    // asm volatile("cli");
-    // curProcN = pushListHead(processList, p);
-    // curProc = p;
-    // startProc(p);
-}
+// static void doStartApp(uint64_t stdout) {
+//     printf("Starting app whose output will go to %u\n", stdout);
+//     struct process *p = mallocz(sizeof(struct process));
+//     p->page = palloc();
+//     p->stdout = stdout;
+//     for (uint64_t i = 0; i < app_len; i++)
+//         ((uint64_t*) (p->page))[i] = app[i];
+
+//     p->rip = 0x7FC0000000ull;
+//     p->rsp = 0x7FC0200000ull;
+//     asm volatile("cli");
+//     curProcN = pushListHead(processList, p);
+//     curProc = p;
+//     startProc(p);
+// }
+
+// void startApp(uint64_t stdout) {
+//     push(&wq, doStartApp);
+// }
 
 // Can waitloop be scheduler?
 // Do any kernel work, then bounce between any user processes?  And if none of the above, hlt loop?
@@ -432,8 +436,12 @@ void waitloop() {
 
         asm volatile("cli");
 
-        if (curProcN) {
+        if (curProcN)
             curProcN = nextNodeCirc(processList, curProcN);
+        else if (listLen(processList)) // TODO: I feel like there's a cleaner approach to sort out when I'm less tired...
+            curProcN = listHead(processList);
+
+        if (curProcN) {
             curProc = listItem(curProcN);
             startProc(curProc);
         }
@@ -587,7 +595,8 @@ void __attribute__((interrupt)) int0x80_syscall(struct interrupt_frame *frame) {
             //   Then we do say no_ints before printing, and that aftward.
             //printf
             no_ints(); // Printing will disable and then reenable, but we want them to stay off until iretq, so inc count of noes
-            vaprintf((char*) curProc->rbx, (va_list*) curProc->rcx);
+            //printf("attemting to pring proc's output to terminal %u\n", curProc->stdout);
+            vaprintf(curProc->stdout, (char*) curProc->rbx, (va_list*) curProc->rcx);
             ints_okay_once_on(); // dec count of noes, so count is restored and iretq turns them on
 
             break;
