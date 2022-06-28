@@ -597,16 +597,14 @@ void __attribute__((interrupt)) int0x80_syscall(struct interrupt_frame *frame) {
             waitloop();
             break;
         case 1:
-            // Just calling normal print stuff will do no_ints and ints_okay, but we don't want ints on until iretq.
-            // We could call no_ints here ourselves, but then
-            //   1. If we call ints_okay afterward, that'll turn them on before we're ready, and
-            //   2. If we don't, we'll have incremented count of reasons not to turn ints on...
-            // I guess I need something to the effect of ints_okay_but_not_now()...
-            //   Then we do say no_ints before printing, and that aftward.
-            //printf
             no_ints(); // Printing will disable and then reenable, but we want them to stay off until iretq, so inc count of noes
-            //printf("attemting to pring proc's output to terminal %u\n", curProc->stdout);
             vaprintf(curProc->stdout, (char*) curProc->rbx, (va_list*) curProc->rcx);
+            ints_okay_once_on(); // dec count of noes, so count is restored and iretq turns them on
+
+            break;
+        case 2:
+            no_ints(); // Printing will disable and then reenable, but we want them to stay off until iretq, so inc count of noes
+            printColorTo(curProc->stdout, (char*) curProc->rbx, (uint8_t) curProc->rcx); // This is a safe way to get just low 8-bits, right?
             ints_okay_once_on(); // dec count of noes, so count is restored and iretq turns them on
 
             break;

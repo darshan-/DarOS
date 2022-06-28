@@ -460,15 +460,14 @@ void printColorTo(uint64_t t, char* s, uint8_t c) {
 
     terms[t].anchor = terms[t].cur;
 
-    syncScreen();
+    if (t == at) // TODO: Check this elsewhere too?
+        syncScreen();
+
     ints_okay();
 }
 
 void printColor(char* s, uint8_t c) {
-    no_ints();
     printColorTo(at, s, c);
-    syncScreen();
-    ints_okay();
 }
 
 void printTo(uint64_t t, char* s) {
@@ -477,14 +476,6 @@ void printTo(uint64_t t, char* s) {
 
 void print(char* s) {
     printColor(s, 0x07);
-}
-
-void printc(char c) {
-    no_ints();
-    printCharColor(at, c, 0x07);
-    terms[at].anchor = terms[at].cur;
-    syncScreen();
-    ints_okay();
 }
 
 void printf(char* fmt, ...) {
@@ -535,7 +526,11 @@ void procDone(void* p, uint64_t t) {
         return;
 
     terms[t].proc = 0; // Do we need a zero value? Or just leave old value alone?  Edit: Yeah, good to zero it, e.g. for prompting on \n.
-    prompt(t);
+
+    if (terms[t].cur % 160 != 0)
+        printTo(t, "\n");
+
+    //prompt(t);
 }
 
 static void gotInput(struct input i) {
@@ -581,7 +576,40 @@ static void gotInput(struct input i) {
         else if (i.key == '\n' && !i.alt && !i.ctrl && !i.shift) {
             char* l = M_readline();
             print("\n");
-            
+
+            // Tell the shell for this terminal what string we got?
+            //  What if the shell isn't the active process, but an app is running and waiting for input?
+            //  Is there always exactly one (or always at most one, if shell isn't necessarily there?) recepient of line input?
+            // I think the shell is always the arbiter of who gets the line input -- whether it consumes it itself, passes it on to a
+            //   sub-process, or whatever - up to it.
+            // So I think the idea is that if the process is in a state of waiting for input -- it's not in the queue of active processes --
+            //  when we are here, having gotten a line in the terminal, then we return to it with the input it wants.  It's just taking
+            //  shape in my mind now, but I think from the perspective of the processes, it's just called a syscall -- from sys.c, in
+            //  assembly, we just called int0x80, and now we're here at the next instruction -- and rax, say, has our zero-terminated char*
+            //  in it.  Maybe if that is zero-length, we can check rbx for an error code. **NOTE** that the string must be in the process's
+            //  page.  Think about how to do that...  (I don't want to have a whole other 2 MB page for this... Oh, wait, it can be on the
+            //    processes stack, right?)  [Leaving parenthetical...]  Right?  I mean, that'd probably work great most of the time,
+            //    realistically... I'd worry about perverse input overflowing the stack...  With heap-allocation, we might run out of memory,
+            //    but as long as we're checking for 0 returns from malloc (which, yeah, we're currently being super lazy about, but we can do
+            //    it pretty easily in this case), we don't have to worry about that.
+
+            // Honestly, it's really ugly, but I think I kinda like the idea of, for now, putting the string at the end of the process page.
+            // For now, with 2 MB, and the app at the beginning and the string at the end, there's no real worry of overlap.  We don't have
+            //   multiprocessing, so we'll only ever need one... Hmm, well, I guess interrupts are back on the moment iretq is called, so,
+            //   shoot.  I guess it feels too wrong, not just ugly.
+            // Oh, wait, haha, that's where the stack is, anyway!  But, uh, that's where the stack is -- I forgot we don't run out of space
+            //   on the stack until the stack grows down and everything else grows up (and right now nothing's growing up yet anyway) and
+            //   they meet.  So, yeah, just on the stack is the obvious good-enough, let's get going approach, actually.
+
+            // Which lets me get back to finishing the thought I'd only halfway (it feels, who knows, because I'm not done) worked out:
+            //   how do we represent it on the stack?  I'm thinking we want the start of the string (ah, interrupts being back on doesn't
+            //   matter, because, again, we're single-threaded, and no one else is touching this memory page, even if an interrupt happens.)
+            //   (for now anyway -- I guess at some point we'll worry about getting interrupted by kernel (or user, via kernel so still
+            //    kernel) and possibly dealing with something and then coming back?  Like, a signal was sent to us?) -- anyway, start of the
+            //    string at the lowest address, so if the string is 100 chars long, we'd perhaps leave rsp alone, and set rax to rsp - 100, so
+            //    rax is the address... Ah, shucks -- yeah, that gets it in, but it's not safe to return it from the syscall to the app there,
+            //    so where do we copy it to?  We really need user mode malloc, I guess...
+            terms[at].sh
             if (!strcmp(l, "app"))
                 terms[at].proc = startApp(at);
             else if (!terms[at].proc)
