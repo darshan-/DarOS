@@ -9,7 +9,8 @@
 #include "malloc.h"
 #include "periodic_callback.h"
 #include "rtc.h"
-#include "strings.h"
+
+#include "../lib/strings.h"
 
 #define VRAM ((uint8_t*) 0xb8000)
 #define VRAM64 ((uint64_t*) VRAM)

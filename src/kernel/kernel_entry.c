@@ -7,7 +7,8 @@
 #include "log.h"
 #include "malloc.h"
 #include "serial.h"
-#include "strings.h"
+
+#include "../lib/strings.h"
 
 struct mem_table_entry {
     uint64_t start : 64;

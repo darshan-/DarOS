@@ -54,7 +54,7 @@ char* M_readline() {
     ":"=m"(len), "=m"(l));
 
     char* s = malloc(len + 1);
-    for (int i = 0; i < len; i++)
+    for (uint64_t i = 0; i < len; i++)
         s[i] = l[i];
     s[len] = 0;
 

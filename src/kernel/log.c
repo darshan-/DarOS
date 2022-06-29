@@ -4,7 +4,8 @@
 
 #include "console.h"
 #include "list.h"
-#include "strings.h"
+
+#include "../lib/strings.h"
 
 static struct list* logs = (struct list*) 0;
 

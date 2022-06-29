@@ -5,7 +5,8 @@
 #include "interrupt.h"
 #include "io.h"
 #include "malloc.h"
-#include "strings.h"
+
+#include "../lib/strings.h"
 
 #define COM1 0x3f8
 

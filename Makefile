@@ -8,7 +8,7 @@ LD_OPTS := -N --warn-common -T src/kernel/linker.ld #--print-map
 
 include build/headers.mk
 
-build out build/userspace:
+build out build/userspace build/lib:
 	mkdir -p $@
 
 # TODO: Doesn't account for headers including other local headers (could use gcc --freestanding -M instead?)
@@ -23,10 +23,15 @@ build/*.o: Makefile
 build/%.o: src/kernel/%.c | build
 	gcc $(GCC_OPTS) $< -o $@
 
+build/lib/*.o: Makefile
+build/lib/%.o: src/lib/%.c | build/lib
+	gcc $(GCC_OPTS) $< -o $@
+
+
 build/userspace/app.o1: Makefile src/userspace/app.c | build/userspace
 	gcc $(GCC_OPTS) src/userspace/app.c -o build/userspace/app.o1
-build/userspace/app.o2: Makefile build/userspace/app.o1 build/userspace/sys.o
-	ld -o build/userspace/app.o2 -N --warn-common -T src/userspace/linker.ld build/userspace/app.o1 build/userspace/sys.o
+build/userspace/app.o2: Makefile build/userspace/app.o1 build/userspace/sys.o build/userspace/malloc.o
+	ld -o build/userspace/app.o2 -N --warn-common -T src/userspace/linker.ld build/userspace/app.o1 build/userspace/sys.o build/userspace/malloc.o
 build/userspace/app.c: Makefile build/userspace/app.o2
 	echo "#include <stdint.h>" >build/userspace/app.c
 	echo "uint64_t app[] = {" >>build/userspace/app.c
@@ -41,8 +46,14 @@ build/userspace/app.o: Makefile build/userspace/app.c
 build/userspace/sys.o: Makefile src/userspace/sys.c | build/userspace
 	gcc $(GCC_OPTS) src/userspace/sys.c -o build/userspace/sys.o
 
-out/boot.img: $(c_objects) src/kernel/linker.ld build/bootloader.o build/userspace/app.o | out
-	ld -o out/boot.img $(LD_OPTS) build/bootloader.o $(c_objects) build/userspace/app.o
+build/userspace/malloc.o: Makefile src/userspace/malloc.c | build/userspace
+	gcc $(GCC_OPTS) src/userspace/malloc.c -o build/userspace/malloc.o
+
+build/lib/strings.o: Makefile src/lib/strings.c | build/lib
+	gcc $(GCC_OPTS) src/lib/strings.c -o build/lib/strings.o
+
+out/boot.img: $(c_objects) src/kernel/linker.ld build/bootloader.o build/lib/strings.o build/userspace/app.o | out
+	ld -o out/boot.img $(LD_OPTS) build/bootloader.o $(c_objects) build/lib/strings.o build/userspace/app.o
 
 out/bochs.img: out/boot.img
 	cp out/boot.img out/bochs.img

@@ -4,8 +4,7 @@
 
 #include "interrupt.h"
 
-#include "log.h"
-#include "strings.h"
+#include "../lib/strings.h"
 
 #define BLK_SZ 128
 #define MAP_ENTRY_SZ 2

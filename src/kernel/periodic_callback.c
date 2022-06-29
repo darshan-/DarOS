@@ -6,7 +6,8 @@
 #include "interrupt.h"
 #include "list.h"
 #include "malloc.h"
-#include "strings.h"
+
+#include "../lib/strings.h"
 
 #define INIT_CAP 10
 
