@@ -592,21 +592,25 @@ void __attribute__((interrupt)) int0x80_syscall(struct interrupt_frame *frame) {
         curProc->rsp = frame->sp;
 
         switch (curProc->rax) {
-        case 0:
+        case 0: // exit()
             killProc(curProc);
             waitloop();
             break;
-        case 1:
+        case 1: // printf(char* fmt, va_list ap)
             no_ints(); // Printing will disable and then reenable, but we want them to stay off until iretq, so inc count of noes
             vaprintf(curProc->stdout, (char*) curProc->rbx, (va_list*) curProc->rcx);
             ints_okay_once_on(); // dec count of noes, so count is restored and iretq turns them on
 
             break;
-        case 2:
+        case 2: // printColor(char* s, color c)
             no_ints(); // Printing will disable and then reenable, but we want them to stay off until iretq, so inc count of noes
             printColorTo(curProc->stdout, (char*) curProc->rbx, (uint8_t) curProc->rcx); // This is a safe way to get just low 8-bits, right?
             ints_okay_once_on(); // dec count of noes, so count is restored and iretq turns them on
 
+            break;
+        case 3: // readline()
+            // So my idea is to put the process into a "waiting or input" state, and when console reads a line on terminal for this process,
+            //   if it's waiting for input, we put the line on the stack and iretq to it.
             break;
         default:
             logf("Unknown syscall 0x%h\n", curProc->rax);
