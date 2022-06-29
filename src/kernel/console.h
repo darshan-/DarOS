@@ -12,5 +12,5 @@ void printf(char* fmt, ...);
 void printColorTo(uint64_t t, char* s, uint8_t c);
 void printTo(uint64_t t, char* s);
 void startTty();
-void vaprintf(uint64_t t, char* fmt, va_list ap);
+void vaprintf(uint64_t t, char* fmt, va_list* ap);
 void procDone(void* p, uint64_t t);

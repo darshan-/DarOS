@@ -3,7 +3,8 @@
 #include "list.h"
 
 #include "interrupt.h"
-#include "malloc.h"
+
+#include "../lib/malloc.h"
 
 struct list_node {
     void* item;

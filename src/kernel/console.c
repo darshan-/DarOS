@@ -6,10 +6,10 @@
 #include "interrupt.h"
 #include "io.h"
 #include "keyboard.h"
-#include "malloc.h"
 #include "periodic_callback.h"
 #include "rtc.h"
 
+#include "../lib/malloc.h"
 #include "../lib/strings.h"
 
 #define VRAM ((uint8_t*) 0xb8000)
@@ -482,8 +482,8 @@ void printf(char* fmt, ...) {
     VARIADIC_PRINT(print);
 }
 
-void vaprintf(uint64_t t, char* fmt, va_list ap) {
-    char* s = M_vsprintf(0, 0, fmt, ap);
+void vaprintf(uint64_t t, char* fmt, va_list* ap) {
+    char* s = M_vsprintf(0, 0, fmt, *ap);
     printTo(t, s);
     free(s);
 }
@@ -612,10 +612,13 @@ static void gotInput(struct input i) {
             //    rax is the address... Ah, shucks -- yeah, that gets it in, but it's not safe to return it from the syscall to the app there,
             //    so where do we copy it to?  We really need user mode malloc, I guess...
             //terms[at].sh
-            if (!strcmp(l, "app"))
-                terms[at].proc = startApp(at);
-            else if (!terms[at].proc)
-                prompt(at);
+
+            gotLine(terms[at].proc, l);
+
+            // if (!strcmp(l, "app"))
+            //     terms[at].proc = startApp(at);
+            // else if (!terms[at].proc)
+            //     prompt(at);
 
             free(l);
         }

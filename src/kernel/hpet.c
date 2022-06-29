@@ -4,7 +4,8 @@
 
 #include "acpi.h"
 #include "log.h"
-#include "malloc.h"
+
+#include "../lib/malloc.h"
 
 /*
   000-007h RO General Capabilities and ID Register

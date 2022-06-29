@@ -5,9 +5,9 @@
 #include "hpet.h"
 #include "interrupt.h"
 #include "log.h"
-#include "malloc.h"
 #include "serial.h"
 
+#include "../lib/malloc.h"
 #include "../lib/strings.h"
 
 struct mem_table_entry {

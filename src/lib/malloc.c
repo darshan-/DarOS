@@ -2,9 +2,11 @@
 
 #include "malloc.h"
 
-#include "interrupt.h"
+#ifdef KERNEL
+#include "../kernel/interrupt.h"
+#endif
 
-#include "../lib/strings.h"
+#include "strings.h"
 
 #define BLK_SZ 128
 #define MAP_ENTRY_SZ 2
@@ -17,6 +19,14 @@
 #define BEND  0b10ull
 
 #define blocks_per(region_sz, block_sz) ((region_sz / block_sz) + !!(region_sz % block_sz))
+
+#define NO_INTS
+#define INTS_OKAY
+
+#ifdef KERNEL
+#define NO_INTS no_ints()
+#define INTS_OKAY ints_okay()
+#endif
 
 static uint64_t map_size; // Size in quadwords
 static uint64_t* map = (uint64_t*) 0;
@@ -68,7 +78,7 @@ void* malloc(uint64_t nBytes) {
     uint64_t need;// = needed; // TODO: Looks like this was redundant, right?
     void* ret = 0;
 
-    no_ints();
+    NO_INTS;
     for (uint64_t i = 0; i < map_size; i++) {
         for (need = needed; need > 64 / MAP_ENTRY_SZ; i++) {
             if (map[i])
@@ -95,7 +105,7 @@ void* malloc(uint64_t nBytes) {
                 for (; needed > 64 / MAP_ENTRY_SZ; needed -= 64 / MAP_ENTRY_SZ, i--)
                     map[i-1] = -1ull;
 
-                ints_okay();
+                INTS_OKAY;
                 return ret;
             } else if (needed > 64 / MAP_ENTRY_SZ) {
                 goto not_found;
@@ -107,10 +117,11 @@ void* malloc(uint64_t nBytes) {
         ret = 0;
     }
 
-    ints_okay();
+    INTS_OKAY;
     return 0;
 }
 
+#ifdef KERNEL
 void* palloc() {
     if (heap == 0)
         return 0;
@@ -118,7 +129,7 @@ void* palloc() {
     // heap64 % L2_PAGE_SZ is something...  Hmm, if we subtract that from a 512-map-qword-aligned...  Ugh, I think it's fine how we have it!
     uint64_t i = (((heap64 + map_size * QBLK_SZ) & ~(L2_PAGE_SZ - 1)) - L2_PAGE_SZ - heap64) / QBLK_SZ;
 
-    no_ints();
+    NO_INTS;
     for (; i > 0; i -= L2_PAGE_SZ / QBLK_SZ) {
         for (uint64_t j = 0; j < 512; j++)
             if (map[i + j])
@@ -129,13 +140,14 @@ void* palloc() {
 
         map[i + 511] -= 1;
 
-        ints_okay();
+        INTS_OKAY;
         return (void*) heap + i * QBLK_SZ;
     next:
     }
-    ints_okay();
+    INTS_OKAY;
     return 0;
 }
+#endif
 
 void* mallocz(uint64_t nBytes) {
     uint64_t* p = malloc(nBytes);
@@ -158,7 +170,7 @@ void free(void *p) {
 
     // If we were only ever changing a whole qword at time I think we'd be fine without turning of interrupts, but since each entry
     //   is only a couple bits, someone else may also want to change another part of a given qword at the same time.
-    no_ints();
+    NO_INTS;
     for (uint64_t mask = 0b11ull << o;; n++, mask = 0b11ull, o = 0) {
         for (; mask && (map[n] & mask) == BPART << o; mask <<= 2, o += 2)
             map[n] &= ~mask;
@@ -168,7 +180,7 @@ void free(void *p) {
             break;
         }
     }
-    ints_okay();
+    INTS_OKAY;
 }
 
 static void* dorealloc(void* p, uint64_t newSize, int zero) {
@@ -182,7 +194,7 @@ static void* dorealloc(void* p, uint64_t newSize, int zero) {
 
     uint64_t count = 0;
     uint8_t freeing = 0;
-    no_ints();
+    NO_INTS;
     for (uint64_t mask = 0b11ull << o;; n++, mask = 0b11ull, o = 0) {
         for (; mask && (map[n] & mask) == BPART << o; mask <<= MAP_ENTRY_SZ, o += MAP_ENTRY_SZ) {
             count++;
@@ -218,7 +230,7 @@ static void* dorealloc(void* p, uint64_t newSize, int zero) {
         }
     }
 
-    ints_okay();
+    INTS_OKAY;
     return p;
 }
 

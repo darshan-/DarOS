@@ -8,11 +8,11 @@
 #include "keyboard.h"
 #include "list.h"
 #include "log.h"
-#include "malloc.h"
 #include "periodic_callback.h"
 #include "periodic_callback_int.h"
 #include "rtc_int.h"
 
+#include "../lib/malloc.h"
 
 // TODO: Keep thinking about what I want to do about sprinkling cli and sti all over the place.
 //   It's iffy turning interrupts back on sometimes -- maybe they still need to be off because of
@@ -171,7 +171,6 @@ static inline void push(struct queue* q, void* p) {
 // 49 ff c7   inc r15
 // eb fb      jmp -5      eb = jmp, fb = -5
 
-#define PROC_
 struct process {
     void* page; // For now only one page allowed
 
@@ -196,11 +195,19 @@ struct process {
 
     uint64_t stdout;
 
-    uint64_t state;
+    uint64_t wait;
 };
 
+// Huh, what if I didn't keep a list of waiting/sleeping procs?  Terminal has a reference, and can send termination signal, or readline, etc.
+// Presumably it will be natural for other sleep reasons (like sleeping for a given time, or reading from disk or network, if those are ever
+//   things here) for them to also have a reference to their relevant process, or else I'd have a list special to whatever it was.
+// So maybe runnableProcs is only list here?
+// We'll want to make sure in that case to not assume every process has a node...
+// I mean, ultimately, it feels pretty wrong to not be able to say, here, here's all the processes.
+// Hmm, at some point, maybe soon, perhaps each process will have a list of subprocesses?  So you can hold "init" process, and walk the
+//   tree to all other processes?
 static struct list* runnableProcs = (struct list*) 0;
-static struct list* sleepingProcs = (struct list*) 0;
+//static struct list* sleepingProcs = (struct list*) 0;
 
 static struct process* curProc = 0;
 void* curProcN = 0;
@@ -217,12 +224,16 @@ void killProc(struct process* p) {
     procDone(p, p->stdout); // Would rather console doesn't understand proc; it just sees p as a unique id.
     free(p);
 
+    if (!curProcN)
+        return;
+
     if (p == curProc) {
         void* n = nextNodeCirc(runnableProcs, curProcN);
         int same = n == curProcN;
-        removeNodeFromList(runnableProcs, curProcN); // TODO: Doesn't check if it was in list, and now it might be in sleeping list
-        // I mean, not *now*, because right now we only kill a proc when it asks to exit, and it can't do that while sleeping... but
-        //   I still want this to be safe and correct...
+        // if (p->sleeping)
+        //     removeNodeFromList(sleepingProcs, curProcN);
+        // else
+        removeNodeFromList(runnableProcs, curProcN);
 
         if (same) {
             curProcN = 0;
@@ -315,6 +326,10 @@ void* startApp(uint64_t stdout) {
 
     pushListHead(runnableProcs, p); // TODO: I may have assumptions elsewhere that aren't met with this as is...
     return p;
+}
+
+void gotLine(struct process* proc, char* l) {
+    
 }
 
 // Can waitloop be scheduler?
@@ -581,6 +596,9 @@ void __attribute__((interrupt)) int0x80_syscall(struct interrupt_frame *frame) {
         case 3: // readline()
             // So my idea is to put the process into a "waiting for input" state, and when console reads a line on terminal for this process,
             //   if it's waiting for input, we put the line on the stack and iretq to it.
+            curProc->wait = curProc->rax;
+            removeNodeFromList(runnableProcs, curProcN);
+            waitloop();
             break;
         default:
             logf("Unknown syscall 0x%h\n", curProc->rax);
@@ -785,7 +803,7 @@ void init_interrupts() {
     registerPeriodicCallback((struct periodic_callback) {1, 2, check_queue_caps});
 
     runnableProcs = newList();
-    sleepingProcs = newList();
+    //sleepingProcs = newList();
     //curProc = malloc(sizeof(struct process));
 
     //__asm__ __volatile__ ("xchgw %bx, %bx");

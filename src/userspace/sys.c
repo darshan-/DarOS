@@ -3,7 +3,7 @@
 
 #include "sys.h"
 
-#include "malloc.h"
+#include "../lib/malloc.h"
 
 /*
    0: exit
