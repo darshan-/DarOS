@@ -2,13 +2,20 @@
 
 #include "sys.h"
 
-static void prompt(uint64_t t) {
-    terms[at].cur = terms[at].end; // Call cursorEnd?  How much is terminal and how much is shell?
-    if (terms[t].cur % 160 != 0)
-        printTo("\n");
+// I think I want to soon make strings library a single thing importatable by the kernel or userspace.
+// Malloc still seems easiest kept separate.
+// But then my print functions can stop being variadic, and less work is done in the kernel for printf.
 
-    printColorTo("\3 > ", 0x05);
+void processInput(char* l) {
+    if (!strcmp(l, "app"))
+        runProg("app");
 }
 
 void main() {
+    for (;;) {
+        printColor("\3 > ", 0x05);
+        char* l = M_readline();
+        processInput(l);
+        free(l);
+    }   
 }

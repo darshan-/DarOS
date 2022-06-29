@@ -396,7 +396,6 @@ char* M_readline() {
     char* s = malloc(len);
     s[len - 1] = 0;
 
-    //for (uint64_t i = terms[at].anchor; i < terms[at].end; i++)
     for (uint64_t i = 0; i < len; i++)
         s[i] = byte_at(at, terms[at].anchor + i * 2);
 
@@ -575,6 +574,8 @@ static void gotInput(struct input i) {
 
         else if (i.key == '\n' && !i.alt && !i.ctrl && !i.shift) {
             char* l = M_readline();
+
+            terms[at].cur = terms[at].end;
             print("\n");
 
             // Tell the shell for this terminal what string we got?
@@ -609,7 +610,7 @@ static void gotInput(struct input i) {
             //    string at the lowest address, so if the string is 100 chars long, we'd perhaps leave rsp alone, and set rax to rsp - 100, so
             //    rax is the address... Ah, shucks -- yeah, that gets it in, but it's not safe to return it from the syscall to the app there,
             //    so where do we copy it to?  We really need user mode malloc, I guess...
-            terms[at].sh
+            //terms[at].sh
             if (!strcmp(l, "app"))
                 terms[at].proc = startApp(at);
             else if (!terms[at].proc)

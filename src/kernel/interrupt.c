@@ -321,7 +321,7 @@ void* startApp(uint64_t stdout) {
         ((uint64_t*) (p->page))[i] = app[i];
 
     p->rip = 0x7FC0000000ull;
-    p->rsp = 0x7FC0200000ull;
+    p->rsp = 0x7FC0180000ull;
 
     pushListHead(processList, p); // TODO: I may have assumptions elsewhere that aren't met with this as is...
     return p;

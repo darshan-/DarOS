@@ -27,7 +27,6 @@ static uint64_t* heap = (uint64_t*) 0;
 // I think I want to 4096-align (0x1000) heap start, to make pages page aligned, to make palloc a bit easier
 //   (so l2 2MB page alignment will be a whole number of our pages...)
 void init_heap(uint64_t* start, uint64_t size) {
-    //map_size = size / 513 / 8;
     map_size = size / (QBLK_SZ / 8 + 1) / 8;
     map = start;
     for (uint64_t i = 0; i < map_size; i++)
