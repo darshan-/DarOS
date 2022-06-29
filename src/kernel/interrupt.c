@@ -171,6 +171,7 @@ static inline void push(struct queue* q, void* p) {
 // 49 ff c7   inc r15
 // eb fb      jmp -5      eb = jmp, fb = -5
 
+#define PROC_
 struct process {
     void* page; // For now only one page allowed
 
@@ -194,9 +195,13 @@ struct process {
     uint64_t rsp;
 
     uint64_t stdout;
+
+    uint64_t state;
 };
 
-static struct list* processList = (struct list*) 0;
+static struct list* runnableProcs = (struct list*) 0;
+static struct list* sleepingProcs = (struct list*) 0;
+
 static struct process* curProc = 0;
 void* curProcN = 0;
 
@@ -213,9 +218,11 @@ void killProc(struct process* p) {
     free(p);
 
     if (p == curProc) {
-        void* n = nextNodeCirc(processList, curProcN);
+        void* n = nextNodeCirc(runnableProcs, curProcN);
         int same = n == curProcN;
-        removeNodeFromList(processList, curProcN);
+        removeNodeFromList(runnableProcs, curProcN); // TODO: Doesn't check if it was in list, and now it might be in sleeping list
+        // I mean, not *now*, because right now we only kill a proc when it asks to exit, and it can't do that while sleeping... but
+        //   I still want this to be safe and correct...
 
         if (same) {
             curProcN = 0;
@@ -225,25 +232,8 @@ void killProc(struct process* p) {
             curProc = listItem(n);
         }
     } else {
-        removeFromList(processList, p);
+        removeFromList(runnableProcs, p);
     }
-
-    // int cur = p == curProc;
-    // void* n = nextNodeCirc(processList, curProcN);
-    // int same = n == curProcN;
-    // removeNodeFromList(processList, curProcN);
-
-    // if (cur) {
-    //     if (same) {
-    //         curProcN = 0;
-    //         curProc = 0;
-    //     } else {
-    //         curProcN = n;
-    //         curProc = listItem(curProcN);
-    //     }
-    // }
-
-    // free(p);
 }
 
 void startProc(struct process* p) {
@@ -323,29 +313,9 @@ void* startApp(uint64_t stdout) {
     p->rip = 0x7FC0000000ull;
     p->rsp = 0x7FC0180000ull;
 
-    pushListHead(processList, p); // TODO: I may have assumptions elsewhere that aren't met with this as is...
+    pushListHead(runnableProcs, p); // TODO: I may have assumptions elsewhere that aren't met with this as is...
     return p;
 }
-
-// static void doStartApp(uint64_t stdout) {
-//     printf("Starting app whose output will go to %u\n", stdout);
-//     struct process *p = mallocz(sizeof(struct process));
-//     p->page = palloc();
-//     p->stdout = stdout;
-//     for (uint64_t i = 0; i < app_len; i++)
-//         ((uint64_t*) (p->page))[i] = app[i];
-
-//     p->rip = 0x7FC0000000ull;
-//     p->rsp = 0x7FC0200000ull;
-//     asm volatile("cli");
-//     curProcN = pushListHead(processList, p);
-//     curProc = p;
-//     startProc(p);
-// }
-
-// void startApp(uint64_t stdout) {
-//     push(&wq, doStartApp);
-// }
 
 // Can waitloop be scheduler?
 // Do any kernel work, then bounce between any user processes?  And if none of the above, hlt loop?
@@ -447,9 +417,9 @@ void waitloop() {
         asm volatile("cli");
 
         if (curProcN)
-            curProcN = nextNodeCirc(processList, curProcN);
-        else if (listLen(processList)) // TODO: I feel like there's a cleaner approach to sort out when I'm less tired...
-            curProcN = listHead(processList);
+            curProcN = nextNodeCirc(runnableProcs, curProcN);
+        else if (listLen(runnableProcs)) // TODO: I feel like there's a cleaner approach to sort out when I'm less tired...
+            curProcN = listHead(runnableProcs);
 
         if (curProcN) {
             curProc = listItem(curProcN);
@@ -609,7 +579,7 @@ void __attribute__((interrupt)) int0x80_syscall(struct interrupt_frame *frame) {
 
             break;
         case 3: // readline()
-            // So my idea is to put the process into a "waiting or input" state, and when console reads a line on terminal for this process,
+            // So my idea is to put the process into a "waiting for input" state, and when console reads a line on terminal for this process,
             //   if it's waiting for input, we put the line on the stack and iretq to it.
             break;
         default:
@@ -814,7 +784,8 @@ void init_interrupts() {
 
     registerPeriodicCallback((struct periodic_callback) {1, 2, check_queue_caps});
 
-    processList = newList();
+    runnableProcs = newList();
+    sleepingProcs = newList();
     //curProc = malloc(sizeof(struct process));
 
     //__asm__ __volatile__ ("xchgw %bx, %bx");
