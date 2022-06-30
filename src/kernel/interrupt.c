@@ -318,6 +318,8 @@ extern uint64_t app[];
 extern uint64_t app_len;
 
 void* startApp(uint64_t stdout) {
+    asm volatile("xchgw %ax, %ax");
+    asm volatile("xchgw %bx, %bx");
     struct process *p = mallocz(sizeof(struct process));
     p->page = palloc();
     p->stdout = stdout;

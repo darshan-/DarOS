@@ -1,6 +1,6 @@
         SZ_2MB equ 0x200000
         SZ_QW equ 8
- 
+
         ; Segment Descriptor constants
 
         ; Access byte format:

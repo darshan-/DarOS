@@ -25,7 +25,10 @@ void main() {
         if (a % chunk == 0)
             printf("a: %u\n", a);
     //asm volatile ("mov %%rsp, %0":"=m"(a));
-    printf("rsp (maybe): 0x%h\n", a);
+    //printf("rsp (maybe): 0x%h\n", a);
+    //a += b;
+    asm volatile("xchgw %bx, %bx");
+    asm volatile("xchgw %ax, %ax");
     exit();
     asm volatile("xchgw %bx, %bx");
     //exit();

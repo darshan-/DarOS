@@ -135,3 +135,31 @@ Compile a basic program that calls an interrupt, and include that in my kernel s
 
 TODO: Figure out leak of about 4K every time I start and stop a process.
 Userspace malloc (work out end of code, have rest of page be available for process heap).
+
+
+0x174a0 physical memory address is about end of boot.img once loaded -- is it overwriting something?
+
+According to my map, I should be totally fine in there:
+0x00_7c00 - 0x07_ffff : 481 KB : kernel
+
+If I add a line to app.c, I can't boot.
+It looks like it's all being loaded into memory.
+
+
+Okay, my next question was: is it length alone, of the app array?  (Adding bytes to main kernel didn't stop booting, but I wonder if alignment
+  keeps that from being immediately apparent -- adding more bytes my still trigger it.)
+So I removed that last zero from the array in build/userspace/app.c and reduced
+    uint64_t app_len = 3576 / 8 + 1;
+  to
+    uint64_t app_len = 3568 / 8 + 1;
+
+By being 8 bytes shorter, one fewer zero at the end, we boot again...
+
+Okay, but I can add
+    uint64_t rando[] = {0, 0, 0, 0};
+further increasing the size of the binary, and we're still fine...
+
+So it's a matter of app needing to be 447 qwords or fewer, it seems...
+
+Which is fucking weird.
+
