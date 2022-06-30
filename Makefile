@@ -27,6 +27,7 @@ build/lib/*.o: Makefile
 build/lib/%.o: src/lib/%.c | build/lib
 	gcc $(GCC_OPTS) $< -o $@
 
+build/interrupt.o: build/userspace/app.c
 
 build/userspace/app.o1: Makefile src/userspace/app.c | build/userspace
 	gcc $(GCC_OPTS) src/userspace/app.c -o build/userspace/app.o1
@@ -55,8 +56,8 @@ build/lib/malloc-k.o: Makefile src/lib/malloc.c | build/lib
 build/lib/strings.o: Makefile src/lib/strings.c | build/lib
 	gcc $(GCC_OPTS) src/lib/strings.c -o build/lib/strings.o
 
-out/boot.img: $(c_objects) src/kernel/linker.ld build/bootloader.o build/lib/strings.o build/lib/malloc-k.o build/userspace/app.o | out
-	ld -o out/boot.img $(LD_OPTS) build/bootloader.o $(c_objects) build/lib/strings.o build/lib/malloc-k.o build/userspace/app.o
+out/boot.img: $(c_objects) src/kernel/linker.ld build/bootloader.o build/lib/strings.o build/lib/malloc-k.o | out
+	ld -o out/boot.img $(LD_OPTS) build/bootloader.o $(c_objects) build/lib/strings.o build/lib/malloc-k.o
 
 out/bochs.img: out/boot.img
 	cp out/boot.img out/bochs.img

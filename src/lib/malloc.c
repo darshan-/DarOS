@@ -24,6 +24,8 @@
 #define INTS_OKAY
 
 #ifdef KERNEL
+#undef NO_INTS
+#undef INTS_OKAY
 #define NO_INTS no_ints()
 #define INTS_OKAY ints_okay()
 #endif

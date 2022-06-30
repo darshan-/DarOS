@@ -18,7 +18,7 @@ void main() {
     while (b < 10000000000000000000ull)
         fibNext();
 
-    printf("Hi, I'm app; I've stopped fib-ing with a: %u and b: %u\n", a, b);
+    printf("Hi,  I'm app; I've stopped fib-ing with a: %u and b: %u\n", a, b);
 
     const uint64_t chunk = 1000000000ull / 8; // Chunk that's not too fast, not too slow, for target system
     for (a = 0; a < chunk * 10; a++)
