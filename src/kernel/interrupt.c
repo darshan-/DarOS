@@ -213,6 +213,9 @@ static struct process* curProc = 0;
 void* curProcN = 0;
 
 void killProc(struct process* p) {
+    if (!p)
+        return;
+
     free(p->page);
     //procDone(p->at);  Hmm, not really... might be sub-processes...
     // I guess I need to keep track of top-level process that is keeping shell from prompting?
@@ -456,8 +459,8 @@ void process_keys() {
 }
 
 static void dumpFrame(struct interrupt_frame *frame) {
-    logf("ip: 0x%p016h    cs: 0x%p016h flags: 0x%p016h\n", frame->ip, frame->cs, frame->flags);
-    logf("sp: 0x%p016h    ss: 0x%p016h\n", frame->sp, frame->ss);
+    printf("ip: 0x%p016h    cs: 0x%p016h flags: 0x%p016h\n", frame->ip, frame->cs, frame->flags);
+    printf("sp: 0x%p016h    ss: 0x%p016h\n", frame->sp, frame->ss);
 }
 
 static inline void generic_trap_n(struct interrupt_frame *frame, int n) {
@@ -650,7 +653,11 @@ static void __attribute__((interrupt)) trap_0x0e_page_fault(struct interrupt_fra
 
     logf("cr2: %p016h\n", cr2);
 
-    frame->ip = (uint64_t) waitloop;
+    if (frame->cs == 0x13)
+        killProc(curProc);
+
+    waitloop();
+    //frame->ip = (uint64_t) waitloop;
     // TODO: Just call waitloop?
 }
 

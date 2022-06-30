@@ -41,8 +41,10 @@ void init_heap(uint64_t* start, uint64_t size) {
     for (uint64_t i = 0; i < map_size; i++)
         map[i] = 0;
     heap = map + map_size;
+    #ifdef KERNEL
     if (heap64 % 0x1000)
         heap = (void*) ((heap64 + 0x1000) & ~0xfffull);
+    #endif
 }
 
 uint64_t heapUsed() {

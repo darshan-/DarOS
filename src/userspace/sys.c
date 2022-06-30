@@ -64,6 +64,15 @@ char* M_readline() {
 extern void main();
 
 void __attribute__((section(".entry"))) _entry() {
+    // I think I might prefer to use linker to place map last in text section, and have heap grow up toward stack, and have stack at end
+    //   of page...
+    init_heap(0x7FC0180000ull, 0x80000);
+    //asm volatile("xchgw %bx, %bx");
+    //uint64_t rsp;
+    //exit();
+    //asm volatile("mov %%rsp, %%rax\nmov %%rax, %0":"=m"(rsp));
+    //exit();
     main();
+    //printf("what?\n");
     exit();
 }

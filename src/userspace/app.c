@@ -20,10 +20,15 @@ void main() {
 
     printf("Hi, I'm app; I've stopped fib-ing with a: %u and b: %u\n", a, b);
 
-    const uint64_t chunk = 1000000000ull; // Chunk that's not too fast, not too slow, for target system
+    const uint64_t chunk = 1000000000ull / 8; // Chunk that's not too fast, not too slow, for target system
     for (a = 0; a < chunk * 10; a++)
         if (a % chunk == 0)
             printf("a: %u\n", a);
+    //asm volatile ("mov %%rsp, %0":"=m"(a));
+    printf("rsp (maybe): 0x%h\n", a);
+    exit();
+    asm volatile("xchgw %bx, %bx");
+    //exit();
 }
 
 

@@ -615,10 +615,10 @@ static void gotInput(struct input i) {
 
             gotLine(terms[at].proc, l);
 
-            // if (!strcmp(l, "app"))
-            //     terms[at].proc = startApp(at);
-            // else if (!terms[at].proc)
-            //     prompt(at);
+            if (!strcmp(l, "app"))
+                terms[at].proc = startApp(at);
+            else if (!terms[at].proc)
+                prompt(at);
 
             free(l);
         }
