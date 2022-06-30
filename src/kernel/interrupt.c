@@ -317,7 +317,7 @@ void startProc(struct process* p) {
 //extern uint64_t app3[];
 extern uint64_t app_len;
 
-uint64_t app3[] = {
+uint64_t app[] = {
 0x80000bee5894855ull,
 0x7fc0180000b84800ull,
 0xb848c78948000000ull,
