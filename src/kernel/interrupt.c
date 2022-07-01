@@ -13,6 +13,7 @@
 #include "rtc_int.h"
 
 #include "../lib/malloc.h"
+#include "../lib/strings.h"
 
 // TODO: Keep thinking about what I want to do about sprinkling cli and sti all over the place.
 //   It's iffy turning interrupts back on sometimes -- maybe they still need to be off because of
@@ -196,6 +197,8 @@ struct process {
     uint64_t stdout;
 
     uint64_t wait;
+    //uint64_t waitPid;
+    struct process* waiting; // For now just one process can wait for a given process to exit
 };
 
 // Huh, what if I didn't keep a list of waiting/sleeping procs?  Terminal has a reference, and can send termination signal, or readline, etc.
@@ -207,6 +210,7 @@ struct process {
 // Hmm, at some point, maybe soon, perhaps each process will have a list of subprocesses?  So you can hold "init" process, and walk the
 //   tree to all other processes?
 static struct list* runnableProcs = (struct list*) 0;
+//static struct list* readyProcs = (struct list*) 0;
 //static struct list* sleepingProcs = (struct list*) 0;
 
 static struct process* curProc = 0;
@@ -225,6 +229,12 @@ void killProc(struct process* p) {
     //   another process, and the first one returned at some point after that.  That first one returning is the signal the console needs
     //   to go ahead and prompt again.  The sub-process can still write to the termainal, and is a background process.
     procDone(p, p->stdout); // Would rather console doesn't understand proc; it just sees p as a unique id.
+
+    // if (p->waiting) // Enqueue work of returning to wait() call of waiting process
+    //     pushListHead(readyProcs, p->waiting);
+    if (p->waiting)
+        pushListTail(runnableProcs, p->waiting);
+
     free(p);
 
     if (!curProcN)
@@ -329,7 +339,7 @@ void* startApp(uint64_t stdout) {
     p->rip = 0x7FC0000000ull;
     p->rsp = 0x7FC0180000ull;
 
-    pushListHead(runnableProcs, p); // TODO: I may have assumptions elsewhere that aren't met with this as is...
+    pushListTail(runnableProcs, p); // TODO: I may have assumptions elsewhere that aren't met with this as is...
     return p;
 }
 
@@ -436,6 +446,11 @@ void waitloop() {
 
         asm volatile("cli");
 
+        // if (listLen(readyProcs)) {
+        //     struct process* p = popListHead(readyProcs); // I should take from tail?  Or push to tail everywhere and take from head?
+        //     pushListTail(runnableProcs, p);
+        // }
+
         if (curProcN)
             curProcN = nextNodeCirc(runnableProcs, curProcN);
         else if (listLen(runnableProcs)) // TODO: I feel like there's a cleaner approach to sort out when I'm less tired...
@@ -461,8 +476,8 @@ void process_keys() {
 }
 
 static void dumpFrame(struct interrupt_frame *frame) {
-    printf("ip: 0x%p016h    cs: 0x%p016h flags: 0x%p016h\n", frame->ip, frame->cs, frame->flags);
-    printf("sp: 0x%p016h    ss: 0x%p016h\n", frame->sp, frame->ss);
+    logf("ip: 0x%p016h    cs: 0x%p016h flags: 0x%p016h\n", frame->ip, frame->cs, frame->flags);
+    logf("sp: 0x%p016h    ss: 0x%p016h\n", frame->sp, frame->ss);
 }
 
 static inline void generic_trap_n(struct interrupt_frame *frame, int n) {
@@ -564,7 +579,7 @@ static void init_pic() {
 
 static void __attribute__((interrupt)) default_interrupt_handler(struct interrupt_frame *frame) {
     logf("Default interrupt handler\n");
-    //dumpFrame(frame);
+    dumpFrame(frame);
 }
 
 void __attribute__((interrupt)) int0x80_syscall(struct interrupt_frame *frame) {
@@ -599,17 +614,20 @@ void __attribute__((interrupt)) int0x80_syscall(struct interrupt_frame *frame) {
             removeNodeFromList(runnableProcs, curProcN);
             waitloop();
             break;
-
         case 4: // runProg(char* s)
-            char* s = curProc->rbx;
-            if (!strcmp(s, "app"))
-                curProc->rax = startApp(curProc->stdout);
+            if (!strcmp((char*) curProc->rbx, "app"))
+                curProc->rax = (uint64_t) startApp(curProc->stdout);
             else
                 curProc->rax = 0;
 
             startProc(curProc);
             break;
         case 5: // wait(uint64_t p)
+            curProc->wait = curProc->rax;
+            //curProc->waitPid = curProc->rbx;
+            ((struct process*) curProc->rbx)->waiting = curProc;
+            removeNodeFromList(runnableProcs, curProcN);
+            waitloop();
             break;
         default:
             logf("Unknown syscall 0x%h\n", curProc->rax);
@@ -818,6 +836,7 @@ void init_interrupts() {
     registerPeriodicCallback((struct periodic_callback) {1, 2, check_queue_caps});
 
     runnableProcs = newList();
+    //readyProcs = newList();
     //sleepingProcs = newList();
     //curProc = malloc(sizeof(struct process));
 
