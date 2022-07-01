@@ -601,6 +601,13 @@ void __attribute__((interrupt)) int0x80_syscall(struct interrupt_frame *frame) {
             break;
 
         case 4: // runProg(char* s)
+            char* s = curProc->rbx;
+            if (!strcmp(s, "app"))
+                curProc->rax = startApp(curProc->stdout);
+            else
+                curProc->rax = 0;
+
+            startProc(curProc);
             break;
         case 5: // wait(uint64_t p)
             break;
