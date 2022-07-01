@@ -475,6 +475,8 @@ void printTo(uint64_t t, char* s) {
 }
 
 void print(char* s) {
+    ((char*) 0xb8000)[0] = '!';
+    asm volatile("hlt");
     printColor(s, 0x07);
 }
 
