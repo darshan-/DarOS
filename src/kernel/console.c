@@ -40,6 +40,7 @@ struct vterm {
     uint64_t v_scroll;  // Vertical offset from scrolling
 
     void* proc; // Foreground process -- we won't prompt until it exits (and we will prompt when it exits)
+    void* reading;
 };
 
 static uint64_t at = -1;
@@ -392,6 +393,10 @@ static inline void cursorEnd() {
     updateCursorPosition();
 }
 
+void setReading(uint64_t t, void* p) {
+    terms[t].reading = p;
+}
+
 char* M_readline() {
     uint64_t len = terms[at].end - terms[at].anchor + 1;
     char* s = malloc(len);
@@ -467,7 +472,7 @@ void printColorTo(uint64_t t, char* s, uint8_t c) {
 }
 
 void printColor(char* s, uint8_t c) {
-    if (at == -1)
+    if (at == -1ull)
         return;
 
     printColorTo(at, s, c);
@@ -616,7 +621,11 @@ static void gotInput(struct input i) {
             //    so where do we copy it to?  We really need user mode malloc, I guess...
             //terms[at].sh
 
-            gotLine(terms[at].proc, l);
+            //gotLine(terms[at].proc, l);
+            if (terms[at].reading) {
+                gotLine(terms[at].reading, l);
+                terms[at].reading = 0;
+            }
 
             if (!strcmp(l, "app"))
                 terms[at].proc = startApp(at);

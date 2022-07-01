@@ -196,8 +196,6 @@ struct process {
 
     uint64_t stdout;
 
-    uint64_t wait;
-    //uint64_t waitPid;
     struct process* waiting; // For now just one process can wait for a given process to exit
 };
 
@@ -343,8 +341,16 @@ void* startApp(uint64_t stdout) {
     return p;
 }
 
-void gotLine(struct process* proc, char* l) {
-    
+void gotLine(void* v, char* l) {
+    struct process* p = v;
+    p->rax = strlen(l);
+    //p->rsp -= p->rax;
+    p->rbx = p->rsp - p->rax;
+    char* s = (char*) p->rbx;
+    for (uint64_t i = 0; i < p->rbx; i++)
+        s[i] = l[i];
+
+    pushListTail(runnableProcs, p);
 }
 
 // Can waitloop be scheduler?
@@ -610,7 +616,7 @@ void __attribute__((interrupt)) int0x80_syscall(struct interrupt_frame *frame) {
         case 3: // readline()
             // So my idea is to put the process into a "waiting for input" state, and when console reads a line on terminal for this process,
             //   if it's waiting for input, we put the line on the stack and iretq to it.
-            curProc->wait = curProc->rax;
+            setReading(curProc->stdout, curProc);
             removeNodeFromList(runnableProcs, curProcN);
             waitloop();
             break;
@@ -623,8 +629,6 @@ void __attribute__((interrupt)) int0x80_syscall(struct interrupt_frame *frame) {
             startProc(curProc);
             break;
         case 5: // wait(uint64_t p)
-            curProc->wait = curProc->rax;
-            //curProc->waitPid = curProc->rbx;
             ((struct process*) curProc->rbx)->waiting = curProc;
             removeNodeFromList(runnableProcs, curProcN);
             waitloop();
