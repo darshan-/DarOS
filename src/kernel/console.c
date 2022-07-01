@@ -467,6 +467,9 @@ void printColorTo(uint64_t t, char* s, uint8_t c) {
 }
 
 void printColor(char* s, uint8_t c) {
+    if (at == -1)
+        return;
+
     printColorTo(at, s, c);
 }
 
@@ -475,8 +478,6 @@ void printTo(uint64_t t, char* s) {
 }
 
 void print(char* s) {
-    ((char*) 0xb8000)[0] = '!';
-    asm volatile("hlt");
     printColor(s, 0x07);
 }
 
