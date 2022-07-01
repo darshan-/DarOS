@@ -27,12 +27,10 @@ build/lib/*.o: Makefile
 build/lib/%.o: src/lib/%.c | build/lib
 	gcc $(GCC_OPTS) $< -o $@
 
-build/interrupt.o: build/userspace/app.c
-
 build/userspace/app.o1: Makefile src/userspace/app.c | build/userspace
 	gcc $(GCC_OPTS) src/userspace/app.c -o build/userspace/app.o1
-build/userspace/app.o2: Makefile build/userspace/app.o1 build/userspace/sys.o build/lib/malloc.o
-	ld -o build/userspace/app.o2 -N --warn-common -T src/userspace/linker.ld build/userspace/app.o1 build/userspace/sys.o build/lib/malloc.o
+build/userspace/app.o2: Makefile build/userspace/app.o1 build/userspace/sys.o build/lib/malloc.o build/lib/strings.o
+	ld -o build/userspace/app.o2 -N --warn-common -T src/userspace/linker.ld build/userspace/app.o1 build/userspace/sys.o build/lib/malloc.o build/lib/strings.o
 build/userspace/app.c: Makefile build/userspace/app.o2
 	echo "#include <stdint.h>" >build/userspace/app.c
 	echo "uint64_t app[] = {" >>build/userspace/app.c
@@ -43,6 +41,22 @@ build/userspace/app.c: Makefile build/userspace/app.o2
 	echo " / 8 + 1;" >>build/userspace/app.c
 build/userspace/app.o: Makefile build/userspace/app.c
 	gcc $(GCC_OPTS) build/userspace/app.c -o build/userspace/app.o
+
+build/userspace/sh.o1: Makefile src/userspace/sh.c | build/userspace
+	gcc $(GCC_OPTS) src/userspace/sh.c -o build/userspace/sh.o1
+build/userspace/sh.o2: Makefile build/userspace/sh.o1 build/userspace/sys.o build/lib/malloc.o build/lib/strings.o
+	ld -o build/userspace/sh.o2 -N --warn-common -T src/userspace/linker.ld build/userspace/sh.o1 build/userspace/sys.o build/lib/malloc.o build/lib/strings.o
+build/userspace/sh.c: Makefile build/userspace/sh.o2
+	echo "#include <stdint.h>" >build/userspace/sh.c
+	echo "uint64_t sh[] = {" >>build/userspace/sh.c
+	hexdump -v -e '1/8 "0x%xull," "\n"' build/userspace/sh.o2 >>build/userspace/sh.c
+	echo "0};" >>build/userspace/sh.c
+	echo -n "uint64_t sh_len = " >>build/userspace/sh.c
+	wc -c <build/userspace/sh.o2 | tr -d '\n' >>build/userspace/sh.c
+	echo " / 8 + 1;" >>build/userspace/sh.c
+build/userspace/sh.o: Makefile build/userspace/sh.c
+	gcc $(GCC_OPTS) build/userspace/sh.c -o build/userspace/sh.o
+
 
 build/userspace/sys.o: Makefile src/userspace/sys.c | build/userspace
 	gcc $(GCC_OPTS) src/userspace/sys.c -o build/userspace/sys.o
@@ -56,8 +70,8 @@ build/lib/malloc-k.o: Makefile src/lib/malloc.c | build/lib
 build/lib/strings.o: Makefile src/lib/strings.c | build/lib
 	gcc $(GCC_OPTS) src/lib/strings.c -o build/lib/strings.o
 
-out/boot.img: $(c_objects) src/kernel/linker.ld build/bootloader.o build/lib/strings.o build/lib/malloc-k.o | out
-	ld -o out/boot.img $(LD_OPTS) build/bootloader.o $(c_objects) build/lib/strings.o build/lib/malloc-k.o
+out/boot.img: $(c_objects) src/kernel/linker.ld build/bootloader.o build/lib/strings.o build/lib/malloc-k.o build/userspace/app.o build/userspace/sh.o | out
+	ld -o out/boot.img $(LD_OPTS) build/bootloader.o $(c_objects) build/lib/strings.o build/lib/malloc-k.o build/userspace/app.o build/userspace/sh.o
 
 out/bochs.img: out/boot.img
 	cp out/boot.img out/bochs.img

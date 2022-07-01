@@ -4,6 +4,7 @@
 #include "sys.h"
 
 #include "../lib/malloc.h"
+#include "../lib/strings.h"
 
 /*
    0: exit
@@ -20,18 +21,10 @@ void exit() {
     ");
 }
 
-void printf(char* fmt, ...) {
-    va_list ap;
-    va_list* app = &ap;
-    va_start(ap, fmt);
+void wait(uint64_t p) {
+}
 
-    asm volatile("\
-\n      mov $1, %%rax                           \
-\n      mov %0, %%rbx                           \
-\n      mov %1, %%rcx                           \
-\n      int $0x80                               \
-    "::"m"(fmt),"m"(app));
-    va_end(ap);
+uint64_t runProg(char* s) {
 }
 
 void printColor(char* s, uint8_t c) {
@@ -41,6 +34,14 @@ void printColor(char* s, uint8_t c) {
 \n      movb %1, %%cl                           \
 \n      int $0x80                               \
     "::"m"(s),"m"(c));
+}
+
+void print(char* s) {
+    printColor(s, 0x07);
+}
+
+void printf(char* fmt, ...) {
+    VARIADIC_PRINT(print);
 }
 
 char* M_readline() {
@@ -66,13 +67,8 @@ extern void main();
 void __attribute__((section(".entry"))) _entry() {
     // I think I might prefer to use linker to place map last in text section, and have heap grow up toward stack, and have stack at end
     //   of page...
-    init_heap(0x7FC0180000ull, 0x80000);
-    //asm volatile("xchgw %bx, %bx");
-    //uint64_t rsp;
-    //exit();
-    //asm volatile("mov %%rsp, %%rax\nmov %%rax, %0":"=m"(rsp));
-    //exit();
+
+    init_heap((uint64_t*) 0x7FC0180000ull, 0x80000);
     main();
-    //printf("what?\n");
     exit();
 }

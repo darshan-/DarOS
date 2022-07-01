@@ -1,6 +1,7 @@
 #include <stdint.h>
 
 #include "sys.h"
+#include "../lib/strings.h"
 
 // I think I want to soon make strings library a single thing importatable by the kernel or userspace.
 // Malloc still seems easiest kept separate.
@@ -8,7 +9,7 @@
 
 void processInput(char* l) {
     if (!strcmp(l, "app"))
-        runProg("app");
+        wait(runProg("app"));
 }
 
 void main() {

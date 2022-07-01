@@ -314,12 +314,8 @@ void startProc(struct process* p) {
     ");
 }
 
-//extern uint64_t app3[];
-//extern uint64_t app_len;
-
-
-
-#include "../../build/userspace/app.c"
+extern uint64_t app[];
+extern uint64_t app_len;
 
 void* startApp(uint64_t stdout) {
     asm volatile("xchgw %ax, %ax");
@@ -590,12 +586,6 @@ void __attribute__((interrupt)) int0x80_syscall(struct interrupt_frame *frame) {
             killProc(curProc);
             waitloop();
             break;
-        case 1: // printf(char* fmt, va_list ap)
-            no_ints(); // Printing will disable and then reenable, but we want them to stay off until iretq, so inc count of noes
-            vaprintf(curProc->stdout, (char*) curProc->rbx, (va_list*) curProc->rcx);
-            ints_okay_once_on(); // dec count of noes, so count is restored and iretq turns them on
-
-            break;
         case 2: // printColor(char* s, color c)
             no_ints(); // Printing will disable and then reenable, but we want them to stay off until iretq, so inc count of noes
             printColorTo(curProc->stdout, (char*) curProc->rbx, (uint8_t) curProc->rcx); // This is a safe way to get just low 8-bits, right?
@@ -608,6 +598,11 @@ void __attribute__((interrupt)) int0x80_syscall(struct interrupt_frame *frame) {
             curProc->wait = curProc->rax;
             removeNodeFromList(runnableProcs, curProcN);
             waitloop();
+            break;
+
+        case 4: // runProg(char* s)
+            break;
+        case 5: // wait(uint64_t p)
             break;
         default:
             logf("Unknown syscall 0x%h\n", curProc->rax);
