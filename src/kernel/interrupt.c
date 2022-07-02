@@ -282,8 +282,8 @@ void startProc(struct process* p) {
     *--sp = p->rsp;
     *--sp = flags;
     *--sp = 19;
-
     *--sp = p->rip;
+
     *--sp = p->rax;
     *--sp = p->rbx;
     *--sp = p->rcx;
@@ -326,8 +326,6 @@ extern uint64_t app[];
 extern uint64_t app_len;
 
 void* startApp(uint64_t stdout) {
-    asm volatile("xchgw %ax, %ax");
-    asm volatile("xchgw %bx, %bx");
     struct process *p = mallocz(sizeof(struct process));
     p->page = palloc();
     p->stdout = stdout;
@@ -344,10 +342,9 @@ void* startApp(uint64_t stdout) {
 void gotLine(void* v, char* l) {
     struct process* p = v;
     p->rax = strlen(l);
-    //p->rsp -= p->rax;
-    p->rbx = p->rsp - p->rax;
+    p->rbx = p->rsp - p->rax - 160;
     char* s = (char*) p->rbx;
-    for (uint64_t i = 0; i < p->rbx; i++)
+    for (uint64_t i = 0; i < p->rax; i++)
         s[i] = l[i];
 
     pushListTail(runnableProcs, p);

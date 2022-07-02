@@ -627,7 +627,7 @@ static void gotInput(struct input i) {
                 terms[at].reading = 0;
             }
 
-            if (!strcmp(l, "app"))
+            else if (!strcmp(l, "app"))
                 terms[at].proc = startApp(at);
             else if (!terms[at].proc)
                 prompt(at);

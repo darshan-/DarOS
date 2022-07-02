@@ -45,7 +45,7 @@ void printf(char* fmt, ...) {
 }
 
 char* M_readline() {
-    uint64_t len; // kernel needs to know len in order to know where to put it on stack, so use that knowledge
+    uint64_t len; // Kernel needs to know len in order to know where to put it on stack, so use that knowledge (to malloc needed size)
     char* l;
     asm volatile("\
 \n      mov $3, %%rax                           \
