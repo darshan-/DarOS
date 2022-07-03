@@ -30,9 +30,11 @@ void main() {
     const uint64_t chunk = 100000000ull / 8; // Chunk that's not too fast, not too slow, for target system
     //asm volatile("xchgw %bx, %bx");
     printf("We'll stop when a is %u\n", chunk * 10);
-    for (a = 0; a < chunk; a++)
-        if (a % chunk == 0)
+    for (a = 0; a < chunk; a++) {
+        if (a % chunk == 0) {
             printf("a: %u\n", a);
+        }
+    }
     printf("Final a: %u (which is no longer less than %u\n", a, chunk);
     printf("is %u less than %u? %s\n", a, chunk, a < chunk ? "yes" : "no");
     // Bochs is stopping at a different way-too-soon every time, not the same way-too-soon -- which makes me think that for some reason we're
@@ -41,6 +43,10 @@ void main() {
 
     // Hmm, well, it seems to go back to userspace plenty of times in bochs... So why the heck is it stopping WAY too soon, and at a different
     //   value every time???
+
+    // I was thinking chunk was somehow being corrupted, with a register not being restored properly, or the stack getting messed up... But, no.
+
+    // So are we not coming back to the correct instruction, and ending up after the loop?  That seems unlikely...
 }
 
 
