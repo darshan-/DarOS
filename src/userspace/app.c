@@ -34,6 +34,7 @@ void main() {
         if (a % chunk == 0)
             printf("a: %u\n", a);
     printf("Final a: %u (which is no longer less than %u\n", a, chunk * 10);
+    printf("is %u less than %u? %s\n", a, chunk * 10, a < chunk * 10 ? "yes" : "no");
     // Bochs is stopping at a different way-too-soon every time, not the same way-too-soon -- which makes me think that for some reason we're
     //  not coming back from an interrupt...  I thought I was coming back if instruction pointer was in user space, or something close to that...
     //  So let's investigate.
