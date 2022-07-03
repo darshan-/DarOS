@@ -258,6 +258,8 @@ void killProc(struct process* p) {
     }
 }
 
+static int setRbx = 0;
+
 void startProc(struct process* p) {
     asm volatile ("cli");
 
@@ -276,6 +278,10 @@ void startProc(struct process* p) {
 \n      or $0x200, %%rax                        \
 \n      mov %%rax, %0                           \
     " : "=m"(flags));
+
+    if (setRbx)
+        logf("startProc rax: (%u chars) %s (@0x%h)\n", p->rax, p->rbx, p->rbx);
+    setRbx = 0;
 
     uint64_t* sp = (uint64_t*) p->rsp;
     *--sp = 27;
@@ -300,6 +306,7 @@ void startProc(struct process* p) {
     *--sp = p->r14;
     *--sp = p->r15;
 
+    //asm volatile("xchgw %bx, %bx");
     asm volatile ("mov %0, %%rsp"::"m"(sp));
 
     asm volatile ("\
@@ -340,13 +347,16 @@ void* startApp(uint64_t stdout) {
 }
 
 void gotLine(void* v, char* l) {
+    logf("gotLine: 0x%h, %s\n", v, l);
     struct process* p = v;
     p->rax = strlen(l);
-    p->rbx = p->rsp - p->rax - 160;
+    p->rbx = p->rsp - p->rax - 1060;
     char* s = (char*) p->rbx;
     for (uint64_t i = 0; i < p->rax; i++)
         s[i] = l[i];
 
+    logf("gotLine %u chars: %s (@0x%h)\n", p->rax, p->rbx, p->rbx);
+    setRbx = 1;
     pushListTail(runnableProcs, p);
 }
 
@@ -748,9 +758,12 @@ void __attribute__((interrupt)) irq0_pit(struct interrupt_frame *frame) {
             curProc->rip = frame->ip;
             curProc->rsp = frame->sp;
 
+            print("IP is in userspace and time for scheduler; going to waitloop...\n");
             waitloop();
         }
     }
+    if (frame->ip >= 511ull * 1024 * 1024 * 1024)
+        print("IP is in userspace and returning to userspace\n");
 }
 
 static void set_handler(uint64_t vec, void* handler, uint8_t type) {

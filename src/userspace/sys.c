@@ -15,6 +15,7 @@
   */
 
 void exit() {
+    print("Exiting...\n");
     asm volatile("\
 \n      mov $0, %rax                            \
 \n      int $0x80                               \
@@ -54,9 +55,12 @@ char* M_readline() {
 \n      mov %%rbx, %1                           \
     ":"=m"(len), "=m"(l));
 
+    printf("sys len %u chars starting at 0x%h\n", len, l);
     char* s = malloc(len + 1);
-    for (uint64_t i = 0; i < len; i++)
+    for (uint64_t i = 0; i < len; i++) {
+        printf("0x%h,", l[i]);
         s[i] = l[i];
+    }
     s[len] = 0;
 
     return s;

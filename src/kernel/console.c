@@ -394,6 +394,7 @@ static inline void cursorEnd() {
 }
 
 void setReading(uint64_t t, void* p) {
+    logf("proc 0x%h listening on term %u\n", p, t);
     terms[t].reading = p;
 }
 
@@ -583,6 +584,7 @@ static void gotInput(struct input i) {
 
         else if (i.key == '\n' && !i.alt && !i.ctrl && !i.shift) {
             char* l = M_readline();
+            logf("enter pressed: readline returns: %s\n", l);
 
             terms[at].cur = terms[at].end;
             print("\n");

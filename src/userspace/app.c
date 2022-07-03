@@ -20,17 +20,26 @@ void main() {
 
     printf("Hi,  I'm app; I've stopped fib-ing with a: %u and b: %u\n", a, b);
 
-    print("Say something, please? ");
-    char* l = M_readline();
-    if (l) {
-        printf("  Thanks for saying \"%s\"\n", l);
-        free(l);
-    }
+    // print("Say something, please? ");
+    // char* l = M_readline();
+    // if (l) {
+    //     printf("  Thanks for saying \"%s\"\n", l);
+    //     free(l);
+    // }
 
     const uint64_t chunk = 1000000000ull / 8; // Chunk that's not too fast, not too slow, for target system
+    //asm volatile("xchgw %bx, %bx");
+    printf("We'll stop when a is %u\n", chunk * 10);
     for (a = 0; a < chunk * 10; a++)
         if (a % chunk == 0)
             printf("a: %u\n", a);
+    printf("Final a: %u\n", a);
+    // Bochs is stopping at a different way-too-soon every time, not the same way-too-soon -- which makes me think that for some reason we're
+    //  not coming back from an interrupt...  I thought I was coming back if instruction pointer was in user space, or something close to that...
+    //  So let's investigate.
+
+    // Hmm, well, it seems to go back to userspace plenty of times in bochs... So why the heck is it stopping WAY too soon, and at a different
+    //   value every time???
 }
 
 
