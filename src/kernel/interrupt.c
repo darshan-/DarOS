@@ -758,12 +758,12 @@ void __attribute__((interrupt)) irq0_pit(struct interrupt_frame *frame) {
             curProc->rip = frame->ip;
             curProc->rsp = frame->sp;
 
-            print("IP is in userspace and time for scheduler; going to waitloop...\n");
+            //print("IP is in userspace and time for scheduler; going to waitloop...\n");
             waitloop();
         }
     }
-    if (frame->ip >= 511ull * 1024 * 1024 * 1024)
-        print("IP is in userspace and returning to userspace\n");
+    // if (frame->ip >= 511ull * 1024 * 1024 * 1024)
+    //     print("IP is in userspace and returning to userspace\n");
 }
 
 static void set_handler(uint64_t vec, void* handler, uint8_t type) {
