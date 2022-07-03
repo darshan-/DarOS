@@ -27,14 +27,14 @@ void main() {
     //     free(l);
     // }
 
-    const uint64_t chunk = 1000000000ull / 8; // Chunk that's not too fast, not too slow, for target system
+    const uint64_t chunk = 100000000ull / 8; // Chunk that's not too fast, not too slow, for target system
     //asm volatile("xchgw %bx, %bx");
     printf("We'll stop when a is %u\n", chunk * 10);
-    for (a = 0; a < chunk * 10; a++)
+    for (a = 0; a < chunk; a++)
         if (a % chunk == 0)
             printf("a: %u\n", a);
-    printf("Final a: %u (which is no longer less than %u\n", a, chunk * 10);
-    printf("is %u less than %u? %s\n", a, chunk * 10, a < chunk * 10 ? "yes" : "no");
+    printf("Final a: %u (which is no longer less than %u\n", a, chunk);
+    printf("is %u less than %u? %s\n", a, chunk, a < chunk ? "yes" : "no");
     // Bochs is stopping at a different way-too-soon every time, not the same way-too-soon -- which makes me think that for some reason we're
     //  not coming back from an interrupt...  I thought I was coming back if instruction pointer was in user space, or something close to that...
     //  So let's investigate.
