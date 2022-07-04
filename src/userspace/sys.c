@@ -23,9 +23,12 @@ void exit() {
 }
 
 void wait(uint64_t p) {
+    p = p;
 }
 
 uint64_t runProg(char* s) {
+    s = s;
+    return 0;
 }
 
 void printColor(char* s, uint8_t c) {

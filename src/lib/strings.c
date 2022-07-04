@@ -176,7 +176,7 @@ uint64_t strlen(char* s) {
 int strcmp(char* s, char* t) {
     for (uint64_t i = 0;;i++) {
         int d;
-        if (d = s[i] - t[i])
+        if ((d = s[i] - t[i]))
             return d;
         if (!s[i])
             return 0;

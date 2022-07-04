@@ -128,7 +128,7 @@ void __attribute__((section(".kernel_entry"))) kernel_entry() {
     parse_acpi_tables();
     init_hpet();
 
-    extern void tss;
+    extern uint8_t tss;
     *((void**) (&tss + 4)) = kernel_stack_top;
 
     logf("Set up heap with 0x%h, %u\n", kernel_stack_top, mem_table[il].length - STACK_SIZE);
