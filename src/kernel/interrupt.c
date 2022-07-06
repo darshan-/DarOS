@@ -699,7 +699,6 @@ static void __attribute__((interrupt)) trap_0x0e_page_fault(struct interrupt_fra
 }
 
 static void __attribute__((interrupt)) double_fault_handler(struct interrupt_frame *frame, uint64_t error_code) {
-
     logf("Double fault; error should be zero.  error: 0x%p016h\n", error_code);
     dumpFrame(frame);
 }
@@ -746,7 +745,7 @@ void __attribute__((interrupt)) irq0_pit(struct interrupt_frame *frame) {
 
     static uint64_t lms = 0;
 
-    if (ms_since_boot % 2 == 0 && ms_since_boot != lms) {
+    if (ms_since_boot % 4 == 0 && ms_since_boot != lms) {
         lms = ms_since_boot;
 
         if (frame->ip >= 511ull * 1024 * 1024 * 1024) {

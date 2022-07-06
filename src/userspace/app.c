@@ -18,7 +18,7 @@ void main() {
     while (b < 10000000000000000000ull)
         fibNext();
 
-    printf("Hi,  I'm app; I've stopped fib-ing with a: %u and b: %u\n", a, b);
+    printf("Hi, I'm app; I've stopped fib-ing with a: %u and b: %u\n", a, b);
 
     // print("Say something, please? ");
     // char* l = M_readline();
