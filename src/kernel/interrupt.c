@@ -173,8 +173,6 @@ static inline void push(struct queue* q, void* p) {
 // eb fb      jmp -5      eb = jmp, fb = -5
 
 struct process {
-    void* page; // For now only one page allowed
-
     uint64_t rax;
     uint64_t rbx;
     uint64_t rcx;
@@ -195,6 +193,8 @@ struct process {
     uint64_t rsp;
 
     uint64_t stdout;
+
+    void* page; // For now only one page allowed
 
     struct process* waiting; // For now just one process can wait for a given process to exit
 };
@@ -595,15 +595,15 @@ static void __attribute__((interrupt)) default_interrupt_handler(struct interrup
     dumpFrame(frame);
 }
 
+extern uint64_t regs[15];
+
 void __attribute__((interrupt)) int0x80_syscall(struct interrupt_frame *frame) {
     //print("int 0x80 handler\n");
     //dumpFrame(frame);
 
     if (frame->ip >= 511ull * 1024 * 1024 * 1024) {
-        extern uint64_t regs[16];
         uint64_t* curRegs = (uint64_t*) curProc;
-        curRegs++;
-        for (int i = 0; i < 16; i++)
+        for (int i = 0; i < 15; i++)
             curRegs[i] = regs[i];
 
         curProc->rip = frame->ip;
@@ -745,14 +745,12 @@ void __attribute__((interrupt)) irq0_pit(struct interrupt_frame *frame) {
 
     static uint64_t lms = 0;
 
-    if (ms_since_boot % 4 == 0 && ms_since_boot != lms) {
+    if (ms_since_boot % 8 == 0 && ms_since_boot != lms) {
         lms = ms_since_boot;
 
         if (frame->ip >= 511ull * 1024 * 1024 * 1024) {
-            extern uint64_t regs[16];
             uint64_t* curRegs = (uint64_t*) curProc;
-            curRegs++;
-            for (int i = 0; i < 16; i++)
+            for (int i = 0; i < 15; i++)
                 curRegs[i] = regs[i];
             curProc->rip = frame->ip;
             curProc->rsp = frame->sp;
