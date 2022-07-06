@@ -28,7 +28,7 @@ void main() {
     // }
 
     uint64_t loop_fails = 0;
-    const uint64_t chunk = 100000000000ull / 4; // Chunk that's not too fast, not too slow, for target system
+    const uint64_t chunk = 1000000000ull / 4; // Chunk that's not too fast, not too slow, for target system
     //asm volatile("xchgw %bx, %bx");
     printf("We'll stop when a is %u\n", chunk);
     a = 0;
