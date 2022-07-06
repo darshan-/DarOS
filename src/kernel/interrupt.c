@@ -191,6 +191,7 @@ struct process {
 
     uint64_t rip;
     uint64_t rsp;
+    uint64_t rflags;
 
     uint64_t stdout;
 
@@ -271,13 +272,15 @@ void startProc(struct process* p) {
 \n      invlpg (%rax)                          \
     ");
 
-    uint64_t flags;
-    asm volatile ("\
-\n      pushf                                   \
-\n      pop %%rax                               \
-\n      or $0x200, %%rax                        \
-\n      mov %%rax, %0                           \
-    " : "=m"(flags));
+    uint64_t flags = p->rflags;
+    if (!flags) {
+        asm volatile ("\
+\n          pushf                                   \
+\n          pop %%rax                               \
+\n          or $0x200, %%rax                        \
+\n          mov %%rax, %0                           \
+        " : "=m"(flags));
+    }
 
     if (setRbx)
         logf("startProc rax: (%u chars) %s (@0x%h)\n", p->rax, p->rbx, p->rbx);
@@ -606,6 +609,7 @@ void __attribute__((interrupt)) int0x80_syscall(struct interrupt_frame *frame) {
             ((uint64_t*) curProc)[i] = regs[i];
         curProc->rip = frame->ip;
         curProc->rsp = frame->sp;
+        curProc->rflags = frame->flags;
 
         switch (curProc->rax) {
         case 0: // exit()
@@ -754,6 +758,7 @@ void __attribute__((interrupt)) irq0_pit(struct interrupt_frame *frame) {
                 ((uint64_t*) curProc)[i] = regs[i];
             curProc->rip = frame->ip;
             curProc->rsp = frame->sp;
+            curProc->rflags = frame->flags;
 
             removeFromList(ips, (void*)frame->ip);
             pushListHead(ips, (void*)frame->ip);
