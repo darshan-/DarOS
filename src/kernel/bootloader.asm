@@ -293,8 +293,7 @@ regs:
 .r14:   dq 0
 .r15:   dq 0
 
-global irq0
-irq0:
+save_regs:
         mov [regs.rax], rax
         mov [regs.rbx], rbx
         mov [regs.rcx], rcx
@@ -310,27 +309,20 @@ irq0:
         mov [regs.r13], r13
         mov [regs.r14], r14
         mov [regs.r15], r15
+        ret
+
 extern irq0_pit
+extern int0x80_syscall
+
+global irq0
+global int0x80
+
+irq0:
+        call save_regs
         jmp irq0_pit
 
-global int0x80
 int0x80:
-        mov [regs.rax], rax
-        mov [regs.rbx], rbx
-        mov [regs.rcx], rcx
-        mov [regs.rdx], rdx
-        mov [regs.rsi], rsi
-        mov [regs.rdi], rdi
-        mov [regs.rbp], rbp
-        mov [regs.r8], r8
-        mov [regs.r9], r9
-        mov [regs.r10], r10
-        mov [regs.r11], r11
-        mov [regs.r12], r12
-        mov [regs.r13], r13
-        mov [regs.r14], r14
-        mov [regs.r15], r15
-extern int0x80_syscall
+        call save_regs
         jmp int0x80_syscall
 
 kernel_entry:
