@@ -27,19 +27,34 @@ void main() {
     //     free(l);
     // }
 
+    uint64_t loop_fails = 0;
     const uint64_t chunk = 1000000000ull / 4; // Chunk that's not too fast, not too slow, for target system
     //asm volatile("xchgw %bx, %bx");
     printf("We'll stop when a is %u\n", chunk);
     a = 0;
-//keep_going_please:
+// more:
+//     if (a == chunk) {
+//         print("Resetting a to zero.\n");
+//         a = 0;
+//     }
+
+    keep_going:
     for (; a < chunk; a++) {
         if (a % (chunk / 10) == 0) {
             printf("a: %u\n", a);
         }
     }
+    if (a < chunk) {
+        loop_fails++;
+        goto keep_going;
+    }
+
+    printf("Loop failed %u times.\n", loop_fails);
+
+    // printf("Final a: %u (which is no longer less than %u\n", a, chunk);
+    // printf("is %u less than %u? %s\n", a, chunk, a < chunk ? "yes" : "no");
+    //goto more;
     //if (a < chunk) goto keep_going_please;
-    printf("Final a: %u (which is no longer less than %u\n", a, chunk);
-    printf("is %u less than %u? %s\n", a, chunk, a < chunk ? "yes" : "no");
     // Bochs is stopping at a different way-too-soon every time, not the same way-too-soon -- which makes me think that for some reason we're
     //  not coming back from an interrupt...  I thought I was coming back if instruction pointer was in user space, or something close to that...
     //  So let's investigate.
