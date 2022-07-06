@@ -746,11 +746,11 @@ void __attribute__((interrupt)) irq0_pit(struct interrupt_frame *frame) {
     }
 
     static uint64_t lms = 0;
-    static struct list* ips = 0;
-    if (!ips)
-        ips = newList();
+    // static struct list* ips = 0;
+    // if (!ips)
+    //     ips = newList();
 
-    if (ms_since_boot >= lms + 640) {
+    if (ms_since_boot >= lms + 2) {
         lms = ms_since_boot;
 
         if (frame->ip >= 511ull * 1024 * 1024 * 1024) {
@@ -760,24 +760,24 @@ void __attribute__((interrupt)) irq0_pit(struct interrupt_frame *frame) {
             curProc->rsp = frame->sp;
             curProc->rflags = frame->flags;
 
-            removeFromList(ips, (void*)frame->ip);
-            pushListHead(ips, (void*)frame->ip);
+            // removeFromList(ips, (void*)frame->ip);
+            // pushListHead(ips, (void*)frame->ip);
 
             //print("IP is in userspace and time for scheduler; going to waitloop...\n");
             waitloop();
         }
     }
 
-    if (!curProc && listLen(ips)) {
-        print("ips: \n");
-        forEachListItem(ips, ({
-            void __fn__ (void* item) {
-                printf(" * 0x%h\n", item);
-            }
-            __fn__;
-        }));
-        ips = newList(); // Simplest to just leak  bit of memory for this quick test
-    }
+    // if (!curProc && listLen(ips)) {
+    //     print("ips: \n");
+    //     forEachListItem(ips, ({
+    //         void __fn__ (void* item) {
+    //             printf(" * 0x%h\n", item);
+    //         }
+    //         __fn__;
+    //     }));
+    //     ips = newList(); // Simplest to just leak  bit of memory for this quick test
+    // }
     // if (frame->ip >= 511ull * 1024 * 1024 * 1024)
     //     print("IP is in userspace and returning to userspace\n");
 }
