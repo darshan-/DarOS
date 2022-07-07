@@ -584,7 +584,7 @@ static void gotInput(struct input i) {
 
         else if (i.key == '\n' && !i.alt && !i.ctrl && !i.shift) {
             char* l = M_readline();
-            logf("enter pressed: readline returns: %s\n", l);
+            //logf("enter pressed: readline returns: %s\n", l);
 
             terms[at].cur = terms[at].end;
             print("\n");

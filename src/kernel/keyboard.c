@@ -9,7 +9,8 @@
 // https://www.win.tue.nl/~aeb/linux/kbd/scancodes-1.html
 
 #define si(k) (struct input) {(k), alt_down, ctrl_down, shift_down}
-#define map(c, i) case c: gotInput(i); break
+#define    map(c, i) case c: gotInput(i); break
+#define e0_map(c, i) case c: gotInput(i); last_e0 = 0; return
 #define shifty(c, k, s) map(c, shift_down ? si(s) : si(k))
 #define capsy(c, k, s) map(c, (shift_down && !caps_lock_on) || (!shift_down && caps_lock_on) ? si(s) : si(k))
 
@@ -71,46 +72,30 @@ void init_keyboard() {
 }
 
 void keyScanned(uint8_t c) {
+    if (c == 0x48 || c == 0xe0)
+        logf("kbd c: 0x%h\n", c);
     uint8_t hob = c & 0x80;  // Break / release
 
     // Anything that we want to handle specially if e0-escaped goes here, then we'll quit early.
     if (last_e0) {
+        log("We're e0-escaped.\n");
         switch (c) {
-            map(0x35, si('/'));
+            e0_map(0x35, si('/'));
 
-            map(0x47, si(KEY_HOME));
-            map(0x48, si(KEY_UP));
-            map(0x49, si(KEY_PG_UP));
+            e0_map(0x47, si(KEY_HOME));
+            e0_map(0x48, si(KEY_UP));
+            e0_map(0x49, si(KEY_PG_UP));
 
-            map(0x4b, si(KEY_LEFT));
-            map(0x4d, si(KEY_RIGHT));
+            e0_map(0x4b, si(KEY_LEFT));
+            e0_map(0x4d, si(KEY_RIGHT));
 
-            map(0x4f, si(KEY_END));
-            map(0x50, si(KEY_DOWN));
-            map(0x51, si(KEY_PG_DOWN));
-            map(0x52, si(KEY_INS));
-            map(0x53, si(KEY_DEL));
+            e0_map(0x4f, si(KEY_END));
+            e0_map(0x50, si(KEY_DOWN));
+            e0_map(0x51, si(KEY_PG_DOWN));
+            e0_map(0x52, si(KEY_INS));
+            e0_map(0x53, si(KEY_DEL));
         default:
             break;
-        }
-
-        switch (c) {
-        case 0x35:
-
-        case 0x47:
-        case 0x48:
-        case 0x49:
-
-        case 0x4b:
-        case 0x4d:
-
-        case 0x4f:
-        case 0x50:
-        case 0x51:
-        case 0x52:
-        case 0x53:
-            last_e0 = 0;
-            return;
         }
     }
 

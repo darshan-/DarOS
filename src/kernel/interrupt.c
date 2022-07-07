@@ -709,6 +709,7 @@ static void __attribute__((interrupt)) irq1_kbd(struct interrupt_frame *) {
     uint8_t code = inb(0x60);
     outb(PIC_PRIMARY_CMD, PIC_ACK);
     push(&kbd_buf, (void*) (uint64_t) code);
+    //printf("[%u]", code);
     push(&wq, process_keys);
 }
 
