@@ -252,17 +252,6 @@ static inline void clear() {
 //  - Shell's exit for "exit" command and for ctrl-d.
 //  - Have console informed when shell exits, and console starts a new shell
 
-static void prompt(uint64_t t) {
-    scrollToBottom();
-    terms[at].cur = terms[at].end;
-    if (terms[t].cur % 160 != 0)
-        printTo(t, "\n");
-
-    printColorTo(t, "\3 > ", 0x05);
-    if (t == at)
-        syncScreen();
-}
-
 static inline void ensureTerm(uint64_t t) {
     no_ints();
     if (!terms[t].buf) {
@@ -280,7 +269,7 @@ static inline void ensureTerm(uint64_t t) {
             printColorTo(t, "Ready!", 0x0d);
             printColorTo(t, s, 0x0b);
             free(s);
-            prompt(t);
+            terms[t].proc = startSh(t);
         }
     }
     ints_okay();
@@ -539,12 +528,10 @@ void procDone(void* p, uint64_t t) {
     if (terms[t].proc != p)
         return;
 
-    terms[t].proc = 0; // Do we need a zero value? Or just leave old value alone?  Edit: Yeah, good to zero it, e.g. for prompting on \n.
+    terms[t].proc = startSh(t);
 
-    if (terms[t].cur % 160 != 0)
-        printTo(t, "\n");
-
-    //prompt(t);
+    // if (terms[t].cur % 160 != 0)
+    //     printTo(t, "\n");
 }
 
 static void gotInput(struct input i) {
@@ -631,13 +618,6 @@ static void gotInput(struct input i) {
                 gotLine(terms[at].reading, l);
                 terms[at].reading = 0;
             }
-
-            else if (!strcmp(l, "app"))
-                terms[at].proc = startApp(at);
-            else if (!strcmp(l, "sh"))
-                terms[at].proc = startSh(at);
-            else if (!terms[at].proc)
-                prompt(at);
 
             free(l);
         }
