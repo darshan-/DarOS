@@ -584,7 +584,6 @@ static void gotInput(struct input i) {
 
         else if (i.key == '\n' && !i.alt && !i.ctrl && !i.shift) {
             char* l = M_readline();
-            logf("Enter pressed: readline returns: %s\n", l);
 
             terms[at].cur = terms[at].end;
             print("\n");
@@ -623,7 +622,6 @@ static void gotInput(struct input i) {
             //    so where do we copy it to?  We really need user mode malloc, I guess...
             //terms[at].sh
 
-            //gotLine(terms[at].proc, l);
             if (terms[at].reading) {
                 gotLine(terms[at].reading, l);
                 terms[at].reading = 0;
