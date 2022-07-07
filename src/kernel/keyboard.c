@@ -10,7 +10,7 @@
 
 #define si(k) (struct input) {(k), alt_down, ctrl_down, shift_down}
 #define    map(c, i) case c: gotInput(i); break
-#define e0_map(c, i) case c: gotInput(i); last_e0 = 0; return
+#define e0_map(c, i) case c: gotInput(i); return
 #define shifty(c, k, s) map(c, shift_down ? si(s) : si(k))
 #define capsy(c, k, s) map(c, (shift_down && !caps_lock_on) || (!shift_down && caps_lock_on) ? si(s) : si(k))
 
@@ -78,7 +78,18 @@ void keyScanned(uint8_t c) {
 
     // Anything that we want to handle specially if e0-escaped goes here, then we'll quit early.
     if (last_e0) {
-        log("We're e0-escaped.\n");
+        if (c == 0xe0) // I'm not sure if I can get multiple e0 codes in a row, but might as well check and keep flag on if so.
+            return;
+
+        last_e0 = 0;
+
+        if (hob)
+            return;
+            
+        if (c == 0x48) {
+            logf("e0-upArrow: %u, %u, %u\n", alt_down, ctrl_down, shift_down);
+        }
+
         switch (c) {
             e0_map(0x35, si('/'));
 
@@ -99,29 +110,50 @@ void keyScanned(uint8_t c) {
         }
     }
 
-    switch (c) {
-    case 0x9d: // LCtrl (Or RCtrl if e0 was before this)
-    case 0xaa: // LShift
-    case 0xb6: // RShift
-    case 0xb8: // LAlt (Or Ralt if e0 was before this)
-        c -= 0x80;
-        break;
-    default:
-        break;
-    }
+    // if (c == 0xaa)
+    //     log("left shift release\n");
+
+    // switch (c) {
+    // case 0x9d: // LCtrl (Or RCtrl if e0 was before this)
+    // case 0xaa: // LShift
+    // case 0xb6: // RShift
+    // case 0xb8: // LAlt (Or Ralt if e0 was before this)
+    //     c -= 0x80;
+    //     break;
+    // default:
+    //     break;
+    // }
 
     switch (c) {
+    case 0x9d:
+        ctrl_down = 0;
+        break;
+
     case 0x1d:
-        ctrl_down = hob ? 0 : 1;
+        ctrl_down = 1;
+        //ctrl_down = hob ? 0 : 1;
+        break;
+
+    case 0xaa:
+    case 0xb6:
+        log("shift up\n");
+        shift_down = 0;
         break;
 
     case 0x2a:
     case 0x36:
-        shift_down = hob ? 0 : 1;
+        log("shift down\n");
+        shift_down = 1;
+        //shift_down = hob ? 0 : 1;
+        break;
+
+    case 0xb8:
+        alt_down = 0;
         break;
 
     case 0x38:
-        alt_down = hob ? 0 : 1;
+        alt_down = 1;
+        //alt_down = hob ? 0 : 1;
         break;
 
     case 0x3a:
