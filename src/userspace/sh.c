@@ -8,8 +8,12 @@
 // But then my print functions can stop being variadic, and less work is done in the kernel for printf.
 
 void processInput(char* l) {
-    if (!strcmp(l, "app"))
-        wait(runProg("app"));
+    if (!strcmp(l, "exit"))
+        exit();
+    else if (!strcmp(l, "help"))
+        print("I'm not very helpful, but I hope you have a nice day!\n");
+    else
+        wait(runProg(l));
 }
 
 void main() {

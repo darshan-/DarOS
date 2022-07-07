@@ -247,6 +247,11 @@ static inline void clear() {
     syncScreen();
 }
 
+// Perhaps set things up so that
+//  - When we switch to a terminal, if it doesn't have a process, start a shell
+//  - Shell's exit for "exit" command and for ctrl-d.
+//  - Have console informed when shell exits, and console starts a new shell
+
 static void prompt(uint64_t t) {
     scrollToBottom();
     terms[at].cur = terms[at].end;
@@ -629,6 +634,8 @@ static void gotInput(struct input i) {
 
             else if (!strcmp(l, "app"))
                 terms[at].proc = startApp(at);
+            else if (!strcmp(l, "sh"))
+                terms[at].proc = startSh(at);
             else if (!terms[at].proc)
                 prompt(at);
 

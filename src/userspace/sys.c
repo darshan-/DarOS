@@ -11,11 +11,12 @@
    1: printf
    2: printColor
    3: readline
+   4: runProg
+   5: wait
 
   */
 
 void exit() {
-    print("Exiting...\n");
     asm volatile("\
 \n      mov $0, %rax                            \
 \n      int $0x80                               \
@@ -23,12 +24,24 @@ void exit() {
 }
 
 void wait(uint64_t p) {
-    p = p;
+    if (!p) // Good safety check, and also makes it easy to wait on runProg even if we're not sure if app exists (maybe return error code from here?)
+        return;
+
+    asm volatile("\
+\n      mov $5, %%rax                           \
+\n      mov %0, %%rbx                           \
+\n      int $0x80                               \
+    "::"m"(p));
 }
 
 uint64_t runProg(char* s) {
-    s = s;
-    return 0;
+    uint64_t p;
+    asm volatile("\
+\n      mov $4, %%rax                           \
+\n      mov %1, %%rbx                           \
+\n      int $0x80                               \
+\n      mov %%rax, %0                           \
+    ":"=m"(p):"m"(s));
 }
 
 void printColor(char* s, uint8_t c) {

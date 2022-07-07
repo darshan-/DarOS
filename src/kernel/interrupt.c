@@ -348,6 +348,23 @@ void* startApp(uint64_t stdout) {
     return p;
 }
 
+extern uint64_t sh[];
+extern uint64_t sh_len;
+
+void* startSh(uint64_t stdout) {
+    struct process *p = mallocz(sizeof(struct process));
+    p->page = palloc();
+    p->stdout = stdout;
+    for (uint64_t i = 0; i < sh_len; i++)
+        ((uint64_t*) (p->page))[i] = sh[i];
+
+    p->rip = 0x7FC0000000ull;
+    p->rsp = 0x7FC0180000ull;
+
+    pushListTail(runnableProcs, p); // TODO: I may have assumptions elsewhere that aren't met with this as is...
+    return p;
+}
+
 void gotLine(void* v, char* l) {
     struct process* p = v;
     p->rax = strlen(l);
@@ -596,9 +613,6 @@ static void __attribute__((interrupt)) default_interrupt_handler(struct interrup
 extern uint64_t regs[15];
 
 void __attribute__((interrupt)) int0x80_syscall(struct interrupt_frame *frame) {
-    //print("int 0x80 handler\n");
-    //dumpFrame(frame);
-
     if (frame->ip >= 511ull * 1024 * 1024 * 1024) {
         for (int i = 0; i < 15; i++)
             ((uint64_t*) curProc)[i] = regs[i];
@@ -618,8 +632,6 @@ void __attribute__((interrupt)) int0x80_syscall(struct interrupt_frame *frame) {
 
             break;
         case 3: // readline()
-            // So my idea is to put the process into a "waiting for input" state, and when console reads a line on terminal for this process,
-            //   if it's waiting for input, we put the line on the stack and iretq to it.
             setReading(curProc->stdout, curProc);
             removeNodeFromList(runnableProcs, curProcN);
             waitloop();
@@ -627,6 +639,8 @@ void __attribute__((interrupt)) int0x80_syscall(struct interrupt_frame *frame) {
         case 4: // runProg(char* s)
             if (!strcmp((char*) curProc->rbx, "app"))
                 curProc->rax = (uint64_t) startApp(curProc->stdout);
+            else if (!strcmp((char*) curProc->rbx, "sh"))
+                curProc->rax = (uint64_t) startSh(curProc->stdout);
             else
                 curProc->rax = 0;
 
@@ -640,15 +654,7 @@ void __attribute__((interrupt)) int0x80_syscall(struct interrupt_frame *frame) {
         default:
             logf("Unknown syscall 0x%h\n", curProc->rax);
         }
-        // if (!curProc->rax) {
-        //     killProc(curProc);
-        //     waitloop();
-        // }
     }
-
-    //frame->ip = (uint64_t) waitloop;
-    //print("waitloop?");
-    //printf("hlt_in_waitloop in int 0x80: %u\n", hlt_in_waitloop);
 }
 
 static void __attribute__((interrupt)) default_PIC_P_handler(struct interrupt_frame *frame) {
