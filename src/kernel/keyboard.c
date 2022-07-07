@@ -10,7 +10,6 @@
 
 #define si(k) (struct input) {(k), alt_down, ctrl_down, shift_down}
 #define    map(c, i) case c: gotInput(i); break
-#define e0_map(c, i) case c: gotInput(i); return
 #define shifty(c, k, s) map(c, shift_down ? si(s) : si(k))
 #define capsy(c, k, s) map(c, (shift_down && !caps_lock_on) || (!shift_down && caps_lock_on) ? si(s) : si(k))
 
@@ -72,10 +71,6 @@ void init_keyboard() {
 }
 
 void keyScanned(uint8_t c) {
-    if (c == 0x48 || c == 0xe0)
-        logf("kbd c: 0x%h\n", c);
-    uint8_t hob = c & 0x80;  // Break / release
-
     // Anything that we want to handle specially if e0-escaped goes here, then we'll quit early.
     if (last_e0) {
         if (c == 0xe0) // I'm not sure if I can get multiple e0 codes in a row, but might as well check and keep flag on if so.
@@ -83,46 +78,31 @@ void keyScanned(uint8_t c) {
 
         last_e0 = 0;
 
-        if (hob)
+        // If I ever want num luck key to turn num lock off, I'll need a better approach, but for now this is easiest (and I always want num lock).
+        if ((c & 0x7f) == 0x2a || (c & 0x7f) == 0x36) // Ignore fake shift down and fake shift up
             return;
-            
-        if (c == 0x48) {
-            logf("e0-upArrow: %u, %u, %u\n", alt_down, ctrl_down, shift_down);
-        }
 
         switch (c) {
-            e0_map(0x35, si('/'));
+            map(0x35, si('/'));
 
-            e0_map(0x47, si(KEY_HOME));
-            e0_map(0x48, si(KEY_UP));
-            e0_map(0x49, si(KEY_PG_UP));
+            map(0x47, si(KEY_HOME));
+            map(0x48, si(KEY_UP));
+            map(0x49, si(KEY_PG_UP));
 
-            e0_map(0x4b, si(KEY_LEFT));
-            e0_map(0x4d, si(KEY_RIGHT));
+            map(0x4b, si(KEY_LEFT));
+            map(0x4d, si(KEY_RIGHT));
 
-            e0_map(0x4f, si(KEY_END));
-            e0_map(0x50, si(KEY_DOWN));
-            e0_map(0x51, si(KEY_PG_DOWN));
-            e0_map(0x52, si(KEY_INS));
-            e0_map(0x53, si(KEY_DEL));
+            map(0x4f, si(KEY_END));
+            map(0x50, si(KEY_DOWN));
+            map(0x51, si(KEY_PG_DOWN));
+            map(0x52, si(KEY_INS));
+            map(0x53, si(KEY_DEL));
         default:
             break;
         }
+
+        return;
     }
-
-    // if (c == 0xaa)
-    //     log("left shift release\n");
-
-    // switch (c) {
-    // case 0x9d: // LCtrl (Or RCtrl if e0 was before this)
-    // case 0xaa: // LShift
-    // case 0xb6: // RShift
-    // case 0xb8: // LAlt (Or Ralt if e0 was before this)
-    //     c -= 0x80;
-    //     break;
-    // default:
-    //     break;
-    // }
 
     switch (c) {
     case 0x9d:
@@ -131,20 +111,16 @@ void keyScanned(uint8_t c) {
 
     case 0x1d:
         ctrl_down = 1;
-        //ctrl_down = hob ? 0 : 1;
         break;
 
     case 0xaa:
     case 0xb6:
-        log("shift up\n");
         shift_down = 0;
         break;
 
     case 0x2a:
     case 0x36:
-        log("shift down\n");
         shift_down = 1;
-        //shift_down = hob ? 0 : 1;
         break;
 
     case 0xb8:
@@ -153,7 +129,6 @@ void keyScanned(uint8_t c) {
 
     case 0x38:
         alt_down = 1;
-        //alt_down = hob ? 0 : 1;
         break;
 
     case 0x3a:
