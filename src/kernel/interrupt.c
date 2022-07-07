@@ -259,11 +259,10 @@ void killProc(struct process* p) {
     }
 }
 
-static int setRbx = 0;
+//static int setRbx = 0;
 
-void startProc(struct process* p) {
-    asm volatile ("cli");
-
+// Caller should probably call no_ints before calling, and wait until after it's used the process's memory to call ints_okay, I think?
+void mapProcMem(struct process* p) {
     uint64_t* l2 = (uint64_t*) (0x100000 + (511 * 4096));
     l2[0] = (uint64_t) p->page | PT_PRESENT | PT_WRITABLE | PT_HUGE | PT_USERMODE;
 
@@ -271,6 +270,12 @@ void startProc(struct process* p) {
 \n      mov $0x7FC0000000, %rax                \
 \n      invlpg (%rax)                          \
     ");
+}
+
+void startProc(struct process* p) {
+    asm volatile ("cli");
+
+    mapProcMem(p);
 
     uint64_t flags = p->rflags;
     if (!flags) {
@@ -282,9 +287,13 @@ void startProc(struct process* p) {
         " : "=m"(flags));
     }
 
-    if (setRbx)
-        logf("startProc rax: (%u chars) %s (@0x%h)\n", p->rax, p->rbx, p->rbx);
-    setRbx = 0;
+    // if (setRbx) {
+    //     logf("startProc rax: (%u chars) %s (@0x%h)\n", p->rax, p->rbx, p->rbx);
+    //     uint64_t* stack = (uint64_t*) p->rbx - 8;
+    //     for (int i = 0; i < 16; i++)
+    //         logf("  0x%p016h\n", stack[15 - i]);
+    //     setRbx = 0;
+    // }
 
     uint64_t* sp = (uint64_t*) p->rsp;
     *--sp = 27;
@@ -350,16 +359,22 @@ void* startApp(uint64_t stdout) {
 }
 
 void gotLine(void* v, char* l) {
-    logf("gotLine: 0x%h, %s\n", v, l);
+    // logf("gotLine: 0x%h, %s\n", v, l);
     struct process* p = v;
     p->rax = strlen(l);
     p->rbx = p->rsp - p->rax - 1060;
     char* s = (char*) p->rbx;
+    no_ints();
+    mapProcMem(p);
     for (uint64_t i = 0; i < p->rax; i++)
         s[i] = l[i];
+    ints_okay();
 
-    logf("gotLine %u chars: %s (@0x%h)\n", p->rax, p->rbx, p->rbx);
-    setRbx = 1;
+    // logf("gotLine %u chars: %s (@0x%h)\n", p->rax, p->rbx, p->rbx);
+    // uint64_t* stack = (uint64_t*) p->rbx - 8;
+    // for (int i = 0; i < 16; i++)
+    //     logf("  0x%p016h\n", stack[15 - i]);
+    // setRbx = 1;
     pushListTail(runnableProcs, p);
 }
 
@@ -474,6 +489,13 @@ void waitloop() {
 
         if (curProcN) {
             curProc = listItem(curProcN);
+            // struct process* p = curProc;
+            // if (p->rbx >= 511ull * 1024 * 1024 * 1024 + 8) {
+            //     logf("startProc rax: (%u chars) %s (@0x%h)\n", p->rax, p->rbx, p->rbx);
+            //     uint64_t* stack = (uint64_t*) curProc->rbx - 8;
+            //     // for (int i = 0; i < 16; i++)
+            //     //     logf("  0x%p016h\n", stack[15 - i]);
+            // }
             startProc(curProc);
         }
 
