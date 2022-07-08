@@ -278,7 +278,7 @@ void startProc(struct process* p) {
     uint64_t* sp = (uint64_t*) p->rsp;
     *--sp = 27;
     *--sp = p->rsp;
-    *--sp = p->rflags;
+    *--sp = p->rflags | 0x200;
     *--sp = 19;
     *--sp = p->rip;
 
@@ -346,7 +346,6 @@ static void* startApp(struct app* a, uint64_t stdout) {
     asm volatile ("\
 \n      pushf                                       \
 \n      pop %%rax                                   \
-\n      or $0x200, %%rax                            \
 \n      mov %%rax, %0                               \
     " : "=m"(p->rflags));
 

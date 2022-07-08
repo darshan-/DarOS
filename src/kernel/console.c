@@ -447,6 +447,7 @@ static inline void printCharColor(uint64_t t, uint8_t c, uint8_t color) {
 
 void printColorTo(uint64_t t, char* s, uint8_t c) {
     no_ints();
+    //logf("pCT: %s", s);
 
     ensureTerm(t);
 
