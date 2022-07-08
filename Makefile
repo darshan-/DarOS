@@ -33,10 +33,10 @@ build/userspace/app.o2: Makefile build/userspace/app.o1 build/userspace/sys.o bu
 	ld -o build/userspace/app.o2 -N --warn-common -T src/userspace/linker.ld build/userspace/app.o1 build/userspace/sys.o build/lib/malloc.o build/lib/strings.o
 build/userspace/app.c: Makefile build/userspace/app.o2
 	echo "#include <stdint.h>" >build/userspace/app.c
-	echo "uint64_t app[] = {" >>build/userspace/app.c
+	echo "uint64_t app_code[] = {" >>build/userspace/app.c
 	hexdump -v -e '1/8 "0x%xull," "\n"' build/userspace/app.o2 >>build/userspace/app.c
 	echo "0};" >>build/userspace/app.c
-	echo -n "uint64_t app_len = " >>build/userspace/app.c
+	echo -n "uint64_t app_code_len = " >>build/userspace/app.c
 	wc -c <build/userspace/app.o2 | tr -d '\n' >>build/userspace/app.c
 	echo " / 8 + 1;" >>build/userspace/app.c
 build/userspace/app.o: Makefile build/userspace/app.c
@@ -48,10 +48,10 @@ build/userspace/sh.o2: Makefile build/userspace/sh.o1 build/userspace/sys.o buil
 	ld -o build/userspace/sh.o2 -N --warn-common -T src/userspace/linker.ld build/userspace/sh.o1 build/userspace/sys.o build/lib/malloc.o build/lib/strings.o
 build/userspace/sh.c: Makefile build/userspace/sh.o2
 	echo "#include <stdint.h>" >build/userspace/sh.c
-	echo "uint64_t sh[] = {" >>build/userspace/sh.c
+	echo "uint64_t sh_code[] = {" >>build/userspace/sh.c
 	hexdump -v -e '1/8 "0x%xull," "\n"' build/userspace/sh.o2 >>build/userspace/sh.c
 	echo "0};" >>build/userspace/sh.c
-	echo -n "uint64_t sh_len = " >>build/userspace/sh.c
+	echo -n "uint64_t sh_code_len = " >>build/userspace/sh.c
 	wc -c <build/userspace/sh.o2 | tr -d '\n' >>build/userspace/sh.c
 	echo " / 8 + 1;" >>build/userspace/sh.c
 build/userspace/sh.o: Makefile build/userspace/sh.c

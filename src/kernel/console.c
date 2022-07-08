@@ -262,15 +262,10 @@ static inline void ensureTerm(uint64_t t) {
     if (!terms[t].buf[0]) {
         ensurePages(t);
 
-        if (t == LOGS_TERM) {
+        if (t == LOGS_TERM)
             printColorTo(t, "- Start of logs -\n", 0x0f);
-        } else {
-            char* s = M_sprintf(" (#%u)\n", t);
-            printColorTo(t, "Ready!", 0x0d);
-            printColorTo(t, s, 0x0b);
-            free(s);
+        else
             terms[t].proc = startSh(t);
-        }
     }
     ints_okay();
 }

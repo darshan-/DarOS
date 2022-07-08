@@ -79,12 +79,15 @@ char* M_readline() {
     return s;
 }
 
+uint64_t stdout;
+
 extern void main();
 
-void __attribute__((section(".entry"))) _entry() {
+void __attribute__((section(".entry")))  _entry() {
     // I think I might prefer to use linker to place map last in text section, and have heap grow up toward stack, and have stack at end
     //   of page...
 
+    asm volatile("mov %%r15, %0":"=m"(stdout));
     init_heap((uint64_t*) 0x7FC0180000ull, 0x80000);
     main();
     exit();

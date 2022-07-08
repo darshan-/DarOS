@@ -17,6 +17,11 @@ void processInput(char* l) {
 }
 
 void main() {
+    char* s = M_sprintf(" (#%u)\n", stdout);
+    printColor("Ready!", 0x0d);
+    printColor(s, 0x0b);
+    free(s);
+
     for (;;) {
         printColor("\3 > ", 0x05);
         char* l = M_readline();

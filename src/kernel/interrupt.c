@@ -275,20 +275,10 @@ void startProc(struct process* p) {
 
     mapProcMem(p);
 
-    uint64_t flags = p->rflags;
-    if (!flags) {
-        asm volatile ("\
-\n          pushf                                   \
-\n          pop %%rax                               \
-\n          or $0x200, %%rax                        \
-\n          mov %%rax, %0                           \
-        " : "=m"(flags));
-    }
-
     uint64_t* sp = (uint64_t*) p->rsp;
     *--sp = 27;
     *--sp = p->rsp;
-    *--sp = flags;
+    *--sp = p->rflags;
     *--sp = 19;
     *--sp = p->rip;
 
@@ -308,7 +298,6 @@ void startProc(struct process* p) {
     *--sp = p->r14;
     *--sp = p->r15;
 
-    //asm volatile("xchgw %bx, %bx");
     asm volatile ("mov %0, %%rsp"::"m"(sp));
 
     asm volatile ("\
@@ -331,38 +320,43 @@ void startProc(struct process* p) {
     ");
 }
 
-extern uint64_t app[];
-extern uint64_t app_len;
+struct app {
+    uint64_t* code;
+    uint64_t len;
+};
 
-void* startApp(uint64_t stdout) {
+extern uint64_t app_code[];
+extern uint64_t app_code_len;
+static struct app app;
+
+extern uint64_t sh_code[];
+extern uint64_t sh_code_len;
+static struct app sh;
+
+static void* startApp(struct app* a, uint64_t stdout) {
     struct process *p = mallocz(sizeof(struct process));
     p->page = palloc();
     p->stdout = stdout;
-    for (uint64_t i = 0; i < app_len; i++)
-        ((uint64_t*) (p->page))[i] = app[i];
+    for (uint64_t i = 0; i < a->len; i++)
+        ((uint64_t*) (p->page))[i] = a->code[i];
 
+    p->r15 = stdout;
     p->rip = 0x7FC0000000ull;
     p->rsp = 0x7FC0180000ull;
+    asm volatile ("\
+\n      pushf                                       \
+\n      pop %%rax                                   \
+\n      or $0x200, %%rax                            \
+\n      mov %%rax, %0                               \
+    " : "=m"(p->rflags));
 
     pushListTail(runnableProcs, p); // TODO: I may have assumptions elsewhere that aren't met with this as is...
+
     return p;
 }
 
-extern uint64_t sh[];
-extern uint64_t sh_len;
-
 void* startSh(uint64_t stdout) {
-    struct process *p = mallocz(sizeof(struct process));
-    p->page = palloc();
-    p->stdout = stdout;
-    for (uint64_t i = 0; i < sh_len; i++)
-        ((uint64_t*) (p->page))[i] = sh[i];
-
-    p->rip = 0x7FC0000000ull;
-    p->rsp = 0x7FC0180000ull;
-
-    pushListTail(runnableProcs, p); // TODO: I may have assumptions elsewhere that aren't met with this as is...
-    return p;
+    return startApp(&sh, stdout);
 }
 
 void gotLine(void* v, char* l) {
@@ -638,9 +632,9 @@ void __attribute__((interrupt)) int0x80_syscall(struct interrupt_frame *frame) {
             break;
         case 4: // runProg(char* s)
             if (!strcmp((char*) curProc->rbx, "app"))
-                curProc->rax = (uint64_t) startApp(curProc->stdout);
+                curProc->rax = (uint64_t) startApp(&app, curProc->stdout);
             else if (!strcmp((char*) curProc->rbx, "sh"))
-                curProc->rax = (uint64_t) startSh(curProc->stdout);
+                curProc->rax = (uint64_t) startApp(&sh, curProc->stdout);
             else
                 curProc->rax = 0;
 
@@ -873,5 +867,12 @@ void init_interrupts() {
     //curProc = malloc(sizeof(struct process));
 
     //__asm__ __volatile__ ("xchgw %bx, %bx");
+
+    app.code = &app_code[0];
+    app.len = app_code_len;
+
+    sh.code = &sh_code[0];
+    sh.len = sh_code_len;
+
     ints_okay();
 }
