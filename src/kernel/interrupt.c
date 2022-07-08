@@ -464,6 +464,12 @@ void gotLine(void* v, char* l) {
 // Also, why did I switch from mapping 512 to mapping 256 GB?  I don't recall.  I recall doing it to solve some problem, but I
 //   don't remember what the problem was...  Because I may want to put user processes at 256 GB, for example.
 
+
+// TODO: Known issues:
+// In qemu, sometimes freezing after launching app (doesn't seem to happen in bochs...)
+// In qemu, changing terminals not working while app is counting/outputting (definitely didn't used to happen) (haven't tested
+//   anywhere else yet).  Like, the keystrokes are clearly captured, because we jump to the terminal we should once app finishes...
+
 void waitloop() {
     for (;;) {
         void (*f)();
