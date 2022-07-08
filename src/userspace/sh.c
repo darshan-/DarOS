@@ -23,7 +23,7 @@ void main() {
     free(s);
 
     for (;;) {
-        printColor("\3 > ", 0x05);
+        printColor("\r\3 > ", 0x05);
         char* l = M_readline();
         processInput(l);
         free(l);

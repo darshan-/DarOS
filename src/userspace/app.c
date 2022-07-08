@@ -33,4 +33,5 @@ void main() {
     for (; a < chunk; a++)
         if (a % (chunk / 10) == 0)
             printf("a: %u\n", a);
+    print("Ending without a newline.");
 }

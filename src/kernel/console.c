@@ -434,6 +434,13 @@ static inline void clearCurToEnd() {
 static inline void printCharColor(uint64_t t, uint8_t c, uint8_t color) {
     uint64_t l = top(t);
 
+    if (c == '\r') { // I treat \r as a request to ensure we are at the first column, going to the next line if necessary
+        if (terms[t].cur % 160 != 0)
+            c = '\n';
+        else
+            return;
+    }
+
     if (c == '\n') {
         for (uint64_t n = 160 - terms[t].cur % 160; n > 0; n -= 2)
             printcc(t, 0, color);
