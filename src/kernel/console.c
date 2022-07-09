@@ -181,6 +181,20 @@ void updateClock() {
     free(s);
 }
 
+void ni(uint64_t b) {
+    b = b;
+    STATUS_LINE[40] = 'n';
+}
+
+void ieo(uint64_t b) {
+    b = b;
+    STATUS_LINE[40] = 'e';
+}
+
+void ion() {
+    STATUS_LINE[40] = 'o';
+}
+
 static void setStatusBar() {
     for (uint64_t* v = (uint64_t*) STATUS_LINE; v < (uint64_t*) VRAM_END; v++)
         *v = 0x5f005f005f005f00ull;
@@ -582,30 +596,6 @@ static void gotInput(struct input i) {
 
             terms[at].cur = terms[at].end;
             print("\n");
-
-            // Tell the shell for this terminal what string we got?
-            //  What if the shell isn't the active process, but an app is running and waiting for input?
-            //  Is there always exactly one (or always at most one, if shell isn't necessarily there?) recepient of line input?
-            // I think the shell is always the arbiter of who gets the line input -- whether it consumes it itself, passes it on to a
-            //   sub-process, or whatever - up to it.
-            // So I think the idea is that if the process is in a state of waiting for input -- it's not in the queue of active processes --
-            //  when we are here, having gotten a line in the terminal, then we return to it with the input it wants.  It's just taking
-            //  shape in my mind now, but I think from the perspective of the processes, it's just called a syscall -- from sys.c, in
-            //  assembly, we just called int0x80, and now we're here at the next instruction -- and rax, say, has our zero-terminated char*
-            //  in it.  Maybe if that is zero-length, we can check rbx for an error code. **NOTE** that the string must be in the process's
-            //  page.  Think about how to do that...  (I don't want to have a whole other 2 MB page for this... Oh, wait, it can be on the
-            //    processes stack, right?)  [Leaving parenthetical...]  Right?  I mean, that'd probably work great most of the time,
-            //    realistically... I'd worry about perverse input overflowing the stack...  With heap-allocation, we might run out of memory,
-            //    but as long as we're checking for 0 returns from malloc (which, yeah, we're currently being super lazy about, but we can do
-            //    it pretty easily in this case), we don't have to worry about that.
-
-            // Honestly, it's really ugly, but I think I kinda like the idea of, for now, putting the string at the end of the process page.
-            // For now, with 2 MB, and the app at the beginning and the string at the end, there's no real worry of overlap.  We don't have
-            //   multiprocessing, so we'll only ever need one... Hmm, well, I guess interrupts are back on the moment iretq is called, so,
-            //   shoot.  I guess it feels too wrong, not just ugly.
-            // Oh, wait, haha, that's where the stack is, anyway!  But, uh, that's where the stack is -- I forgot we don't run out of space
-            //   on the stack until the stack grows down and everything else grows up (and right now nothing's growing up yet anyway) and
-            //   they meet.  So, yeah, just on the stack is the obvious good-enough, let's get going approach, actually.
 
             // Which lets me get back to finishing the thought I'd only halfway (it feels, who knows, because I'm not done) worked out:
             //   how do we represent it on the stack?  I'm thinking we want the start of the string (ah, interrupts being back on doesn't

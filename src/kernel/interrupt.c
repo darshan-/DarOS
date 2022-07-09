@@ -358,17 +358,19 @@ void* startSh(uint64_t stdout) {
     return startApp(&sh, stdout);
 }
 
+// TODO: Hmm, is it worth mapping the process's page in?  We can access it directly at its physical address...
 void gotLine(void* v, char* l) {
     struct process* p = v;
     p->rax = strlen(l);
-    p->rbx = p->rsp - p->rax - 1060;
+    p->rbx = p->rsp - p->rax - (20 * 8); // We push 20 quadwords onto stack as part of resuming process
+    //p->rbx = p->rsp - p->rax - 160;
 
-    char* s = (char*) p->rbx;
-    no_ints();
-    mapProcMem(p);
+    char* s = (char*) (p->page + p->rbx - 0x7FC0000000ull);
+    //no_ints();
+    //mapProcMem(p);
     for (uint64_t i = 0; i < p->rax; i++)
         s[i] = l[i];
-    ints_okay();
+    //ints_okay();
 
     pushListTail(runnableProcs, p);
 }
@@ -466,8 +468,17 @@ void gotLine(void* v, char* l) {
 
 // TODO: Known issues:
 // In qemu, sometimes freezing after launching app (doesn't seem to happen in bochs...)
-// In qemu, changing terminals not working while app is counting/outputting (definitely didn't used to happen) (haven't tested
-//   anywhere else yet).  Like, the keystrokes are clearly captured, because we jump to the terminal we should once app finishes...
+
+// And that's back, just before I made it here to delete that.
+// I've determined that it appears *not* to be about missing turning interrupts back on.  Certainly ints_okay() appears to be called more
+//   recently than no_ints().  (I'm showing in status bar to assess this.)
+// *And* I noticed my CPU fan getting loud a few seconds after freezing, and HTOP shows qemu CPU usage at 100%.
+// So I think I have an infinite loop somewhere.  Likely, I think, something a bit subtle, that is ultimately an infinite loop.
+// If I could replicate in bochs, that would make it easier to track down.  Although it's occuring to me now that qemu I think still does
+//   allow me to inspect registers (and memory, but I think rip is fairly likely to be my main clue as to what's going on).
+// Otherwise maybe write serial output to a file on the host system (or, I guess I can still see that too -- yeah; I'm just used to my log
+//   console now, and blurring that with the serial console.  So, if I can't sort it out otherwise, having logs go to serial console and
+//   looking there is probably my best approach to figuring out what's going on.
 
 void waitloop() {
     for (;;) {
@@ -737,6 +748,7 @@ void __attribute__((interrupt)) irq0_pit(struct interrupt_frame *frame) {
     if (periodicCallbacks.pcs) {
         for (uint64_t i = 0; i < periodicCallbacks.len; i++) {
             if (periodicCallbacks.pcs[i]->count == 0 || periodicCallbacks.pcs[i]->count > TICK_HZ) {
+                printf("halting!\n");
                 logf("halting!\n");
                 __asm__ __volatile__ ("hlt");
             }

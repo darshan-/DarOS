@@ -15,3 +15,8 @@ void startTty();
 void vaprintf(uint64_t t, char* fmt, va_list* ap);
 void procDone(void* p, uint64_t t);
 void setReading(uint64_t t, void* p);
+
+
+void ni(uint64_t b);
+void ieo(uint64_t b);
+void ion();

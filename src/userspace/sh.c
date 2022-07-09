@@ -3,10 +3,6 @@
 #include "sys.h"
 #include "../lib/strings.h"
 
-// I think I want to soon make strings library a single thing importatable by the kernel or userspace.
-// Malloc still seems easiest kept separate.
-// But then my print functions can stop being variadic, and less work is done in the kernel for printf.
-
 void processInput(char* l) {
     if (!strcmp(l, "exit"))
         exit();
