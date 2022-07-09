@@ -358,113 +358,17 @@ void* startSh(uint64_t stdout) {
     return startApp(&sh, stdout);
 }
 
-// TODO: Hmm, is it worth mapping the process's page in?  We can access it directly at its physical address...
 void gotLine(void* v, char* l) {
     struct process* p = v;
     p->rax = strlen(l);
     p->rbx = p->rsp - p->rax - (20 * 8); // We push 20 quadwords onto stack as part of resuming process
-    //p->rbx = p->rsp - p->rax - 160;
 
     char* s = (char*) (p->page + p->rbx - 0x7FC0000000ull);
-    //no_ints();
-    //mapProcMem(p);
     for (uint64_t i = 0; i < p->rax; i++)
         s[i] = l[i];
-    //ints_okay();
 
     pushListTail(runnableProcs, p);
 }
-
-// Can waitloop be scheduler?
-// Do any kernel work, then bounce between any user processes?  And if none of the above, hlt loop?
-// So most interrupts can return, to whatever was interrupted, but timer interrupt, if the time slice is up, will
-//  call scheduler instead (that thing that we're not returning to will be gotten back to when schedule says it's time)?
-// Well, we'd need to keep track of state ourselves, if not iretq-ing back there.  But stack is messed up?  How do we get
-//  state?  Why is stack weird?
-// And weren't keyboard interrupts *not* happening before?  Wait, are they happening when in user land?  Yes?  What changed?
-// Oh, that's right, if all interrupt does is queue work then go back to userland, we never make it to waitoop to do queued
-//   work.  So I think that's all working as expected.
-// So main issue is storing all registers -- we're not just starting a process, we're trying to get back to exactly the
-//   state of everything when going back to that line of code.  So restoring will mean not just setting up stack, but when
-//   we call iretq, every single register should be restored first.
-// Hmm, don't I still need to know if I'm in the interrupt from user land vs kernel code?  I mean, if the above works, then
-//  all interrupts except timer (pit / hpet -- I plan to use HPET where available relatively soon) will just iretq (return
-//  in C).  But timer interrupt will want to pause a user process if it's time.  (Oh, other interrupts will pause user process
-//  too, like when waiting for disk or network or something -- but in that case, they don't need to know how they got there.)
-// So I need to check stack or something, to know.  Because there is no process for kernel stuff, and if kernel is in the middle
-//   of something and we just went to waitloop and abandoned it, we'd never get back to it.  Well, and that makes it obvious
-//   what I'd thought briefly above but hadn't fully sat with -- we need to know not just whether we're here from users space,
-//   but exactly which process -- how else could we save the registers for it?
-// I guess the stack frame GCC presents me with should be sufficient... the IP of that should show me which process I'm in
-//  (unless I'm doing something in the kernel on behalf of that process -- which a proper OS would keep track of, but maybe,
-//  as far as playing, experimenting, and learning here, for now at least, I can look at that) -- if the stack frame IP is
-//  part of userland process, and it's time to task switch, save registers for that process, and do process switch; but if it's
-//  not part of a ring 3 proess, iretq to let kernel finish what it's doing?  (Hmm, kernel could also be doing things that
-//  wait -- I/O, etc. -- *and* doing them on bahalf of a user process -- so it's not just a matter of being lax with time
-//  acounting, it's also a matter of it not necessarily making sense to return there.  Hmm, or is it?  Hmm... well, if I was
-//  waiting for disk or network io or somethign, I guess I'd set up data structures for what to do when the data is ready, and
-//  then go to the waitloop.  So the basic design is that the kernel never does anything that takes a long time, and I should
-//  always return to what the kernel was doing?  Ooh -- wait, what about waitloop?  I *don't* want to return to the hlt -- yeah
-//  okay, but it's not a hlt loop, we always, for quite some time now, have been doing work at the top of that very loop, exactly
-//  as we'd want.  Hmm, yeah, I gues I'm spacey and want to consider further when less spacy, but I think I'm good to iretq to
-//  whatever ring 0 thing we were doing if GCC's interrupt stack frame IP isn't part of a user process.
-
-// Hmm, in thinking about paging, and how IP wouldn't be reliable if things weren't identity mapped, and wondering how this is
-//   supposed to work, it finally just occured to me that -- duh! -- the kernel can know what it was ding by keeping track
-//   itself, right?  When about to switch to a user process, we mark that as the active process (after turning interrupts off,
-//   obviously, so we're not going to get an interrupt between setting that and actually *being* in that process).  So we know
-//   whether to iretq back to kernel or to go to waitlist/scheduler based on that.  If it's time to schedule, and there's an
-//   active ring 3 process, go to scheduler.  Otherwise iretq.
-
-// So, let's see, I'd want to *not* share l2 table anymore, and instead make a new one per process, where the process sees
-//   itself as beign an a fixed, predicatable address.  (Ah, and I think I finally get the higher-half kernel thing now, or
-//   at least better than I had -- software interrupt puts me in ring 0, with my ring 0 stack (from tss) and cs from idt.  But
-//   it doesn't restore our old cr3.  Kernel and user land both share the same page tables.  When we context switch (change
-//   processes), we change cr3.  But software or hardware interrupt, while similar in some ways, is *not* a context switch, and
-//   page tables remain the same.  So we map the kernel separate from any addresses the userland might use, because the kernel
-//   sees the same addresses!
-// This does require further thought and consideration...  When we're leaving the interrupt to go to the waitloop/scheduler, or
-//   otherwise doing kernel work for the kernel, we go back to the default cr3?  No, friend.  Malloc and everything else sees
-//   *consistent* higher-half addresesses, regardless of which process we are in.  The only addresses changing are lower-half,
-//   userland stuff that only those processes need to worry about.  Kernel will see that userspace 2 MB page at *both* places --
-//   the higher-half returned by malloc, and at the lower-half address we load everything at.  Because that's how we'll map
-//   things in our page tables.
-// So in the original, kernel-only tables, the kernel itself will be identity mapped in lower half (as it currently is) *and*
-//   higher-half mapped as well, as it will be in all tables.  I guess that means we *still* have to make sure we'll compiled
-//   with *only* relative addresses, right?  No absolute addresses other than what we explicitely use, like IDT, and stuff --
-//   which raises the great question: which lower-half things need to be identity mapped?  Certainly first meg.  Well, again,
-//   whole kernel will be, as all kernel code fits within first meg.  It's just things returned from malloc that are above
-//   that.  Stack, heap.
-
-// Hmm, seems hard to get GCC to use relative-only addressing; everything seems to be designed to not be runnable until made
-//   fixed location.  (Linking required.)  That doesn't make sense to me, but whatever.  I guess the idea is lower-half setup
-//   is fixed low; higher-half kernel is fixed high.  So maybe bootloader is lower half, and all of C code is higher-half, and
-//   instead of falling straight through into C (still so cool!), we jump to higher-half address.  Easy to link that way.
-// Do I need to care about physical alignment?  Can I just map my base higher-half address to exactly whatever address is
-//   a label at bottom of bootloader assembly file, regardless of how it's aligned?
-
-// Okay, but the question I was starting to ask was about what else needs to be identity mapped low, besides idt, gdtr, etc.
-//   Kernel stack can be mapped both ways.  But what about page tables?  If I'm using tables I'm getting from malloc, I'm going
-//   to see them as upper half.  But I'll need to load them in cr3 (l4, l3, l2) as physical addresses, right?
-// Well, it would seem ugly on the one hand, but in reality not tricky, to translate to physical address simply by subtraction.
-// We'll know the physical address of start of C code, and we'll know the virtual address, and that difference will be constant
-//   across all mappings of virtual to physical, upper to lower.  So we can just use malloc and translate, as one option.
-
-// Also note that Rust book finally answered I question I've had: I guess I want to call invlpg (“invalidate page”) when I update
-//   pages, due to the translation lookaside buffer.
-
-// Hmm, as I was going to bed, and very much as I was waking up, I realized I was jumping too far: I now have paging motivated,
-//   and having kernel mapped in user process motivated, but the benefits of higher-half aren't clear to me.  Everything about
-//   my process here is to have fun and do things the way that makes most sense to me, that feels fun and/or easy and/or
-//   interesting and/or most right for me me here.
-
-// And so what feels most obvious, fun, natural, and right to me here (which might soon be apparent as flawed, in which case we'd
-//   have learned something!), is to have kernel in the lower half.  So it's always only dealing with physical addresses.  User
-//   space can be high, though not necessarily upper half, just a consistent high location.
-
-// Also, why did I switch from mapping 512 to mapping 256 GB?  I don't recall.  I recall doing it to solve some problem, but I
-//   don't remember what the problem was...  Because I may want to put user processes at 256 GB, for example.
-
 
 // TODO: Known issues:
 // In qemu, sometimes freezing after launching app (doesn't seem to happen in bochs...)
@@ -742,9 +646,6 @@ void __attribute__((interrupt)) irq0_pit(struct interrupt_frame *frame) {
 
     ms_since_boot = pitCount * PIT_COUNT * 1000 / PIT_FREQ;
 
-    // if (pitCount % TICK_HZ == 0)
-    //     logf("Average CPU ticks per PIT tick: %u\n", (read_tsc() - cpuCountOffset) / pitCount);
-
     if (periodicCallbacks.pcs) {
         for (uint64_t i = 0; i < periodicCallbacks.len; i++) {
             if (periodicCallbacks.pcs[i]->count == 0 || periodicCallbacks.pcs[i]->count > TICK_HZ) {
@@ -759,10 +660,6 @@ void __attribute__((interrupt)) irq0_pit(struct interrupt_frame *frame) {
     }
 
     static uint64_t lms = 0;
-    // static struct list* ips = 0;
-    // if (!ips)
-    //     ips = newList();
-
     if (ms_since_boot >= lms + 2) {
         lms = ms_since_boot;
 
@@ -773,26 +670,9 @@ void __attribute__((interrupt)) irq0_pit(struct interrupt_frame *frame) {
             curProc->rsp = frame->sp;
             curProc->rflags = frame->flags;
 
-            // removeFromList(ips, (void*)frame->ip);
-            // pushListHead(ips, (void*)frame->ip);
-
-            //print("IP is in userspace and time for scheduler; going to waitloop...\n");
             waitloop();
         }
     }
-
-    // if (!curProc && listLen(ips)) {
-    //     print("ips: \n");
-    //     forEachListItem(ips, ({
-    //         void __fn__ (void* item) {
-    //             printf(" * 0x%h\n", item);
-    //         }
-    //         __fn__;
-    //     }));
-    //     ips = newList(); // Simplest to just leak  bit of memory for this quick test
-    // }
-    // if (frame->ip >= 511ull * 1024 * 1024 * 1024)
-    //     print("IP is in userspace and returning to userspace\n");
 }
 
 static void set_handler(uint64_t vec, void* handler, uint8_t type) {
