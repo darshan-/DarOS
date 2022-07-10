@@ -642,6 +642,13 @@ static uint64_t cpuCountOffset = 0;
 void __attribute__((interrupt)) irq0_pit(struct interrupt_frame *frame) {
     outb(PIC_PRIMARY_CMD, PIC_ACK);
 
+#define VRAM ((uint8_t*) 0xb8000)
+#define LINES 24
+#define LINE(l) (VRAM + 160 * (l))
+#define STATUS_LINE LINE(LINES)
+
+    STATUS_LINE[100]++;
+
     pitCount++;
 
     ms_since_boot = pitCount * PIT_COUNT * 1000 / PIT_FREQ;

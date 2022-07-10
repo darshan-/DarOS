@@ -8,6 +8,7 @@
 #include "keyboard.h"
 #include "periodic_callback.h"
 #include "rtc.h"
+#include "serial.h"
 
 #include "../lib/malloc.h"
 #include "../lib/strings.h"
@@ -58,6 +59,18 @@ static struct vterm terms[TERM_COUNT];
 #define byte_at(t, i) page_for(t, i)[(i) % (LINES * 160)]
 #define word_at(t, i) (((uint16_t*) page_for(t, i))[(i) % (LINES * 160) / 2])
 #define qword_at(t, i) (((uint64_t*) page_for(t, i))[(i) % (LINES * 160) / 8])
+
+static void* cmalloc(uint64_t n) {
+    com1_print("cmalloc Start");
+    void* p = malloc(n);
+    com1_print("cmalloc END");
+    return p;
+}
+
+static void* cmallocz(uint64_t n) {
+    com1_print("(cmallocZZZZZ)");
+    return mallocz(n);
+}
 
 static void addPage(uint64_t t, uint64_t i) {
     if (terms[t].buf[i])
@@ -270,7 +283,7 @@ static inline void ensureTerm(uint64_t t) {
     no_ints();
     if (!terms[t].buf) {
         terms[t].cap = 16;
-        terms[t].buf = mallocz(terms[t].cap * sizeof(uint8_t*));
+        terms[t].buf = cmallocz(terms[t].cap * sizeof(uint8_t*));
     }
 
     if (!terms[t].buf[0]) {
@@ -403,7 +416,7 @@ void setReading(uint64_t t, void* p) {
 
 char* M_readline() {
     uint64_t len = terms[at].end - terms[at].anchor + 1;
-    char* s = malloc(len);
+    char* s = cmalloc(len);
     s[len - 1] = 0;
 
     for (uint64_t i = 0; i < len; i++)
@@ -462,13 +475,12 @@ static inline void printCharColor(uint64_t t, uint8_t c, uint8_t color) {
         printcc(t, c, color);
     }
 
-    if (top(t) != l)
+    if (top(t) != l) // This seems like a the likeliest culprit?
         ensurePages(t);
 }
 
 void printColorTo(uint64_t t, char* s, uint8_t c) {
     no_ints();
-    //logf("pCT: %s", s);
 
     ensureTerm(t);
 
@@ -546,9 +558,6 @@ void procDone(void* p, uint64_t t) {
         return;
 
     terms[t].proc = startSh(t);
-
-    // if (terms[t].cur % 160 != 0)
-    //     printTo(t, "\n");
 }
 
 static void gotInput(struct input i) {
