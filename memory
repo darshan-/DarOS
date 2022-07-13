@@ -163,3 +163,48 @@ So it's a matter of app needing to be 447 qwords or fewer, it seems...
 
 Which is fucking weird.
 
+
+
+gcc -Wall -Wextra -c -ffreestanding -fno-stack-protector -mgeneral-regs-only -mno-red-zone -fno-PIC -mcmodel=large -momit-leaf-frame-pointer -S -fverbose-asm src/lib/malloc.c
+
+
+
+---------> irq0
+!!! iretqWaitloop !!!
+Waitloop
+wl curProcN 0x90C900
+listLen(runnableProcs): 1
+Set (after nextNodeCirc) curProcN to 0x90C900
+l404 listItem
+---------> irq0
+---------> int 0x80
+  ------- syscall: 3
+ -- readline -- setting proc to reading state
+logs trying to print...
+ -- readline -- removing proc from runnable list
+ -- readline -- calling iretqWaitloop
+!!! iretqWaitloop !!!
+Waitloop
+wl curProcN 0x90C900
+listLen(runnableProcs): 1
+Set (after nextNodeCirc) curProcN to 0x656C62616E6E7572
+l404 listItem
+Double fault, frame->ip: 0x13BDD
+ip: 0x0000000000013BDD    cs: 0x0000000000000008 flags: 0x0000000000010006
+sp: 0x000000000030FF18    ss: 0x0000000000000000
+
+
+struct stack_frame {
+    struct stack_frame* next;
+    void* ret;
+};
+
+void printStackTrace() {
+  register struct stack_frame* fp asm("ebp");
+
+  com1_print("-> /// Stack frame START\n");
+  for (struct stack_frame* frame = fp; frame; frame = frame->next)
+      com1_printf("0x%h\n", frame->ret);
+  com1_print("-> \\\ Stack frame END\n");
+}
+

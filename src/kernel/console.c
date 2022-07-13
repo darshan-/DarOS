@@ -69,7 +69,9 @@ static void* cmalloc(uint64_t n) {
 
 static void* cmallocz(uint64_t n) {
     com1_print("(cmallocZZZZZ)");
-    return mallocz(n);
+    void* p = mallocz(n);
+    com1_print("cmallocz END");
+    return p;
 }
 
 static void addPage(uint64_t t, uint64_t i) {
@@ -464,8 +466,10 @@ static inline void printCharColor(uint64_t t, uint8_t c, uint8_t color) {
     if (c == '\r') { // I treat \r as a request to ensure we are at the first column, going to the next line if necessary
         if (terms[t].cur % 160 != 0)
             c = '\n';
-        else
+        else {
+            //com1_print("pCC END");
             return;
+        }
     }
 
     if (c == '\n') {
@@ -475,7 +479,7 @@ static inline void printCharColor(uint64_t t, uint8_t c, uint8_t color) {
         printcc(t, c, color);
     }
 
-    if (top(t) != l) // This seems like a the likeliest culprit?
+    if (top(t) != l)
         ensurePages(t);
 }
 
@@ -484,8 +488,10 @@ void printColorTo(uint64_t t, char* s, uint8_t c) {
 
     ensureTerm(t);
 
+    //com1_print("pCt WHILE START");
     while (*s != 0)
         printCharColor(t, *s++, c);
+    //com1_print("pCt WHILE END");
 
     terms[t].anchor = terms[t].cur;
 
@@ -502,7 +508,10 @@ void printColor(char* s, uint8_t c) {
     printColorTo(at, s, c);
 }
 
+extern void printStackTrace();
 void printTo(uint64_t t, char* s) {
+    //com1_print("printTo\n");
+    //printStackTrace();
     printColorTo(t, s, 0x07);
 }
 
