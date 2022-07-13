@@ -42,6 +42,8 @@ uint64_t runProg(char* s) {
 \n      int $0x80                               \
 \n      mov %%rax, %0                           \
     ":"=m"(p):"m"(s));
+
+    return p;
 }
 
 void printColor(char* s, uint8_t c) {

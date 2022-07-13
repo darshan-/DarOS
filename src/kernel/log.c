@@ -18,7 +18,6 @@ void log(char* s) {
     //   the string?
     pushListTail(logs, M_scopy(s));
 
-    com1_print("logs trying to print...\n");
     printTo(LOGS_TERM, s);
 }
 

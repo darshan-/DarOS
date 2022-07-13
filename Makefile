@@ -4,7 +4,7 @@ c_objects := $(patsubst src/kernel/%.c, build/%.o, $(wildcard src/kernel/*.c))
 
 GCC_OPTS := -Wall -Wextra -c -ffreestanding -fno-stack-protector -mgeneral-regs-only -mno-red-zone -fno-PIC -mcmodel=large -momit-leaf-frame-pointer #--static-pie
 
-LD_OPTS := -N --warn-common -T src/kernel/linker.ld --print-map
+LD_OPTS := -N --warn-common -T src/kernel/linker.ld #--print-map
 
 include build/headers.mk
 

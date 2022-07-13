@@ -8,7 +8,6 @@
 #include "keyboard.h"
 #include "periodic_callback.h"
 #include "rtc.h"
-#include "serial.h"
 
 #include "../lib/malloc.h"
 #include "../lib/strings.h"
@@ -59,20 +58,6 @@ static struct vterm terms[TERM_COUNT];
 #define byte_at(t, i) page_for(t, i)[(i) % (LINES * 160)]
 #define word_at(t, i) (((uint16_t*) page_for(t, i))[(i) % (LINES * 160) / 2])
 #define qword_at(t, i) (((uint64_t*) page_for(t, i))[(i) % (LINES * 160) / 8])
-
-static void* cmalloc(uint64_t n) {
-    com1_print("cmalloc Start");
-    void* p = malloc(n);
-    com1_print("cmalloc END");
-    return p;
-}
-
-static void* cmallocz(uint64_t n) {
-    com1_print("(cmallocZZZZZ)");
-    void* p = mallocz(n);
-    com1_print("cmallocz END");
-    return p;
-}
 
 static void addPage(uint64_t t, uint64_t i) {
     if (terms[t].buf[i])
@@ -196,20 +181,6 @@ void updateClock() {
     free(s);
 }
 
-void ni(uint64_t b) {
-    b = b;
-    STATUS_LINE[40] = 'n';
-}
-
-void ieo(uint64_t b) {
-    b = b;
-    STATUS_LINE[40] = 'e';
-}
-
-void ion() {
-    STATUS_LINE[40] = 'o';
-}
-
 static void setStatusBar() {
     for (uint64_t* v = (uint64_t*) STATUS_LINE; v < (uint64_t*) VRAM_END; v++)
         *v = 0x5f005f005f005f00ull;
@@ -285,7 +256,7 @@ static inline void ensureTerm(uint64_t t) {
     no_ints();
     if (!terms[t].buf) {
         terms[t].cap = 16;
-        terms[t].buf = cmallocz(terms[t].cap * sizeof(uint8_t*));
+        terms[t].buf = mallocz(terms[t].cap * sizeof(uint8_t*));
     }
 
     if (!terms[t].buf[0]) {
@@ -418,7 +389,7 @@ void setReading(uint64_t t, void* p) {
 
 char* M_readline() {
     uint64_t len = terms[at].end - terms[at].anchor + 1;
-    char* s = cmalloc(len);
+    char* s = malloc(len);
     s[len - 1] = 0;
 
     for (uint64_t i = 0; i < len; i++)
@@ -466,10 +437,8 @@ static inline void printCharColor(uint64_t t, uint8_t c, uint8_t color) {
     if (c == '\r') { // I treat \r as a request to ensure we are at the first column, going to the next line if necessary
         if (terms[t].cur % 160 != 0)
             c = '\n';
-        else {
-            //com1_print("pCC END");
+        else
             return;
-        }
     }
 
     if (c == '\n') {
@@ -488,10 +457,8 @@ void printColorTo(uint64_t t, char* s, uint8_t c) {
 
     ensureTerm(t);
 
-    //com1_print("pCt WHILE START");
     while (*s != 0)
         printCharColor(t, *s++, c);
-    //com1_print("pCt WHILE END");
 
     terms[t].anchor = terms[t].cur;
 
@@ -508,10 +475,7 @@ void printColor(char* s, uint8_t c) {
     printColorTo(at, s, c);
 }
 
-extern void printStackTrace();
 void printTo(uint64_t t, char* s) {
-    //com1_print("printTo\n");
-    //printStackTrace();
     printColorTo(t, s, 0x07);
 }
 

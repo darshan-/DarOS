@@ -216,7 +216,6 @@ static struct process* curProc = 0;
 void* curProcN = 0;
 
 void killProc(struct process* p) {
-    com1_print("killProc");
     if (!p)
         return;
 
@@ -254,8 +253,6 @@ void killProc(struct process* p) {
             curProc = 0;
         } else {
             curProcN = n;
-            com1_printf("Set curProcN to 0x%h\n", curProcN);
-            com1_print("l256 listItem\n");
             curProc = listItem(n);
         }
     } else {
@@ -324,29 +321,6 @@ void startProc(struct process* p) {
     ");
 }
 
-//0xC03100007C05EA00
-// An exerperiment in going to waitloop from interrupt handler with iretq
-void iretqWaitloop() {
-    com1_print("!!! iretqWaitloop !!!\n");
-
-    void* ip = &waitloop;
-    // Which instruction do we fail on?
-    asm volatile ("\
-\n      movq %%rsp, %%rax                         \
-\n      push $0                                   \
-\n      push %%rax                                \
-\n      pushf                                     \
-\n      push $8                                   \
-\n      push %0                                   \
-\n      iretq                                     \
-    "::"m"(ip));
-/*
-\n      pop %%rax                                 \
-\n      or $0x200, %%rax                          \
-\n      push %%rax                                \
-  */
-}
-
 struct app {
     uint64_t* code;
     uint64_t len;
@@ -412,7 +386,6 @@ void gotLine(void* v, char* l) {
 //   looking there is probably my best approach to figuring out what's going on.
 
 void waitloop() {
-    com1_print("Waitloop\n");
     for (;;) {
         void (*f)();
 
@@ -421,20 +394,12 @@ void waitloop() {
 
         asm volatile("cli");
 
-        if (curProcN) {
-            com1_printf("wl curProcN 0x%h\n", curProcN);
-            com1_printf("listLen(runnableProcs): %u\n", listLen(runnableProcs));
+        if (curProcN)
             curProcN = nextNodeCirc(runnableProcs, curProcN);
-            com1_printf("Bee Tee Dubs, runnableProcs' head is 0x%h\n", listHead(runnableProcs));
-            com1_printf("Set (after nextNodeCirc) curProcN to 0x%h\n", curProcN);
-        }
-        else if (listLen(runnableProcs)) {// TODO: I feel like there's a cleaner approach to sort out when I'm less tired...
+        else if (listLen(runnableProcs)) // TODO: I feel like there's a cleaner approach to sort out when I'm less tired...
             curProcN = listHead(runnableProcs);\
-            com1_printf("Set curProcN to 0x%h\n", curProcN);
-        }
 
         if (curProcN) {
-            com1_print("l404 listItem\n");
             curProc = listItem(curProcN);
             startProc(curProc);
         }
@@ -454,12 +419,11 @@ void process_keys() {
 }
 
 static void dumpFrame(struct interrupt_frame *frame) {
-    com1_printf("ip: 0x%p016h    cs: 0x%p016h flags: 0x%p016h\n", frame->ip, frame->cs, frame->flags);
-    com1_printf("sp: 0x%p016h    ss: 0x%p016h\n", frame->sp, frame->ss);
+    logf("ip: 0x%p016h    cs: 0x%p016h flags: 0x%p016h\n", frame->ip, frame->cs, frame->flags);
+    logf("sp: 0x%p016h    ss: 0x%p016h\n", frame->sp, frame->ss);
 }
 
 static inline void generic_trap_n(struct interrupt_frame *frame, int n) {
-    com1_print("---------> generic trap\n");
     printf("Generic trap handler used for trap vector 0x%h\n", n);
     dumpFrame(frame);
 
@@ -472,7 +436,6 @@ static inline void generic_trap_n(struct interrupt_frame *frame, int n) {
 }
 
 static inline void generic_etrap_n(struct interrupt_frame *frame, uint64_t error_code, int n) {
-    com1_print("---------> generic etrap\n");
     printf("Generic trap handler used for trap vector 0x%h, with error on stack; error: 0x%p016h\n", n, error_code);
     dumpFrame(frame);
     frame->ip = (uint64_t) waitloop;
@@ -558,7 +521,6 @@ static void init_pic() {
 // }
 
 static void __attribute__((interrupt)) default_interrupt_handler(struct interrupt_frame *frame) {
-    com1_print("---------> default\n");
     printf("Default interrupt handler\n");
     dumpFrame(frame);
 }
@@ -566,60 +528,54 @@ static void __attribute__((interrupt)) default_interrupt_handler(struct interrup
 extern uint64_t regs[15];
 
 void __attribute__((interrupt)) int0x80_syscall(struct interrupt_frame *frame) {
-    com1_print("---------> int 0x80\n");
-    if (frame->ip >= 511ull * 1024 * 1024 * 1024) {
-        for (int i = 0; i < 15; i++)
-            ((uint64_t*) curProc)[i] = regs[i];
-        curProc->rip = frame->ip;
-        curProc->rsp = frame->sp;
-        curProc->rflags = frame->flags;
+    if (frame->ip < 511ull * 1024 * 1024 * 1024) // Is it actually useful to test for this?
+        return;
 
-        com1_printf("  ------- syscall: %u\n", curProc->rax);
+    for (int i = 0; i < 15; i++)
+        ((uint64_t*) curProc)[i] = regs[i];
+    curProc->rip = frame->ip;
+    curProc->rsp = frame->sp;
+    curProc->rflags = frame->flags;
 
-        switch (curProc->rax) {
-        case 0: // exit()
-            killProc(curProc);
-            iretqWaitloop();
-            break;
-        case 2: // printColor(char* s, color c)
-            no_ints(); // Printing will disable and then reenable, but we want them to stay off until iretq, so inc count of noes
-            printColorTo(curProc->stdout, (char*) curProc->rbx, (uint8_t) curProc->rcx); // This is a safe way to get just low 8-bits, right?
-            ints_okay_once_on(); // dec count of noes, so count is restored and iretq turns them on
+    switch (curProc->rax) {
+    case 0: // exit()
+        killProc(curProc);
+        waitloop();
+        break;
+    case 2: // printColor(char* s, color c)
+        no_ints(); // Printing will disable and then reenable, but we want them to stay off until iretq, so inc count of noes
+        printColorTo(curProc->stdout, (char*) curProc->rbx, (uint8_t) curProc->rcx); // This is a safe way to get just low 8-bits, right?
+        ints_okay_once_on(); // dec count of noes, so count is restored and iretq turns them on
 
-            break;
-        case 3: // readline()
-            com1_print(" -- readline -- setting proc to reading state\n");
-            setReading(curProc->stdout, curProc);
-            com1_print(" -- readline -- removing proc from runnable list\n");
-            removeNodeFromList(runnableProcs, curProcN);
-            curProcN = 0;
-            com1_print(" -- readline -- calling iretqWaitloop\n");
-            iretqWaitloop();
-            break;
-        case 4: // runProg(char* s)
-            if (!strcmp((char*) curProc->rbx, "app"))
-                curProc->rax = (uint64_t) startApp(&app, curProc->stdout);
-            else if (!strcmp((char*) curProc->rbx, "sh"))
-                curProc->rax = (uint64_t) startApp(&sh, curProc->stdout);
-            else
-                curProc->rax = 0;
+        break;
+    case 3: // readline()
+        setReading(curProc->stdout, curProc);
+        removeNodeFromList(runnableProcs, curProcN);
+        curProcN = 0;
+        waitloop();
+        break;
+    case 4: // runProg(char* s)
+        if (!strcmp((char*) curProc->rbx, "app"))
+            curProc->rax = (uint64_t) startApp(&app, curProc->stdout);
+        else if (!strcmp((char*) curProc->rbx, "sh"))
+            curProc->rax = (uint64_t) startApp(&sh, curProc->stdout);
+        else
+            curProc->rax = 0;
 
-            startProc(curProc);
-            break;
-        case 5: // wait(uint64_t p)
-            ((struct process*) curProc->rbx)->waiting = curProc;
-            removeNodeFromList(runnableProcs, curProcN);
-            curProcN = 0;
-            iretqWaitloop();
-            break;
-        default:
-            printf("Unknown syscall 0x%h\n", curProc->rax);
-        }
+        startProc(curProc);
+        break;
+    case 5: // wait(uint64_t p)
+        ((struct process*) curProc->rbx)->waiting = curProc;
+        removeNodeFromList(runnableProcs, curProcN);
+        curProcN = 0;
+        waitloop();
+        break;
+    default:
+        printf("Unknown syscall 0x%h\n", curProc->rax);
     }
 }
 
 static void __attribute__((interrupt)) default_PIC_P_handler(struct interrupt_frame *frame) {
-    com1_print("---------> default primary pic\n");
     outb(PIC_PRIMARY_CMD, PIC_ACK);
 
     printf("Default primary PIC interrupt handler\n");
@@ -627,7 +583,6 @@ static void __attribute__((interrupt)) default_PIC_P_handler(struct interrupt_fr
 }
 
 static void __attribute__((interrupt)) default_PIC_S_handler(struct interrupt_frame *frame) {
-    com1_print("---------> default secondary pic\n");
     outb(PIC_SECONDARY_CMD, PIC_ACK);
     outb(PIC_PRIMARY_CMD, PIC_ACK);
 
@@ -636,14 +591,12 @@ static void __attribute__((interrupt)) default_PIC_S_handler(struct interrupt_fr
 }
 
 static void __attribute__((interrupt)) divide_by_zero_handler(struct interrupt_frame *frame) {
-    com1_print("---------> div zero\n");
     printf("Divide by zero handler\n");
     frame->ip = (uint64_t) waitloop;
     dumpFrame(frame);
 }
 
 static void __attribute__((interrupt)) trap_0x0e_page_fault(struct interrupt_frame *frame, uint64_t error_code) {
-    com1_print("---------> page fault\n");
     printf("\nPage fault; error: 0x%p016h\n", error_code);
     printf("Page fault; error: 0x%p016h\n", error_code);
     dumpFrame(frame);
@@ -661,32 +614,22 @@ static void __attribute__((interrupt)) trap_0x0e_page_fault(struct interrupt_fra
     if (frame->cs == 0x13)
         killProc(curProc);
 
-    iretqWaitloop();
+    waitloop();
     //frame->ip = (uint64_t) waitloop;
     // TODO: Just call waitloop?
 }
 
-// Getting double fault at IP 0x13757
-// First 13808, then 13784
-// printTo gives l404 listItem, then doubleFault in listItem at 0x13822, then
-// I get more at 137C0 -- nextNodeCirc
-
-/*
-  
-  */
 static void __attribute__((interrupt)) double_fault_handler(struct interrupt_frame *frame, uint64_t error_code) {
-    com1_printf("Double fault, frame->ip: 0x%h\n", frame->ip);
     printf("Double fault; error should be zero.  error: 0x%p016h\n", error_code);
     dumpFrame(frame);
     if (frame->ip >= 511ull * 1024 * 1024 * 1024) {
     }
     if (frame->cs == 0x13)
         killProc(curProc);
-    iretqWaitloop();
+    waitloop();
 }
 
 static void __attribute__((interrupt)) irq1_kbd(struct interrupt_frame *) {
-    com1_print("---------> kbd\n");
     uint8_t code = inb(0x60);
     outb(PIC_PRIMARY_CMD, PIC_ACK);
     push(&kbd_buf, (void*) (uint64_t) code);
@@ -695,7 +638,6 @@ static void __attribute__((interrupt)) irq1_kbd(struct interrupt_frame *) {
 }
 
 static void __attribute__((interrupt)) irq8_rtc(struct interrupt_frame *) {
-    com1_print("---------> irq8\n");
     outb(PIC_SECONDARY_CMD, PIC_ACK);
     outb(PIC_PRIMARY_CMD, PIC_ACK);
 
@@ -707,15 +649,7 @@ static void __attribute__((interrupt)) irq8_rtc(struct interrupt_frame *) {
 static uint64_t cpuCountOffset = 0;
 
 void __attribute__((interrupt)) irq0_pit(struct interrupt_frame *frame) {
-    com1_print("---------> irq0\n");
     outb(PIC_PRIMARY_CMD, PIC_ACK);
-
-#define VRAM ((uint8_t*) 0xb8000)
-#define LINES 24
-#define LINE(l) (VRAM + 160 * (l))
-#define STATUS_LINE LINE(LINES)
-
-    STATUS_LINE[100]++;
 
     pitCount++;
 
@@ -745,7 +679,7 @@ void __attribute__((interrupt)) irq0_pit(struct interrupt_frame *frame) {
             curProc->rsp = frame->sp;
             curProc->rflags = frame->flags;
 
-            iretqWaitloop();
+            waitloop();
         }
     }
 }

@@ -30,49 +30,6 @@
 #define INTS_OKAY ints_okay()
 #endif
 
-#define COM1 0x3f8
-
-static uint8_t inb(uint32_t source) {
-    uint8_t val;
-
-    __asm__ __volatile__(
-        "mov %1, %%dx\n"
-        "in %%dx, %%al\n"
-        "mov %%al, %0\n"
-        :"=m"(val): "m"(source)
-    );
-
-    return val;
-}
-
-static void outb(uint32_t dest, uint8_t val) {
-    __asm__ __volatile__(
-        "mov %0, %%al\n"
-        "mov %1, %%dx\n"
-        "out %%al, %%dx\n"
-        ::"m"(val), "m"(dest)
-    );
-}
-
-static void com1_write(char c) {
-    NO_INTS;
-    while ((inb(COM1 + 5) & 0x20) == 0) // Wait until transmitter holding register is empty and ready for data
-        ;
-
-    // Qemu's serial port display interprets control characters, but \n just drops down a line, so we want a
-    //   carriage return as well;
-    if (c == '\n')
-        outb(COM1, '\r');
-
-    outb(COM1, c);
-    INTS_OKAY;
-}
-
-static void com1_print(char* s) {
-    while (*s != 0)
-        com1_write(*s++);
-}
-
 static uint64_t map_size; // Size in quadwords
 static uint64_t* map = (uint64_t*) 0;
 static uint64_t* heap = (uint64_t*) 0;
@@ -113,15 +70,8 @@ uint64_t heapSize() {
 }
 
 void* malloc(uint64_t nBytes) {
-    #ifdef KERNEL
-    //com1_print("malloc START");
-    #endif
-    if (heap == 0 || nBytes == 0) {
-        #ifdef KERNEL
-        //com1_print("malloc END");
-        #endif
+    if (heap == 0 || nBytes == 0)
         return 0;
-    }
 
     uint64_t needed = blocks_per(nBytes, BLK_SZ);
     uint64_t mask = 0;
@@ -133,7 +83,8 @@ void* malloc(uint64_t nBytes) {
     void* ret = 0;
 
     NO_INTS;
-    for (uint64_t i = 0; i < map_size; i++) {  // This looks like where we're stuck in an infinite loop...
+
+    for (uint64_t i = 0; i < map_size; i++) {
         for (need = needed; need > 64 / MAP_ENTRY_SZ; i++) {
             if (map[i])
                 goto not_found;
@@ -160,9 +111,6 @@ void* malloc(uint64_t nBytes) {
                     map[i-1] = -1ull;
 
                 INTS_OKAY;
-                #ifdef KERNEL
-                //com1_print("malloc END");
-                #endif
                 return ret;
             } else if (needed > 64 / MAP_ENTRY_SZ) {
                 goto not_found;
@@ -175,9 +123,7 @@ void* malloc(uint64_t nBytes) {
     }
 
     INTS_OKAY;
-    #ifdef KERNEL
-    //com1_print("malloc END");
-    #endif
+
     return 0;
 }
 
