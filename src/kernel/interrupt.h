@@ -13,7 +13,7 @@ extern uint64_t int_blocks;
 extern uint64_t* kernel_stack_top;
 
 static inline void no_ints() {
-    __asm__ __volatile__("cli");
+    asm volatile("cli");
     int_blocks++;
 }
 
@@ -30,5 +30,5 @@ static inline void ints_okay() {
     ints_okay_once_on();
 
     if (int_blocks == 0)
-        __asm__ __volatile__("sti");
+        asm volatile("sti");
 }

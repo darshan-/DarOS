@@ -321,6 +321,38 @@ void startProc(struct process* p) {
     ");
 }
 
+static inline void no_ints2() {
+    //asm volatile("cli");
+}
+
+// An exerperiment in going to waitloop from interrupt handler with iretq
+void iretqWaitloop() {
+    //no_ints();
+    //ints_okay();
+    //asm volatile("cli");
+    no_ints2();
+
+    void* ip = &waitloop;
+
+    asm volatile ("\
+\n      movq %%rsp, %%rax                         \
+\n      push $0                                   \
+\n      push %%rax                                \
+\n      pushf                                     \
+\n      pop %%rax                                 \
+\n      or $0x200, %%rax                          \
+\n      push %%rax                                \
+\n      push $8                                   \
+\n      push %0                                   \
+\n      iretq                                     \
+    "::"m"(ip));
+/*
+\n      pop %%rax                                 \
+\n      or $0x200, %%rax                          \
+\n      push %%rax                                \
+  */
+}
+
 struct app {
     uint64_t* code;
     uint64_t len;
@@ -540,7 +572,7 @@ void __attribute__((interrupt)) int0x80_syscall(struct interrupt_frame *frame) {
     switch (curProc->rax) {
     case 0: // exit()
         killProc(curProc);
-        waitloop();
+        iretqWaitloop();
         break;
     case 2: // printColor(char* s, color c)
         no_ints(); // Printing will disable and then reenable, but we want them to stay off until iretq, so inc count of noes
@@ -552,7 +584,7 @@ void __attribute__((interrupt)) int0x80_syscall(struct interrupt_frame *frame) {
         setReading(curProc->stdout, curProc);
         removeNodeFromList(runnableProcs, curProcN);
         curProcN = 0;
-        waitloop();
+        iretqWaitloop();
         break;
     case 4: // runProg(char* s)
         if (!strcmp((char*) curProc->rbx, "app"))
@@ -568,7 +600,7 @@ void __attribute__((interrupt)) int0x80_syscall(struct interrupt_frame *frame) {
         ((struct process*) curProc->rbx)->waiting = curProc;
         removeNodeFromList(runnableProcs, curProcN);
         curProcN = 0;
-        waitloop();
+        iretqWaitloop();
         break;
     default:
         printf("Unknown syscall 0x%h\n", curProc->rax);
@@ -614,7 +646,7 @@ static void __attribute__((interrupt)) trap_0x0e_page_fault(struct interrupt_fra
     if (frame->cs == 0x13)
         killProc(curProc);
 
-    waitloop();
+    iretqWaitloop();
     //frame->ip = (uint64_t) waitloop;
     // TODO: Just call waitloop?
 }
@@ -626,7 +658,7 @@ static void __attribute__((interrupt)) double_fault_handler(struct interrupt_fra
     }
     if (frame->cs == 0x13)
         killProc(curProc);
-    waitloop();
+    iretqWaitloop();
 }
 
 static void __attribute__((interrupt)) irq1_kbd(struct interrupt_frame *) {
@@ -679,7 +711,7 @@ void __attribute__((interrupt)) irq0_pit(struct interrupt_frame *frame) {
             curProc->rsp = frame->sp;
             curProc->rflags = frame->flags;
 
-            waitloop();
+            iretqWaitloop();
         }
     }
 }
