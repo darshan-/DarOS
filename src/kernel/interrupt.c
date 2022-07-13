@@ -330,7 +330,12 @@ void iretqWaitloop() {
     //no_ints();
     //ints_okay();
     //asm volatile("cli");
-    no_ints2();
+    //no_ints2();
+    int i;
+    i = 0;
+    i = i;
+    {
+    }
 
     void* ip = &waitloop;
 
@@ -339,18 +344,10 @@ void iretqWaitloop() {
 \n      push $0                                   \
 \n      push %%rax                                \
 \n      pushf                                     \
-\n      pop %%rax                                 \
-\n      or $0x200, %%rax                          \
-\n      push %%rax                                \
 \n      push $8                                   \
 \n      push %0                                   \
 \n      iretq                                     \
     "::"m"(ip));
-/*
-\n      pop %%rax                                 \
-\n      or $0x200, %%rax                          \
-\n      push %%rax                                \
-  */
 }
 
 struct app {
