@@ -425,6 +425,7 @@ void waitloop() {
             com1_printf("wl curProcN 0x%h\n", curProcN);
             com1_printf("listLen(runnableProcs): %u\n", listLen(runnableProcs));
             curProcN = nextNodeCirc(runnableProcs, curProcN);
+            com1_printf("Bee Tee Dubs, runnableProcs' head is 0x%h\n", listHead(runnableProcs));
             com1_printf("Set (after nextNodeCirc) curProcN to 0x%h\n", curProcN);
         }
         else if (listLen(runnableProcs)) {// TODO: I feel like there's a cleaner approach to sort out when I'm less tired...
@@ -591,6 +592,7 @@ void __attribute__((interrupt)) int0x80_syscall(struct interrupt_frame *frame) {
             setReading(curProc->stdout, curProc);
             com1_print(" -- readline -- removing proc from runnable list\n");
             removeNodeFromList(runnableProcs, curProcN);
+            curProcN = 0;
             com1_print(" -- readline -- calling iretqWaitloop\n");
             iretqWaitloop();
             break;
@@ -607,6 +609,7 @@ void __attribute__((interrupt)) int0x80_syscall(struct interrupt_frame *frame) {
         case 5: // wait(uint64_t p)
             ((struct process*) curProc->rbx)->waiting = curProc;
             removeNodeFromList(runnableProcs, curProcN);
+            curProcN = 0;
             iretqWaitloop();
             break;
         default:
