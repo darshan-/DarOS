@@ -514,7 +514,8 @@ static void showTerm(uint64_t t) {
 //   (If I switch to page tables, ctrl-pgup to jump up 10 pages, ctrl-pgdn to jump down 10 pages?)
 //
 //   ctrl-j as enter?
-//   alt-backspace to delete previous word?
+//   alt-backspace to delete previous word
+//   alt-d to delete next word
 //
 //   How much would it be worth it to invalidate regions rather than the whole screen at once?
 //     - whole screen
@@ -578,16 +579,6 @@ static void gotInput(struct input i) {
 
             terms[at].cur = terms[at].end;
             print("\n");
-
-            // Which lets me get back to finishing the thought I'd only halfway (it feels, who knows, because I'm not done) worked out:
-            //   how do we represent it on the stack?  I'm thinking we want the start of the string (ah, interrupts being back on doesn't
-            //   matter, because, again, we're single-threaded, and no one else is touching this memory page, even if an interrupt happens.)
-            //   (for now anyway -- I guess at some point we'll worry about getting interrupted by kernel (or user, via kernel so still
-            //    kernel) and possibly dealing with something and then coming back?  Like, a signal was sent to us?) -- anyway, start of the
-            //    string at the lowest address, so if the string is 100 chars long, we'd perhaps leave rsp alone, and set rax to rsp - 100, so
-            //    rax is the address... Ah, shucks -- yeah, that gets it in, but it's not safe to return it from the syscall to the app there,
-            //    so where do we copy it to?  We really need user mode malloc, I guess...
-            //terms[at].sh
 
             if (terms[at].reading) {
                 gotLine(terms[at].reading, l);

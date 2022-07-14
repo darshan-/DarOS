@@ -321,32 +321,6 @@ void startProc(struct process* p) {
     ");
 }
 
-/*
-// static inline void no_ints2() {
-//     //asm volatile("cli");
-// }
-
-// // An exerperiment in going to waitloop from interrupt handler with iretq
-// void iretqWaitloop() {
-//     //no_ints();
-//     //ints_okay();
-//     //asm volatile("cli");
-//     no_ints2();
-
-//     void* ip = &waitloop;
-
-//     asm volatile ("\
-// \n      movq %%rsp, %%rax                         \
-// \n      push $0                                   \
-// \n      push %%rax                                \
-// \n      pushf                                     \
-// \n      push $8                                   \
-// \n      push %0                                   \
-// \n      iretq                                     \
-//     "::"m"(ip));
-// }
-*/
-
 struct app {
     uint64_t* code;
     uint64_t len;
@@ -396,20 +370,6 @@ void gotLine(void* v, char* l) {
 
     pushListTail(runnableProcs, p);
 }
-
-// TODO: Known issues:
-// In qemu, sometimes freezing after launching app (doesn't seem to happen in bochs...)
-
-// And that's back, just before I made it here to delete that.
-// I've determined that it appears *not* to be about missing turning interrupts back on.  Certainly ints_okay() appears to be called more
-//   recently than no_ints().  (I'm showing in status bar to assess this.)
-// *And* I noticed my CPU fan getting loud a few seconds after freezing, and HTOP shows qemu CPU usage at 100%.
-// So I think I have an infinite loop somewhere.  Likely, I think, something a bit subtle, that is ultimately an infinite loop.
-// If I could replicate in bochs, that would make it easier to track down.  Although it's occuring to me now that qemu I think still does
-//   allow me to inspect registers (and memory, but I think rip is fairly likely to be my main clue as to what's going on).
-// Otherwise maybe write serial output to a file on the host system (or, I guess I can still see that too -- yeah; I'm just used to my log
-//   console now, and blurring that with the serial console.  So, if I can't sort it out otherwise, having logs go to serial console and
-//   looking there is probably my best approach to figuring out what's going on.
 
 void iretqWaitloop();
 

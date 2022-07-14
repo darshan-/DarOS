@@ -79,7 +79,7 @@ void* malloc(uint64_t nBytes) {
     for (uint64_t i = 0; i < needed && mask != -1ull; i++)
         mask = (mask << 2) + 0b11;
 
-    uint64_t need;// = needed; // TODO: Looks like this was redundant, right?
+    uint64_t need;
     void* ret = 0;
 
     NO_INTS;
