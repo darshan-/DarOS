@@ -313,9 +313,11 @@ save_regs:
 
 extern irq0_pit
 extern int0x80_syscall
+extern waitloop
 
 global irq0
 global int0x80
+global iretqWaitloop
 
 irq0:
         call save_regs
@@ -324,5 +326,14 @@ irq0:
 int0x80:
         call save_regs
         jmp int0x80_syscall
+
+iretqWaitloop:
+        mov rax, rsp
+        push 0
+        push rax
+        pushf
+        push 8
+        push waitloop
+        iretq
 
 kernel_entry:

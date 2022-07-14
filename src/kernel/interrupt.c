@@ -321,34 +321,31 @@ void startProc(struct process* p) {
     ");
 }
 
-static inline void no_ints2() {
-    //asm volatile("cli");
-}
+/*
+// static inline void no_ints2() {
+//     //asm volatile("cli");
+// }
 
-// An exerperiment in going to waitloop from interrupt handler with iretq
-void iretqWaitloop() {
-    //no_ints();
-    //ints_okay();
-    //asm volatile("cli");
-    //no_ints2();
-    int i;
-    i = 0;
-    i = i;
-    {
-    }
+// // An exerperiment in going to waitloop from interrupt handler with iretq
+// void iretqWaitloop() {
+//     //no_ints();
+//     //ints_okay();
+//     //asm volatile("cli");
+//     no_ints2();
 
-    void* ip = &waitloop;
+//     void* ip = &waitloop;
 
-    asm volatile ("\
-\n      movq %%rsp, %%rax                         \
-\n      push $0                                   \
-\n      push %%rax                                \
-\n      pushf                                     \
-\n      push $8                                   \
-\n      push %0                                   \
-\n      iretq                                     \
-    "::"m"(ip));
-}
+//     asm volatile ("\
+// \n      movq %%rsp, %%rax                         \
+// \n      push $0                                   \
+// \n      push %%rax                                \
+// \n      pushf                                     \
+// \n      push $8                                   \
+// \n      push %0                                   \
+// \n      iretq                                     \
+//     "::"m"(ip));
+// }
+*/
 
 struct app {
     uint64_t* code;
@@ -413,6 +410,8 @@ void gotLine(void* v, char* l) {
 // Otherwise maybe write serial output to a file on the host system (or, I guess I can still see that too -- yeah; I'm just used to my log
 //   console now, and blurring that with the serial console.  So, if I can't sort it out otherwise, having logs go to serial console and
 //   looking there is probably my best approach to figuring out what's going on.
+
+void iretqWaitloop();
 
 void waitloop() {
     for (;;) {
