@@ -8,8 +8,14 @@ void processInput(char* l) {
         exit();
     else if (!strcmp(l, "help"))
         print("I'm not very helpful, but I hope you have a nice day!\n");
-    else
-        wait(runProg(l));
+    else {
+        uint64_t p = runProg(l);
+
+        if (p)
+            wait(p);
+        else
+            printf("Unknown command: '%s'\n", l);
+    }
 }
 
 void main() {
