@@ -82,6 +82,8 @@ void keyScanned(uint8_t c) {
         if ((c & 0x7f) == 0x2a || (c & 0x7f) == 0x36) // Ignore fake shift down and fake shift up
             return;
 
+        int handled = 1;
+
         switch (c) {
             map(0x35, si('/'));
 
@@ -98,10 +100,16 @@ void keyScanned(uint8_t c) {
             map(0x52, si(KEY_INS));
             map(0x53, si(KEY_DEL));
         default:
-            break;
+            handled = 0;
         }
 
-        return;
+        // We for sure need 0x1c (enter), 0x1d (rctrl), and 0x38 (ralt) -- and the latter two's release codes.
+        // It feels more correct to only return for codes we explicitly handle here, and continue by default.
+        if (handled)
+            return;
+
+        // if (c != 0x1c && c != 0x1d && c != 0x38) // Keypad Enter, RCtrl, and RAlt should be handled as if no e0
+        //     return;
     }
 
     switch (c) {

@@ -4,7 +4,9 @@
 #include "../lib/strings.h"
 
 void processInput(char* l) {
-    if (!strcmp(l, "exit"))
+    if (l[0] == 0) // Just re-prompt again if empty input (just pressed enter at prompt)
+        return;
+    else if (!strcmp(l, "exit"))
         exit();
     else if (!strcmp(l, "help"))
         print("I'm not very helpful, but I hope you have a nice day!\n");
