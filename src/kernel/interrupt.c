@@ -603,8 +603,6 @@ static void __attribute__((interrupt)) trap_0x0e_page_fault(struct interrupt_fra
         killProc(curProc);
 
     iretqWaitloop();
-    //frame->ip = (uint64_t) waitloop;
-    // TODO: Just call waitloop?
 }
 
 static void __attribute__((interrupt)) double_fault_handler(struct interrupt_frame *frame, uint64_t error_code) {
@@ -711,10 +709,7 @@ void init_interrupts() {
     for (int i = 48; i < 256; i++)
         set_handler(i, default_interrupt_handler, TYPE_INT);
 
-    //set_handler(0x20, irq0_pit, TYPE_INT);
     extern void irq0();
-    printf("&irq0: 0x%h\n", irq0);
-    //asm volatile("cli\nhlt");
     set_handler(0x20, &irq0, TYPE_INT);
     set_handler(0x21, irq1_kbd, TYPE_INT);
     set_handler(0x28, irq8_rtc, TYPE_INT);
@@ -726,28 +721,22 @@ void init_interrupts() {
 
     // These are the traps with errors on stack according to https://wiki.osdev.org/Exceptions, 
     set_handler(8, double_fault_handler, TYPE_INT);
-    //SET_GETRAP_N(08);
     SET_GETRAP_N(0a);
     SET_GETRAP_N(0b);
     SET_GETRAP_N(0c);
     SET_GETRAP_N(0d);
-    //SET_GETRAP_N(0e);
     set_handler(0x0e, trap_0x0e_page_fault, TYPE_INT);
     SET_GETRAP_N(11);
     SET_GETRAP_N(15);
     SET_GETRAP_N(1d);
     SET_GETRAP_N(1e);
 
-    //set_handler(0x80, int_0x80_handler, TYPE_INT);
     extern void int0x80();
     set_handler(0x80, int0x80, TYPE_INT);
-    //set_handler(0x80, int0x80_syscall, TYPE_INT);
 
     init_rtc();
     init_pit();
     init_pic();
-    //set_handler(0x20, irq0_pit, TYPE_INT);
-    //set_handler(0x21, irq1_kbd, TYPE_INT);
     INITQ(wq, INIT_WQ_CAP);
     INITQ(kbd_buf, INIT_KB_CAP);
 
@@ -756,10 +745,6 @@ void init_interrupts() {
     registerPeriodicCallback((struct periodic_callback) {1, 2, check_queue_caps});
 
     runnableProcs = newList();
-    //readyProcs = newList();
-    //sleepingProcs = newList();
-    //curProc = malloc(sizeof(struct process));
-
     //__asm__ __volatile__ ("xchgw %bx, %bx");
 
     app.code = &app_code[0];

@@ -78,7 +78,7 @@ void keyScanned(uint8_t c) {
 
         last_e0 = 0;
 
-        // If I ever want num luck key to turn num lock off, I'll need a better approach, but for now this is easiest (and I always want num lock).
+        // If I ever want num lock key to turn num lock off, I'll need a better approach, but for now this is easiest (and I always want num lock).
         if ((c & 0x7f) == 0x2a || (c & 0x7f) == 0x36) // Ignore fake shift down and fake shift up
             return;
 
@@ -107,9 +107,6 @@ void keyScanned(uint8_t c) {
         // It feels more correct to only return for codes we explicitly handle here, and continue by default.
         if (handled)
             return;
-
-        // if (c != 0x1c && c != 0x1d && c != 0x38) // Keypad Enter, RCtrl, and RAlt should be handled as if no e0
-        //     return;
     }
 
     switch (c) {
