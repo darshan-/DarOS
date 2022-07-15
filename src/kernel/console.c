@@ -328,6 +328,30 @@ static inline void wordLeft() {
     updateCursorPosition();
 }
 
+static inline void deleteWordLeft() {
+    scrollToBottom();
+
+    if (terms[at].cur == terms[at].anchor)
+        return;
+
+    uint64_t old_cur = terms[at].cur;
+
+    while (byte_at(at, terms[at].cur - 2) == ' ' && terms[at].cur != terms[at].anchor)
+        terms[at].cur -= 2;
+    while (byte_at(at, terms[at].cur - 2) != ' ' && terms[at].cur != terms[at].anchor)
+        terms[at].cur -= 2;
+
+    uint64_t cur_diff = old_cur - terms[at].cur;
+    for (uint64_t i = 0; old_cur + i < terms[at].end; i += 2)
+        word_at(at, terms[at].cur + i) = word_at(at, old_cur + i);
+    for (uint64_t i = 0; i < cur_diff; i += 2)
+        word_at(at, terms[at].end - cur_diff + i) = 0x0700;
+
+    terms[at].end -= cur_diff;
+
+    syncScreen();
+}
+
 static inline void wordRight() {
     scrollToBottom();
 
@@ -573,6 +597,9 @@ static void gotInput(struct input i) {
 
         else if (i.key == '\b' && !i.alt && !i.ctrl && !i.shift)
             backspace();
+
+        else if (i.key == '\b' && i.alt && !i.ctrl && !i.shift)
+            deleteWordLeft();
 
         else if (i.key == '\n' && !i.alt && !i.ctrl && !i.shift) {
             char* l = M_readline();
