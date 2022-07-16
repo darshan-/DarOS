@@ -352,6 +352,59 @@ static inline void deleteWordLeft() {
     syncScreen();
 }
 
+static inline void deleteWordRight() {
+    scrollToBottom();
+
+    if (terms[at].cur == terms[at].end)
+        return;
+
+    uint64_t c = terms[at].cur;
+
+    while (byte_at(at, c) == ' ' && c != terms[at].end)
+        c += 2;
+    while (byte_at(at, c) != ' ' && c != terms[at].end)
+        c += 2;
+
+    //uint64_t diff = c - terms[at].cur;
+
+    uint64_t i = 0;
+    for (; c + i < terms[at].end; i += 2)
+        word_at(at, terms[at].cur + i) = word_at(at, c + i);
+    for (; terms[at].cur + i < terms[at].end; i += 2)
+        word_at(at, terms[at].cur + i) = 0x0700;
+
+    terms[at].end -= c - terms[at].cur;
+
+    syncScreen();
+}
+
+// static inline void deleteWordRight() {
+//     scrollToBottom();
+
+//     if (terms[at].cur == terms[at].end)
+//         return;
+
+//     uint64_t old_cur = terms[at].cur;
+
+//     while (byte_at(at, terms[at].cur) == ' ' && terms[at].cur != terms[at].end)
+//         terms[at].cur += 2;
+//     while (byte_at(at, terms[at].cur) != ' ' && terms[at].cur != terms[at].end)
+//         terms[at].cur += 2;
+
+//     uint64_t cur_diff = terms[at].cur - old_cur;
+//     terms[at].cur = old_cur;
+
+//     // I think I now just need to modify these two loops, and we should be good to go...
+//     for (uint64_t i = 0; terms[at].cur + i < terms[at].end - cur_diff; i += 2)
+//         word_at(at, terms[at].cur + i) = word_at(at, terms[at].cur + i);
+//     for (uint64_t i = 0; i < cur_diff; i += 2)
+//         word_at(at, terms[at].end - cur_diff + i) = 0x0700;
+
+//     terms[at].end -= cur_diff;
+
+//     syncScreen();
+// }
+
 static inline void wordRight() {
     scrollToBottom();
 
@@ -600,6 +653,9 @@ static void gotInput(struct input i) {
 
         else if (i.key == '\b' && i.alt && !i.ctrl && !i.shift)
             deleteWordLeft();
+
+        else if ((i.key == 'd' || i.key == 'D') && i.alt && !i.ctrl && !i.shift)
+            deleteWordRight();
 
         else if (i.key == '\n' && !i.alt && !i.ctrl && !i.shift) {
             char* l = M_readline();
