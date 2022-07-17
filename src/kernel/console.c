@@ -605,6 +605,7 @@ static inline int isPrintable(uint8_t c) {
 }
 
 void procDone(void* p, uint64_t t) {
+    logf("procDone(0x%h, %u)\n", p, t);
     if (terms[t].proc != p)
         return;
 

@@ -58,6 +58,22 @@ build/userspace/sh.o: Makefile build/userspace/sh.c
 	gcc $(GCC_OPTS) build/userspace/sh.c -o build/userspace/sh.o
 
 
+build/userspace/procs.o1: Makefile src/userspace/procs.c | build/userspace
+	gcc $(GCC_OPTS) src/userspace/procs.c -o build/userspace/procs.o1
+build/userspace/procs.o2: Makefile build/userspace/procs.o1 build/userspace/sys.o build/lib/malloc.o build/lib/strings.o
+	ld -o build/userspace/procs.o2 -N --warn-common -T src/userspace/linker.ld build/userspace/procs.o1 build/userspace/sys.o build/lib/malloc.o build/lib/strings.o
+build/userspace/procs.c: Makefile build/userspace/procs.o2
+	echo "#include <stdint.h>" >build/userspace/procs.c
+	echo "uint64_t procs_code[] = {" >>build/userspace/procs.c
+	hexdump -v -e '1/8 "0x%xull," "\n"' build/userspace/procs.o2 >>build/userspace/procs.c
+	echo "0};" >>build/userspace/procs.c
+	echo -n "uint64_t procs_code_len = " >>build/userspace/procs.c
+	wc -c <build/userspace/procs.o2 | tr -d '\n' >>build/userspace/procs.c
+	echo " / 8 + 1;" >>build/userspace/procs.c
+build/userspace/procs.o: Makefile build/userspace/procs.c
+	gcc $(GCC_OPTS) build/userspace/procs.c -o build/userspace/procs.o
+
+
 build/userspace/sys.o: Makefile src/userspace/sys.c | build/userspace
 	gcc $(GCC_OPTS) src/userspace/sys.c -o build/userspace/sys.o
 
@@ -70,8 +86,8 @@ build/lib/malloc-k.o: Makefile src/lib/malloc.c | build/lib
 build/lib/strings.o: Makefile src/lib/strings.c | build/lib
 	gcc $(GCC_OPTS) src/lib/strings.c -o build/lib/strings.o
 
-out/boot.img: $(c_objects) src/kernel/linker.ld build/bootloader.o build/lib/strings.o build/lib/malloc-k.o build/userspace/app.o build/userspace/sh.o | out
-	ld -o out/boot.img $(LD_OPTS) build/bootloader.o $(c_objects) build/lib/strings.o build/lib/malloc-k.o build/userspace/app.o build/userspace/sh.o
+out/boot.img: $(c_objects) src/kernel/linker.ld build/bootloader.o build/lib/strings.o build/lib/malloc-k.o build/userspace/app.o build/userspace/sh.o build/userspace/procs.o | out
+	ld -o out/boot.img $(LD_OPTS) build/bootloader.o $(c_objects) build/lib/strings.o build/lib/malloc-k.o build/userspace/app.o build/userspace/sh.o build/userspace/procs.o
 
 out/bochs.img: out/boot.img
 	cp out/boot.img out/bochs.img

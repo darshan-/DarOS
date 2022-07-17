@@ -232,8 +232,12 @@ void killProc(struct process* p) {
 
     // if (p->waiting) // Enqueue work of returning to wait() call of waiting process
     //     pushListHead(readyProcs, p->waiting);
-    if (p->waiting)
+    if (p->waiting) {
+        // Aaaah, okay.  We call wait right after calling startProc...  So if the proc is fast, we only wait on it once it's done.
+        // I think the simplest thing, and what I'm pretty sure I remember meaning to do, is have wait() return immediately if proc is not running.
+        logf("proc 0x%h was waiting on proc 0x%h; moving it to runnableProcs.\n", p->waiting, p);
         pushListTail(runnableProcs, p->waiting);
+    }
 
     free(p);
 
@@ -333,6 +337,10 @@ static struct app app;
 extern uint64_t sh_code[];
 extern uint64_t sh_code_len;
 static struct app sh;
+
+extern uint64_t procs_code[];
+extern uint64_t procs_code_len;
+static struct app procs;
 
 static void* startApp(struct app* a, uint64_t stdout) {
     struct process *p = mallocz(sizeof(struct process));
@@ -547,12 +555,19 @@ void __attribute__((interrupt)) int0x80_syscall(struct interrupt_frame *frame) {
             curProc->rax = (uint64_t) startApp(&app, curProc->stdout);
         else if (!strcmp((char*) curProc->rbx, "sh"))
             curProc->rax = (uint64_t) startApp(&sh, curProc->stdout);
+        else if (!strcmp((char*) curProc->rbx, "procs"))
+            curProc->rax = (uint64_t) startApp(&procs, curProc->stdout);
         else
             curProc->rax = 0;
 
         startProc(curProc);
         break;
     case 5: // wait(uint64_t p)
+        logf("proc 0x%h is waiting on proc 0x%h\n", curProc, curProc->rbx);
+        // TODO: Check if curProc-rbx is actually...  Oh, fuck, not good enough, unless we make non-reusable PIDs...  (actually a proc, I was going to say...)
+        // Okay, I guess a hash map implemented as an array of linked lists.  Say, about 100-500 lists.
+        // So just do PID % bucket_count to get the bucket/list, then search list.  Bam, done.
+
         ((struct process*) curProc->rbx)->waiting = curProc;
         removeNodeFromList(runnableProcs, curProcN);
         curProcN = 0;
@@ -752,6 +767,9 @@ void init_interrupts() {
 
     sh.code = &sh_code[0];
     sh.len = sh_code_len;
+
+    procs.code = &procs_code[0];
+    procs.len = procs_code_len;
 
     ints_okay();
 }
