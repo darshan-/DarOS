@@ -39,8 +39,8 @@ struct vterm {
     uint64_t clear_top; // Top position to use due to ctrl-l / clear
     uint64_t v_scroll;  // Vertical offset from scrolling
 
-    uint64_t fg_pid; // Foreground process -- we won't prompt until it exits (and we will prompt when it exits)
-    void* reading;
+    uint64_t sh;      // PID of shell
+    uint64_t reading; // PID of process waiting for input
 };
 
 static uint64_t at = -1;
@@ -265,7 +265,7 @@ static inline void ensureTerm(uint64_t t) {
         if (t == LOGS_TERM)
             printColorTo(t, "- Start of logs -\n", 0x0f);
         else
-            terms[t].fg_pid = startSh(t);
+            terms[t].sh = startSh(t);
     }
     ints_okay();
 }
@@ -459,9 +459,9 @@ static inline void cursorEnd() {
     updateCursorPosition();
 }
 
-void setReading(uint64_t t, void* p) {
-    logf("proc 0x%h listening on term %u\n", p, t);
-    terms[t].reading = p;
+void setReading(uint64_t t, uint64_t pid) {
+    logf("proc %u listening on term %u\n", pid, t);
+    terms[t].reading = pid;
 }
 
 char* M_readline() {
@@ -605,10 +605,10 @@ static inline int isPrintable(uint8_t c) {
 }
 
 void procDone(uint64_t pid, uint64_t t) {
-    if (terms[t].fg_pid != pid)
+    if (terms[t].sh != pid)
         return;
 
-    terms[t].fg_pid = startSh(t);
+    terms[t].sh = startSh(t);
 }
 
 static void gotInput(struct input i) {

@@ -7,7 +7,7 @@
 void init_interrupts();
 void waitloop();
 uint64_t startSh(uint64_t stdout);
-void gotLine(void* p, char* l);
+void gotLine(uint64_t pid, char* l);
 
 extern uint64_t int_blocks;
 extern uint64_t* kernel_stack_top;
