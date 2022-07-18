@@ -194,6 +194,7 @@ struct process {
     uint64_t rflags;
 
     uint64_t stdout;
+    uint64_t pid;
 
     void* page; // For now only one page allowed
 
@@ -213,7 +214,33 @@ static struct list* runnableProcs = (struct list*) 0;
 //static struct list* sleepingProcs = (struct list*) 0;
 
 static struct process* curProc = 0;
-void* curProcN = 0;
+static void* curProcN = 0;
+
+#define PIDS_SZ 1000
+static struct list* pids[PIDS_SZ];
+static uint64_t last_pid = 0;
+
+struct pidMap {
+    uint64_t pid;
+    struct process* p;
+};
+
+static struct process* procByPid(uint64_t pid) {
+    struct pidMap* pm = listItem(getNodeByCondition(pids[pid % PIDS_SZ], ({
+        int __fn__ (void* item) {
+            return ((struct pidMap*) item)->pid == pid;
+        }
+
+        __fn__;
+    })));
+
+    if (pm)
+        return pm->p;
+
+    return 0;
+
+    //return listItem(listHead(pids[pid]));
+}
 
 void killProc(struct process* p) {
     if (!p)
@@ -228,7 +255,7 @@ void killProc(struct process* p) {
     // That way you can have a background process, by not waiting for it -- and you can have something similar if a process launched
     //   another process, and the first one returned at some point after that.  That first one returning is the signal the console needs
     //   to go ahead and prompt again.  The sub-process can still write to the termainal, and is a background process.
-    procDone(p, p->stdout); // Would rather console doesn't understand proc; it just sees p as a unique id.
+    procDone(p->pid, p->stdout); // Would rather console doesn't understand proc; it just sees p as a unique id.
 
     // if (p->waiting) // Enqueue work of returning to wait() call of waiting process
     //     pushListHead(readyProcs, p->waiting);
@@ -342,7 +369,7 @@ extern uint64_t procs_code[];
 extern uint64_t procs_code_len;
 static struct app procs;
 
-static void* startApp(struct app* a, uint64_t stdout) {
+static uint64_t startApp(struct app* a, uint64_t stdout) {
     struct process *p = mallocz(sizeof(struct process));
     p->page = palloc();
     p->stdout = stdout;
@@ -360,10 +387,20 @@ static void* startApp(struct app* a, uint64_t stdout) {
 
     pushListTail(runnableProcs, p); // TODO: I may have assumptions elsewhere that aren't met with this as is...
 
-    return p;
+    // TODO: Remove from pids when process exits
+    struct pidMap* pm = malloc(sizeof(struct pidMap));
+    // TODO: Can there be a race condition here?  no_ints / ints_okay around increment of last_pid?  (What about other lists???)
+    // I guess be mindful of what's only called from interrupt handler vs what's not...  TODO: Check this out.
+    p->pid = ++last_pid;
+    pm->pid = p->pid;
+    pm->p = p;
+    pushListTail(pids[p->pid % PIDS_SZ], pm);
+    // TODO: Insert into pids
+
+    return p->pid;
 }
 
-void* startSh(uint64_t stdout) {
+uint64_t startSh(uint64_t stdout) {
     return startApp(&sh, stdout);
 }
 
@@ -563,15 +600,17 @@ void __attribute__((interrupt)) int0x80_syscall(struct interrupt_frame *frame) {
         startProc(curProc);
         break;
     case 5: // wait(uint64_t p)
-        logf("proc 0x%h is waiting on proc 0x%h\n", curProc, curProc->rbx);
-        // TODO: Check if curProc-rbx is actually...  Oh, fuck, not good enough, unless we make non-reusable PIDs...  (actually a proc, I was going to say...)
         // Okay, I guess a hash map implemented as an array of linked lists.  Say, about 100-500 lists.
         // So just do PID % bucket_count to get the bucket/list, then search list.  Bam, done.
 
-        ((struct process*) curProc->rbx)->waiting = curProc;
-        removeNodeFromList(runnableProcs, curProcN);
-        curProcN = 0;
-        iretqWaitloop();
+        struct process* p = procByPid(curProc->rbx);
+        if (p) {
+            p->waiting = curProc;
+            removeNodeFromList(runnableProcs, curProcN);
+            curProcN = 0;
+            iretqWaitloop();
+        } // We just return to caller if no such process (the process the caller is waiting on has already finished)
+
         break;
     default:
         printf("Unknown syscall 0x%h\n", curProc->rax);

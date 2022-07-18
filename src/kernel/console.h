@@ -13,5 +13,5 @@ void printColorTo(uint64_t t, char* s, uint8_t c);
 void printTo(uint64_t t, char* s);
 void startTty();
 void vaprintf(uint64_t t, char* fmt, va_list* ap);
-void procDone(void* p, uint64_t t);
+void procDone(uint64_t pid, uint64_t t);
 void setReading(uint64_t t, void* p);

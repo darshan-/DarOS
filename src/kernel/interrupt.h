@@ -6,7 +6,7 @@
 
 void init_interrupts();
 void waitloop();
-void* startSh(uint64_t stdout);
+uint64_t startSh(uint64_t stdout);
 void gotLine(void* p, char* l);
 
 extern uint64_t int_blocks;

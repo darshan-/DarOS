@@ -15,20 +15,20 @@ struct list_node {
 struct list {
     struct list_node* head;
     struct list_node* tail;
-    uint32_t len;
+    uint64_t len;
 };
 
 struct list* newList() {
     struct list* l = malloc(sizeof(struct list));
-    l->head = (struct list_node*) 0;
-    l->tail = (struct list_node*) 0;
+    l->head = 0;
+    l->tail = 0;
     l-> len = 0;
 
     return l;
 }
 
 // Do I want to return -1 if list doesn't exist?  For now, let's treat null list as empty...
-uint32_t listLen(struct list* l) {
+uint64_t listLen(struct list* l) {
     if (!l) return 0;
 
     return l->len;
@@ -117,7 +117,7 @@ void* pushListTail(struct list* l, void* item) {
     l->len++;
     struct list_node* n = malloc(sizeof(struct list_node));
     n->item = item;
-    n->next = (struct list_node*) 0;
+    n->next = 0;
     n->prev = l->tail;
 
     if (l->tail)
@@ -157,6 +157,16 @@ void removeFromListWithEquality(struct list* l, int (*equals)(void*)) {
             removeNodeFromList(l, cur);
 }
 
+void* getNodeByCondition(struct list* l, int (*matches)(void*)) {
+    if (!l || !l->head) return 0;
+
+    for (struct list_node* cur = l->head; cur; cur = cur->next)
+        if (matches(cur->item))
+            return cur;
+
+    return 0;
+}
+
 // Removes first occurance of item from list, if it exists
 void removeFromList(struct list* l, void* item) {
     removeFromListWithEquality(l, ({
@@ -169,7 +179,7 @@ void removeFromList(struct list* l, void* item) {
 }
 
 static void* forEachLI(struct list_node* n, void (*f)(void*)) {
-    struct list_node* last = (void*) 0;
+    struct list_node* last = 0;
     for (; n; n = n->next) {
         last = n;
         f(n->item);
@@ -179,13 +189,13 @@ static void* forEachLI(struct list_node* n, void (*f)(void*)) {
 }
 
 void* forEachListItem(struct list* l, void (*f)(void*)) {
-    if (!l || !l->head) return (void*) 0;
+    if (!l || !l->head) return 0;
 
     return forEachLI(l->head, f);
 }
 
 void* forEachNewListItem(void* last, void (*f)(void*)) {
-    if (!last) return (void*) 0;
+    if (!last) return 0;
 
     void* ret = forEachLI(((struct list_node*) last)->next, f);
     if (!ret) ret = last;

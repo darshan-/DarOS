@@ -39,7 +39,7 @@ struct vterm {
     uint64_t clear_top; // Top position to use due to ctrl-l / clear
     uint64_t v_scroll;  // Vertical offset from scrolling
 
-    void* proc; // Foreground process -- we won't prompt until it exits (and we will prompt when it exits)
+    uint64_t fg_pid; // Foreground process -- we won't prompt until it exits (and we will prompt when it exits)
     void* reading;
 };
 
@@ -265,7 +265,7 @@ static inline void ensureTerm(uint64_t t) {
         if (t == LOGS_TERM)
             printColorTo(t, "- Start of logs -\n", 0x0f);
         else
-            terms[t].proc = startSh(t);
+            terms[t].fg_pid = startSh(t);
     }
     ints_okay();
 }
@@ -604,12 +604,11 @@ static inline int isPrintable(uint8_t c) {
     return c >= ' ' && c <= '~';
 }
 
-void procDone(void* p, uint64_t t) {
-    logf("procDone(0x%h, %u)\n", p, t);
-    if (terms[t].proc != p)
+void procDone(uint64_t pid, uint64_t t) {
+    if (terms[t].fg_pid != pid)
         return;
 
-    terms[t].proc = startSh(t);
+    terms[t].fg_pid = startSh(t);
 }
 
 static void gotInput(struct input i) {
