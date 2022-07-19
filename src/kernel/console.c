@@ -460,7 +460,6 @@ static inline void cursorEnd() {
 }
 
 void setReading(uint64_t t, uint64_t pid) {
-    logf("proc %u listening on term %u\n", pid, t);
     terms[t].reading = pid;
 }
 

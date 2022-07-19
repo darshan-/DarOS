@@ -228,7 +228,6 @@ struct pidMap {
 static struct process* procByPid(uint64_t pid) {
     struct pidMap* pm = listItem(getNodeByCondition(pids[pid % PIDS_SZ], ({
         int __fn__ (void* item) {
-            logf("Comparing %u to %u\n", ((struct pidMap*) item)->pid, pid);
             return ((struct pidMap*) item)->pid == pid;
         }
 
@@ -236,41 +235,20 @@ static struct process* procByPid(uint64_t pid) {
     })));
 
     if (pm)
-        logf("pic %u mapped to proc 0x%h\n", pid, pm->p);
-    else
-        logf("pic %u did not map to any process\n", pid);
-
-    if (pm)
         return pm->p;
 
     return 0;
-
-    //return listItem(listHead(pids[pid]));
 }
 
 void killProc(struct process* p) {
     if (!p)
         return;
 
-    logf("KILLING proc %u on term %u\n", p->pid, p->stdout);
     free(p->page);
-    //procDone(p->at);  Hmm, not really... might be sub-processes...
-    // I guess I need to keep track of top-level process that is keeping shell from prompting?
-    // Or give shell a process ID, and don't tell shell "proc done on terminal t", but do tell it "process with id x is done"?
-    // I think the latter?  (Well, the latter is so console does the former, I guess?)
-    // That way you can have a background process, by not waiting for it -- and you can have something similar if a process launched
-    //   another process, and the first one returned at some point after that.  That first one returning is the signal the console needs
-    //   to go ahead and prompt again.  The sub-process can still write to the termainal, and is a background process.
     procDone(p->pid, p->stdout);
 
-    // if (p->waiting) // Enqueue work of returning to wait() call of waiting process
-    //     pushListHead(readyProcs, p->waiting);
-    if (p->waiting) {
-        // Aaaah, okay.  We call wait right after calling startProc...  So if the proc is fast, we only wait on it once it's done.
-        // I think the simplest thing, and what I'm pretty sure I remember meaning to do, is have wait() return immediately if proc is not running.
-        logf("proc 0x%h was waiting on proc 0x%h; moving it to runnableProcs.\n", p->waiting, p);
+    if (p->waiting)
         pushListTail(runnableProcs, p->waiting);
-    }
 
     removeFromListWithEquality(pids[p->pid % PIDS_SZ], ({
         int __fn__ (void* item) {
@@ -288,9 +266,6 @@ void killProc(struct process* p) {
     if (p == curProc) {
         void* n = nextNodeCirc(runnableProcs, curProcN);
         int same = n == curProcN;
-        // if (p->sleeping)
-        //     removeNodeFromList(sleepingProcs, curProcN);
-        // else
         removeNodeFromList(runnableProcs, curProcN);
 
         if (same) {
@@ -401,7 +376,6 @@ static uint64_t startApp(struct app* a, uint64_t stdout) {
 
     pushListTail(runnableProcs, p); // TODO: I may have assumptions elsewhere that aren't met with this as is...
 
-    // TODO: Remove from pids when process exits
     struct pidMap* pm = malloc(sizeof(struct pidMap));
     // TODO: Can there be a race condition here?  no_ints / ints_okay around increment of last_pid?  (What about other lists???)
     // I guess be mindful of what's only called from interrupt handler vs what's not...  TODO: Check this out.
@@ -619,22 +593,16 @@ void __attribute__((interrupt)) int0x80_syscall(struct interrupt_frame *frame) {
         else
             curProc->rax = 0;
 
-        logf("Started proc with pid %u\n", curProc->rax);
         startProc(curProc); // Huh, okay, so to return something, we need to startProc to set registers; if nothing to return, we can just return from handler
         break;
     case 5: // wait(uint64_t p)
-        logf("Proc %u waiting on proc with pid %u\n", curProc->pid, curProc->rbx);
         struct process* p = procByPid(curProc->rbx);
         if (p) {
-            log("  (Setting waiting....)\n");
             p->waiting = curProc;
             removeNodeFromList(runnableProcs, curProcN);
             curProcN = 0;
             iretqWaitloop();
         } // We just return to caller if no such process (the process the caller is waiting on has already finished)
-        else {
-            logf("Proc %u was already finished...\n", curProc->rbx);
-        }
 
         break;
     default:
