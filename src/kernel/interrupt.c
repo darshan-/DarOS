@@ -197,6 +197,7 @@ struct process {
     uint64_t pid;
 
     void* page; // For now only one page allowed
+    void* node;
 
     struct process* waiting; // For now just one process can wait for a given process to exit
 };
@@ -209,12 +210,11 @@ struct process {
 // I mean, ultimately, it feels pretty wrong to not be able to say, here, here's all the processes.
 // Hmm, at some point, maybe soon, perhaps each process will have a list of subprocesses?  So you can hold "init" process, and walk the
 //   tree to all other processes?
+// Might I ever want to kill a whole tree?
+
 static struct list* runnableProcs = (struct list*) 0;
-//static struct list* readyProcs = (struct list*) 0;
-//static struct list* sleepingProcs = (struct list*) 0;
 
 static struct process* curProc = 0;
-static void* curProcN = 0;
 
 #define PIDS_SZ 1000
 static struct list* pids[PIDS_SZ];
@@ -248,7 +248,7 @@ void killProc(struct process* p) {
     procDone(p->pid, p->stdout);
 
     if (p->waiting)
-        pushListTail(runnableProcs, p->waiting);
+        p->waiting->node = pushListTail(runnableProcs, p->waiting);
 
     removeFromListWithEquality(pids[p->pid % PIDS_SZ], ({
         int __fn__ (void* item) {
@@ -260,24 +260,29 @@ void killProc(struct process* p) {
 
     free(p);
 
-    if (!curProcN)
+    if (!curProc)
         return;
 
-    if (p == curProc) {
-        void* n = nextNodeCirc(runnableProcs, curProcN);
-        int same = n == curProcN;
-        removeNodeFromList(runnableProcs, curProcN);
+    if (p == curProc && nextNodeCirc(runnableProcs, curProc->node) == curProc->node)
+        curProc = 0;
 
-        if (same) {
-            curProcN = 0;
-            curProc = 0;
-        } else {
-            curProcN = n;
-            curProc = listItem(n);
-        }
-    } else {
-        removeFromList(runnableProcs, p);
-    }
+    removeFromList(runnableProcs, p);
+
+    // There's not much point in setting curProc to next in list and then having waitloop go to next one after that...
+
+    // if (p == curProc) {
+    //     void* n = nextNodeCirc(runnableProcs, curProc->node);
+    //     removeNodeFromList(runnableProcs, curProc->node);
+
+    //     if (n == curProc->node) // Next node is us; we were the only node, so no cur proc now
+    //         curProc = 0;
+    //     // else {
+    //     //     curProc = listItem(n);
+    //     //     curProc->node = n;
+    //     // }
+    // } else {
+    //     removeFromList(runnableProcs, p);
+    // }
 }
 
 // Caller should probably call no_ints before calling, and wait until after it's used the process's memory to call ints_okay, I think?
@@ -374,7 +379,7 @@ static uint64_t startApp(struct app* a, uint64_t stdout) {
 \n      mov %%rax, %0                               \
     " : "=m"(p->rflags));
 
-    pushListTail(runnableProcs, p); // TODO: I may have assumptions elsewhere that aren't met with this as is...
+    p->node = pushListTail(runnableProcs, p); // TODO: I may have assumptions elsewhere that aren't met with this as is...
 
     struct pidMap* pm = malloc(sizeof(struct pidMap));
     // TODO: Can there be a race condition here?  no_ints / ints_okay around increment of last_pid?  (What about other lists???)
@@ -409,7 +414,7 @@ void gotLine(uint64_t pid, char* l) {
     for (uint64_t i = 0; i < p->rax; i++)
         s[i] = l[i];
 
-    pushListTail(runnableProcs, p);
+    p->node = pushListTail(runnableProcs, p);
 }
 
 void iretqWaitloop();
@@ -423,15 +428,13 @@ void waitloop() {
 
         asm volatile("cli");
 
-        if (curProcN)
-            curProcN = nextNodeCirc(runnableProcs, curProcN);
+        if (curProc)
+            curProc = listItem(nextNodeCirc(runnableProcs, curProc->node));
         else if (listLen(runnableProcs)) // TODO: I feel like there's a cleaner approach to sort out when I'm less tired...
-            curProcN = listHead(runnableProcs);\
+            curProc = listItem(listHead(runnableProcs));
 
-        if (curProcN) {
-            curProc = listItem(curProcN);
+        if (curProc)
             startProc(curProc);
-        }
 
         asm volatile (
             "mov %0, %%rsp\n" // We'll never return anywhere or use anything currently on the stack, so reset it
@@ -579,8 +582,9 @@ void __attribute__((interrupt)) int0x80_syscall(struct interrupt_frame *frame) {
         break;
     case 3: // readline()
         setReading(curProc->stdout, curProc->pid);
-        removeNodeFromList(runnableProcs, curProcN);
-        curProcN = 0;
+        removeNodeFromList(runnableProcs, curProc->node);
+        curProc->node = 0;
+        curProc = 0; // TODO: Ideally, we'd go to next runnable proc, not head, as will happen this way...
         iretqWaitloop();
         break;
     case 4: // runProg(char* s)
@@ -599,8 +603,9 @@ void __attribute__((interrupt)) int0x80_syscall(struct interrupt_frame *frame) {
         struct process* p = procByPid(curProc->rbx);
         if (p) {
             p->waiting = curProc;
-            removeNodeFromList(runnableProcs, curProcN);
-            curProcN = 0;
+            removeNodeFromList(runnableProcs, curProc->node);
+            curProc->node = 0;
+            curProc = 0; // TODO: Ideally, we'd go to next runnable proc, not head, as will happen this way...
             iretqWaitloop();
         } // We just return to caller if no such process (the process the caller is waiting on has already finished)
 
