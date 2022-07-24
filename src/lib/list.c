@@ -2,9 +2,7 @@
 
 #include "list.h"
 
-#include "interrupt.h"
-
-#include "../lib/malloc.h"
+#include "malloc.h"
 
 struct list_node {
     void* item;

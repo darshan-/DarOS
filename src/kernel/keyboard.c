@@ -4,7 +4,8 @@
 
 #include "interrupt.h"
 #include "io.h"
-#include "list.h"
+
+#include "../lib/list.h"
 
 // https://www.win.tue.nl/~aeb/linux/kbd/scancodes-1.html
 

@@ -6,12 +6,12 @@
 #include "console.h"
 #include "io.h"
 #include "keyboard.h"
-#include "list.h"
 #include "log.h"
 #include "periodic_callback.h"
 #include "periodic_callback_int.h"
 #include "rtc_int.h"
 
+#include "../lib/list.h"
 #include "../lib/malloc.h"
 #include "../lib/strings.h"
 

@@ -3,8 +3,8 @@
 #include "log.h"
 
 #include "console.h"
-#include "list.h"
 
+#include "../lib/list.h"
 #include "../lib/strings.h"
 
 static struct list* logs = (struct list*) 0;

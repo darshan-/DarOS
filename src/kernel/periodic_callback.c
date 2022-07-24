@@ -4,8 +4,8 @@
 #include "periodic_callback_int.h"
 
 #include "interrupt.h"
-#include "list.h"
 
+#include "../lib/list.h"
 #include "../lib/malloc.h"
 #include "../lib/strings.h"
 

@@ -1,12 +1,16 @@
 .DEFAULT_GOAL := out/boot.img
 
-c_objects := $(patsubst src/kernel/%.c, build/%.o, $(wildcard src/kernel/*.c))
+kernel_objects := $(patsubst src/kernel/%.c, build/%.o, $(wildcard src/kernel/*.c))
+
+lib_objects := $(patsubst src/lib/%.c, build/lib/%.o, $(wildcard src/lib/*.c))
 
 GCC_OPTS := -Wall -Wextra -c -ffreestanding -fno-stack-protector -mgeneral-regs-only -mno-red-zone -fno-PIC -mcmodel=large -momit-leaf-frame-pointer #--static-pie
 
 LD_OPTS := -N --warn-common -T src/kernel/linker.ld #--print-map
 
 include build/headers.mk
+
+include build/lib/headers.mk
 
 build out build/userspace build/lib:
 	mkdir -p $@
@@ -15,6 +19,9 @@ build out build/userspace build/lib:
 #   For now let's just have a rule against doing that, and deal with it if I ever need to do it.
 build/headers.mk: src/kernel/*.c src/kernel/*.h | build
 	cd src/kernel && for cf in *.c; do echo -n "build/$$cf" | sed 's/\.c$$/\.o: /'; grep "#include \"" "$$cf" | awk '{print $$2}' | awk -F '"' '{print "src/kernel/"$$2}' | xargs; done >../../build/headers.mk
+
+build/lib/headers.mk: src/kernel/*.c src/kernel/*.h | build
+	cd src/lib && for cf in *.c; do echo -n "build/lib/$$cf" | sed 's/\.c$$/\.o: /'; grep "#include \"" "$$cf" | awk '{print $$2}' | awk -F '"' '{print "src/lib/"$$2}' | xargs; done >../../build/lib/headers.mk
 
 build/bootloader.o: Makefile src/kernel/bootloader.asm | build
 	nasm -f elf64 src/kernel/bootloader.asm -o build/bootloader.o
@@ -29,8 +36,8 @@ build/lib/%.o: src/lib/%.c | build/lib
 
 build/userspace/app.o1: Makefile src/userspace/app.c | build/userspace
 	gcc $(GCC_OPTS) src/userspace/app.c -o build/userspace/app.o1
-build/userspace/app.o2: Makefile build/userspace/app.o1 build/userspace/sys.o build/lib/malloc.o build/lib/strings.o
-	ld -o build/userspace/app.o2 -N --warn-common -T src/userspace/linker.ld build/userspace/app.o1 build/userspace/sys.o build/lib/malloc.o build/lib/strings.o
+build/userspace/app.o2: Makefile build/userspace/app.o1 build/userspace/sys.o build/u-malloc.o build/lib/strings.o
+	ld -o build/userspace/app.o2 -N --warn-common -T src/userspace/linker.ld build/userspace/app.o1 build/userspace/sys.o build/u-malloc.o build/lib/strings.o
 build/userspace/app.c: Makefile build/userspace/app.o2
 	echo "#include <stdint.h>" >build/userspace/app.c
 	echo "uint64_t app_code[] = {" >>build/userspace/app.c
@@ -44,8 +51,8 @@ build/userspace/app.o: Makefile build/userspace/app.c
 
 build/userspace/sh.o1: Makefile src/userspace/sh.c | build/userspace
 	gcc $(GCC_OPTS) src/userspace/sh.c -o build/userspace/sh.o1
-build/userspace/sh.o2: Makefile build/userspace/sh.o1 build/userspace/sys.o build/lib/malloc.o build/lib/strings.o
-	ld -o build/userspace/sh.o2 -N --warn-common -T src/userspace/linker.ld build/userspace/sh.o1 build/userspace/sys.o build/lib/malloc.o build/lib/strings.o
+build/userspace/sh.o2: Makefile build/userspace/sh.o1 build/userspace/sys.o build/u-malloc.o build/lib/strings.o
+	ld -o build/userspace/sh.o2 -N --warn-common -T src/userspace/linker.ld build/userspace/sh.o1 build/userspace/sys.o build/u-malloc.o build/lib/strings.o
 build/userspace/sh.c: Makefile build/userspace/sh.o2
 	echo "#include <stdint.h>" >build/userspace/sh.c
 	echo "uint64_t sh_code[] = {" >>build/userspace/sh.c
@@ -60,8 +67,8 @@ build/userspace/sh.o: Makefile build/userspace/sh.c
 
 build/userspace/procs.o1: Makefile src/userspace/procs.c | build/userspace
 	gcc $(GCC_OPTS) src/userspace/procs.c -o build/userspace/procs.o1
-build/userspace/procs.o2: Makefile build/userspace/procs.o1 build/userspace/sys.o build/lib/malloc.o build/lib/strings.o
-	ld -o build/userspace/procs.o2 -N --warn-common -T src/userspace/linker.ld build/userspace/procs.o1 build/userspace/sys.o build/lib/malloc.o build/lib/strings.o
+build/userspace/procs.o2: Makefile build/userspace/procs.o1 build/userspace/sys.o build/u-malloc.o build/lib/strings.o
+	ld -o build/userspace/procs.o2 -N --warn-common -T src/userspace/linker.ld build/userspace/procs.o1 build/userspace/sys.o build/u-malloc.o build/lib/strings.o
 build/userspace/procs.c: Makefile build/userspace/procs.o2
 	echo "#include <stdint.h>" >build/userspace/procs.c
 	echo "uint64_t procs_code[] = {" >>build/userspace/procs.c
@@ -73,21 +80,20 @@ build/userspace/procs.c: Makefile build/userspace/procs.o2
 build/userspace/procs.o: Makefile build/userspace/procs.c
 	gcc $(GCC_OPTS) build/userspace/procs.c -o build/userspace/procs.o
 
+build/lib/*.o: Makefile
+build/lib/%.o: src/lib/%.c | build/lib
+	gcc $(GCC_OPTS) -DKERNEL $< -o $@
+
 
 build/userspace/sys.o: Makefile src/userspace/sys.c | build/userspace
 	gcc $(GCC_OPTS) src/userspace/sys.c -o build/userspace/sys.o
 
-build/lib/malloc.o: Makefile src/lib/malloc.c | build/lib
-	gcc $(GCC_OPTS) src/lib/malloc.c -o build/lib/malloc.o
+build/u-malloc.o: Makefile src/lib/malloc.c | build
+	gcc $(GCC_OPTS) src/lib/malloc.c -o build/u-malloc.o
 
-build/lib/malloc-k.o: Makefile src/lib/malloc.c | build/lib
-	gcc $(GCC_OPTS) -DKERNEL src/lib/malloc.c -o build/lib/malloc-k.o
 
-build/lib/strings.o: Makefile src/lib/strings.c | build/lib
-	gcc $(GCC_OPTS) src/lib/strings.c -o build/lib/strings.o
-
-out/boot.img: $(c_objects) src/kernel/linker.ld build/bootloader.o build/lib/strings.o build/lib/malloc-k.o build/userspace/app.o build/userspace/sh.o build/userspace/procs.o | out
-	ld -o out/boot.img $(LD_OPTS) build/bootloader.o $(c_objects) build/lib/strings.o build/lib/malloc-k.o build/userspace/app.o build/userspace/sh.o build/userspace/procs.o
+out/boot.img: $(kernel_objects) $(lib_objects) src/kernel/linker.ld build/bootloader.o build/userspace/app.o build/userspace/sh.o build/userspace/procs.o | out
+	ld -o out/boot.img $(LD_OPTS) build/bootloader.o $(kernel_objects) $(lib_objects) build/userspace/app.o build/userspace/sh.o build/userspace/procs.o
 
 out/bochs.img: out/boot.img
 	cp out/boot.img out/bochs.img
