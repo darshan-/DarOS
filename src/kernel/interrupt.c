@@ -268,21 +268,6 @@ void killProc(struct process* p) {
 
     removeFromList(runnableProcs, p);
 
-    // There's not much point in setting curProc to next in list and then having waitloop go to next one after that...
-
-    // if (p == curProc) {
-    //     void* n = nextNodeCirc(runnableProcs, curProc->node);
-    //     removeNodeFromList(runnableProcs, curProc->node);
-
-    //     if (n == curProc->node) // Next node is us; we were the only node, so no cur proc now
-    //         curProc = 0;
-    //     // else {
-    //     //     curProc = listItem(n);
-    //     //     curProc->node = n;
-    //     // }
-    // } else {
-    //     removeFromList(runnableProcs, p);
-    // }
 }
 
 // Caller should probably call no_ints before calling, and wait until after it's used the process's memory to call ints_okay, I think?
