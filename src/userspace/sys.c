@@ -5,6 +5,7 @@
 
 #include "../lib/malloc.h"
 #include "../lib/strings.h"
+#include "../lib/syscall.h"
 
 /*
    0: exit
@@ -13,6 +14,7 @@
    3: readline
    4: runProg
    5: wait
+   6: getProcs
 
   */
 
@@ -66,6 +68,7 @@ void printf(char* fmt, ...) {
 char* M_readline() {
     uint64_t len; // Kernel needs to know len in order to know where to put it on stack, so use that knowledge (to malloc needed size)
     char* l;
+
     asm volatile("\
 \n      mov $3, %%rax                           \
 \n      int $0x80                               \
@@ -79,6 +82,24 @@ char* M_readline() {
     s[len] = 0;
 
     return s;
+}
+
+struct sc_proc* M_getProcs() {
+    uint64_t size;
+    struct sc_proc *procs;
+
+    asm volatile("\
+\n      mov $6, %%rax                           \
+\n      int $0x80                               \
+\n      mov %%rax, %0                           \
+\n      mov %%rbx, %1                           \
+    ":"=m"(size), "=m"(procs));
+
+    struct sc_proc *p = malloc(size * sizeof(struct sc_proc));
+    for (uint64_t i = 0; i < size; i++)
+        p[i] = procs[i];
+
+    return p;
 }
 
 uint64_t stdout;

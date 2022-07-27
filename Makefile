@@ -20,7 +20,7 @@ build out build/userspace build/lib:
 build/headers.mk: src/kernel/*.c src/kernel/*.h | build
 	cd src/kernel && for cf in *.c; do echo -n "build/$$cf" | sed 's/\.c$$/\.o: /'; grep "#include \"" "$$cf" | awk '{print $$2}' | awk -F '"' '{print "src/kernel/"$$2}' | xargs; done >../../build/headers.mk
 
-build/lib/headers.mk: src/kernel/*.c src/kernel/*.h | build
+build/lib/headers.mk: src/kernel/*.c src/kernel/*.h | build/lib
 	cd src/lib && for cf in *.c; do echo -n "build/lib/$$cf" | sed 's/\.c$$/\.o: /'; grep "#include \"" "$$cf" | awk '{print $$2}' | awk -F '"' '{print "src/lib/"$$2}' | xargs; done >../../build/lib/headers.mk
 
 build/bootloader.o: Makefile src/kernel/bootloader.asm | build

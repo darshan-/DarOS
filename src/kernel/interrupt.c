@@ -200,6 +200,9 @@ struct process {
     void* node;
 
     struct process* waiting; // For now just one process can wait for a given process to exit
+
+    struct process* parent;
+    struct list* children;
 };
 
 // Huh, what if I didn't keep a list of waiting/sleeping procs?  Terminal has a reference, and can send termination signal, or readline, etc.
@@ -213,6 +216,7 @@ struct process {
 // Might I ever want to kill a whole tree?
 
 static struct list* runnableProcs = (struct list*) 0;
+static struct list* rootProcs = (struct list*) 0;
 
 static struct process* curProc = 0;
 
@@ -348,10 +352,11 @@ extern uint64_t procs_code[];
 extern uint64_t procs_code_len;
 static struct app procs;
 
-static uint64_t startApp(struct app* a, uint64_t stdout) {
+static uint64_t createProc(struct app* a, uint64_t stdout, struct process* parent) {
     struct process *p = mallocz(sizeof(struct process));
     p->page = palloc();
     p->stdout = stdout;
+    p->parent = parent;
     for (uint64_t i = 0; i < a->len; i++)
         ((uint64_t*) (p->page))[i] = a->code[i];
 
@@ -365,6 +370,15 @@ static uint64_t startApp(struct app* a, uint64_t stdout) {
     " : "=m"(p->rflags));
 
     p->node = pushListTail(runnableProcs, p); // TODO: I may have assumptions elsewhere that aren't met with this as is...
+
+    if (parent) {
+        if (!parent->children)
+            parent->children = newList();
+
+        pushListTail(parent->children, p);
+    } else {
+        pushListTail(rootProcs, p);
+    }
 
     struct pidMap* pm = malloc(sizeof(struct pidMap));
     // TODO: Can there be a race condition here?  no_ints / ints_okay around increment of last_pid?  (What about other lists???)
@@ -383,7 +397,7 @@ static uint64_t startApp(struct app* a, uint64_t stdout) {
 }
 
 uint64_t startSh(uint64_t stdout) {
-    return startApp(&sh, stdout);
+    return createProc(&sh, stdout, 0);
 }
 
 void gotLine(uint64_t pid, char* l) {
@@ -574,11 +588,11 @@ void __attribute__((interrupt)) int0x80_syscall(struct interrupt_frame *frame) {
         break;
     case 4: // runProg(char* s)
         if (!strcmp((char*) curProc->rbx, "app"))
-            curProc->rax = (uint64_t) startApp(&app, curProc->stdout);
+            curProc->rax = (uint64_t) createProc(&app, curProc->stdout, curProc);
         else if (!strcmp((char*) curProc->rbx, "sh"))
-            curProc->rax = (uint64_t) startApp(&sh, curProc->stdout);
+            curProc->rax = (uint64_t) createProc(&sh, curProc->stdout, curProc);
         else if (!strcmp((char*) curProc->rbx, "procs"))
-            curProc->rax = (uint64_t) startApp(&procs, curProc->stdout);
+            curProc->rax = (uint64_t) createProc(&procs, curProc->stdout, curProc);
         else
             curProc->rax = 0;
 
